@@ -199,14 +199,31 @@ def _wikt_search_titles(word):
     return [h["title"] for h in hits if _deaccent(h["title"]) == target]
 
 
+# Articles/déterminants à ignorer en tête d'une traduction (« un cuisinier »).
+_FR_ARTICLES = {"un", "une", "le", "la", "les", "des", "du", "de",
+                "d'", "l'", "se", "s'", "au", "aux", "à"}
+
+
+def _wikt_candidates(word):
+    """Variantes à chercher : enlève les articles de tête (« un cuisinier » →
+    « cuisinier ») et garde le mot-tête (dernier mot du groupe)."""
+    w = word.strip()
+    cands = [w, w.lower()]
+    parts = w.lower().split()
+    while len(parts) > 1 and parts[0] in _FR_ARTICLES:
+        parts = parts[1:]
+    if parts:
+        cands.append(" ".join(parts))     # sans les articles de tête
+        cands.append(parts[-1])           # le mot-tête (souvent le nom/verbe)
+    return list(dict.fromkeys(c for c in cands if c))
+
+
 def wiktionary(word):
-    """Fiche française d'un mot. Essaie d'abord le mot tel quel, puis une
-    recherche tolérante aux accents — en gardant la fiche la PLUS riche (évite
-    « étre » au lieu de « être »)."""
+    """Fiche française d'un mot. Essaie d'abord le mot tel quel (sans article de
+    tête), puis une recherche tolérante aux accents — en gardant la fiche la PLUS
+    riche (évite « étre » pour « être », ou « un » pour « cuisinier »)."""
     tried = set()
-    for cand in dict.fromkeys(
-            [word, word.lower(),
-             word.split()[0].lower() if word.split() else word]):
+    for cand in _wikt_candidates(word):
         if cand and cand not in tried:
             tried.add(cand)
             entry = _wikt_fetch(cand)
