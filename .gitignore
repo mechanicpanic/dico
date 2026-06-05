@@ -1,0 +1,12 @@
+# Bases de données locales — trop volumineuses, reconstructibles via ./setup.sh
+data/*.db
+data/*.txt
+data/*.txt_res/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
