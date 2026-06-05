@@ -13,9 +13,9 @@ Niveaux (cumulables) :
     dico -mda <mot>       tout en même temps
     dico                  mode interactif (tape des mots en boucle)
 
-Détecte la langue source (russe si cyrillique, sinon anglais). La traduction
-rapide et le Wiktionnaire vont vers le français ; Multitran fait ru→fr (mot
-cyrillique) ou fr→ru (mot latin).
+Détecte la langue source (russe si cyrillique, sinon anglais). ATTENTION : la
+traduction rapide va SEULEMENT RU/EN → FR (jamais l'inverse). Pour comprendre un
+mot FRANÇAIS, utilise -m (Multitran fr→ru), -f (Wiktionnaire) ou -a / -p (IA).
 
 Zéro dépendance : seulement la bibliothèque standard de Python 3.
 La traduction et le Wiktionnaire ont besoin d'internet ; Multitran et les
@@ -35,6 +35,13 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+
+try:
+    import readline  # flèche ↑ = rappeler la commande précédente (interactif)
+except ImportError:
+    readline = None
+
+HISTFILE = os.path.expanduser("~/.dico_history")
 
 TIMEOUT = 8
 
@@ -421,16 +428,32 @@ SAVE_HEADER = "## Ajouts du dico"
 SAVE_SEP = "|-----|------|---------|"
 
 
-def save_to_vocab(translation, original):
-    """Ajoute une ligne au tableau « Ajouts du dico » de vocabulaire.md."""
-    row = f"| {translation} | {original} |  |"
+ARTICLE_FOR = {"nom masculin (le / un)": "un", "nom féminin (la / une)": "une"}
+
+
+def vocab_front(french, entry=None):
+    """Le recto à enregistrer : lemme accentué + article (un/une) si c'est un nom.
+    Le genre est l'info la plus précieuse à apprendre — sans lui, on n'apprend
+    jamais le/la !"""
+    front = (entry.get("lemma") if entry else None) or french
+    if entry:
+        art = ARTICLE_FOR.get(entry.get("gender") or "")
+        if art:
+            front = f"{art} {front}"
+    return front
+
+
+def save_to_vocab(front, sens):
+    """Ajoute « | front | sens |  | » au tableau « Ajouts du dico ».
+    Renvoie (statut, front)."""
+    row = f"| {front} | {sens} |  |"
     try:
         with open(VOCAB, encoding="utf-8") as f:
             content = f.read()
     except FileNotFoundError:
         content = "# 📒 Vocabulaire\n"
-    if f"| {translation} |" in content:
-        return "déjà présent"
+    if f"| {front} |" in content:
+        return "déjà présent", front
     if SAVE_HEADER not in content:
         block = (f"\n{SAVE_HEADER}\n*Mots ajoutés automatiquement avec "
                  f"`dico --save`.*\n\n| Mot | Sens | Exemple |\n{SAVE_SEP}\n{row}\n")
@@ -444,7 +467,7 @@ def save_to_vocab(translation, original):
             content = content[:at] + "\n" + row + content[at:]
     with open(VOCAB, "w", encoding="utf-8") as f:
         f.write(content)
-    return "ajouté"
+    return "ajouté", front
 
 
 # --------------------------------------------------------------------------- #
@@ -472,16 +495,24 @@ def clean_multitran(body):
 
 def multitran_lookup(word):
     """Cherche un mot dans Multitran hors-ligne. Cyrillique → ru-fr, sinon fr-ru.
-    Renvoie (lignes, sens, erreur)."""
+    Tolère les accents via la colonne nkey. Renvoie (lignes, sens, erreur)."""
     direction = "rufr" if detect_lang(word) == "ru" else "frru"
     if not os.path.exists(MULTI_DB):
         return None, direction, "base absente (lance build_multitran.py)"
+    key = word.strip().lower()
+    nkey = _deaccent(key)
     try:
         con = sqlite3.connect(f"file:{MULTI_DB}?mode=ro", uri=True)
         row = con.execute(
             "SELECT body FROM entries WHERE key=? AND dir=? LIMIT 1",
-            (word.strip().lower(), direction),
-        ).fetchone()
+            (key, direction)).fetchone()
+        if row is None and nkey != key:           # accents : cafe → café
+            try:
+                row = con.execute(
+                    "SELECT body FROM entries WHERE nkey=? AND dir=? LIMIT 1",
+                    (nkey, direction)).fetchone()
+            except sqlite3.OperationalError:
+                pass                              # base sans nkey → reconstruis-la
         con.close()
     except Exception as e:
         return None, direction, str(e)
@@ -553,7 +584,10 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     if want_conj:
         conj_inf, conj_tenses, conj_err = conjugate_lookup(word)
     direct_fr_verb = bool(conj_inf) and _deaccent(conj_inf) == _deaccent(word)
-    input_is_french = want_fr or direct_fr_verb
+    # Multitran est ru↔fr : un mot en alphabet latin EST du français → pas de
+    # « traduction » Google fr→fr inutile (eventail → eventail).
+    multi_fr = want_multi and detect_lang(word) == "en"
+    input_is_french = want_fr or direct_fr_verb or multi_fr
 
     translation, detected, alts = None, None, []
     if input_is_french:
@@ -617,8 +651,18 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 
     if want_save and translation:
         try:
-            status = save_to_vocab(translation, word)
-            print(f"  {GREEN}💾 « {translation} » → {status} dans vocabulaire.md{RESET}")
+            entry = wiktionary(translation)        # genre (un/une) + accent du lemme
+        except Exception:
+            entry = None
+        front = vocab_front(translation, entry)
+        if input_is_french and entry and entry["defs"]:
+            d = entry["defs"][0]
+            sens = d[:55] + ("…" if len(d) > 55 else "")
+        else:
+            sens = word                            # le mot d'origine (ru/en) = le sens
+        try:
+            status, front = save_to_vocab(front, sens)
+            print(f"  {GREEN}💾 « {front} » → {status} dans vocabulaire.md{RESET}")
         except Exception as e:
             print(f"  {YELLOW}💾 échec de la sauvegarde :{RESET} {e}")
 
@@ -636,34 +680,69 @@ def _parse_inline(line, base_d, base_a, base_s, base_m, base_c, base_p, base_f):
     return line, base_d, base_a, base_s, base_m, base_c, base_p, base_f
 
 
+def _load_history():
+    if not readline:
+        return
+    try:
+        readline.read_history_file(HISTFILE)
+    except OSError:
+        pass
+    readline.set_history_length(1000)
+
+
+def _save_history():
+    if readline:
+        try:
+            readline.write_history_file(HISTFILE)
+        except OSError:
+            pass
+
+
 def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 base_c=False, base_p=False, base_f=False):
+    _load_history()                            # ↑ rappelle les mots précédents
+    # On entoure les couleurs de \001..\002 pour que readline compte bien la
+    # largeur du prompt (sinon décalage du curseur en rappelant l'historique).
+    if sys.stdout.isatty() and readline:
+        prompt = f"\001{BLUE}\002»\001{RESET}\002 "
+    else:
+        prompt = f"{BLUE}»{RESET} "
     print(f"{BOLD}📖 dico{RESET} — russe/anglais → français")
     print(f"{DIM}Tape un mot puis Entrée.  Astuce : « !f » Wikt. français · "
           f"« !d » Wikt.+trad · « !m » Multitran · « !c » conjugaison · « !a » IA · "
           f"« !p » IA profonde · « !s » sauver.{RESET}")
-    print(f"{DIM}« q » ou Ctrl-D pour quitter.{RESET}\n")
-    while True:
-        try:
-            line = input(f"{BLUE}»{RESET} ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print(f"\n{DIM}À bientôt ! 👋{RESET}")
-            return
-        if not line:
-            continue
-        if line.lower() in ("q", "quit", "exit", "quitter"):
-            print(f"{DIM}À bientôt ! 👋{RESET}")
-            return
-        word, d, a, s, m, c, pf, f = _parse_inline(
-            line, base_d, base_a, base_s, base_m, base_c, base_p, base_f)
-        if word:
-            show(word, d, a, s, m, c, pf, f)
+    print(f"{DIM}⚠ Trad. rapide = RU/EN → FR seulement. Pour FR→russe : « !m » ; "
+          f"sens d'un mot FR : « !f » ou « !a »/« !p ».{RESET}")
+    print(f"{DIM}↑ = commande précédente · « q » ou Ctrl-D pour quitter.{RESET}\n")
+    try:
+        while True:
+            try:
+                line = input(prompt).strip()
+            except (EOFError, KeyboardInterrupt):
+                print(f"\n{DIM}À bientôt ! 👋{RESET}")
+                break
+            if not line:
+                continue
+            if line.lower() in ("q", "quit", "exit", "quitter"):
+                print(f"{DIM}À bientôt ! 👋{RESET}")
+                break
+            word, d, a, s, m, c, pf, f = _parse_inline(
+                line, base_d, base_a, base_s, base_m, base_c, base_p, base_f)
+            if word:
+                show(word, d, a, s, m, c, pf, f)
+    finally:
+        _save_history()
 
 
 def main():
     p = argparse.ArgumentParser(
         prog="dico", add_help=True,
-        description="Dictionnaire de poche : russe/anglais → français.")
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Dictionnaire de poche : russe/anglais → français.",
+        epilog=(
+            "⚠ La traduction rapide va seulement RU/EN → FR (jamais l'inverse).\n"
+            "Pour aller de FR vers le russe : -m (Multitran fr→ru).\n"
+            "Pour le SENS d'un mot français : -f (Wiktionnaire) ou -a / -p (Claude)."))
     p.add_argument("mots", nargs="*", help="le(s) mot(s) à traduire")
     p.add_argument("-m", "--multitran", action="store_true",
                    help="ajoute l'entrée Multitran hors-ligne (riche, ru↔fr)")

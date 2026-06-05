@@ -11,6 +11,7 @@ sans aucune dépendance externe (sqlite3 fait partie de la bibliothèque standar
 """
 import os
 import sqlite3
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -35,12 +36,19 @@ def iter_entries(path):
             yield hw, body
 
 
+def _deaccent(s):
+    """Sans accents ni majuscules — pour la colonne nkey (recherche tolérante)."""
+    nfd = unicodedata.normalize("NFD", s)
+    return "".join(c for c in nfd if unicodedata.category(c) != "Mn").lower()
+
+
 def main():
     os.makedirs(DATA, exist_ok=True)
     con = sqlite3.connect(DB)
     con.execute("PRAGMA journal_mode=OFF")
     con.execute("DROP TABLE IF EXISTS entries")
-    con.execute("CREATE TABLE entries (key TEXT, dir TEXT, headword TEXT, body TEXT)")
+    con.execute("CREATE TABLE entries "
+                "(key TEXT, dir TEXT, headword TEXT, body TEXT, nkey TEXT)")
     total = 0
     for direction, fname in SOURCES.items():
         path = os.path.join(DATA, fname)
@@ -49,21 +57,26 @@ def main():
             continue
         n, batch = 0, []
         for hw, body in iter_entries(path):
-            key = hw.strip().lower()
-            if not key:
-                continue
-            batch.append((key, direction, hw.strip(), body))
+            headword = hw.strip()
+            # Une entrée a souvent plusieurs clés jointes par « | », entre
+            # guillemets/espaces (« " zéro "|" zero " ») → on les sépare toutes
+            # pour les rendre cherchables (sinon 55% du frru est inatteignable).
+            keys = {k for part in headword.split("|")
+                    if (k := part.strip().strip('"').strip().lower())}
+            for key in keys:
+                batch.append((key, direction, headword, body, _deaccent(key)))
             if len(batch) >= 5000:
-                con.executemany("INSERT INTO entries VALUES (?,?,?,?)", batch)
+                con.executemany("INSERT INTO entries VALUES (?,?,?,?,?)", batch)
                 n += len(batch)
                 batch = []
         if batch:
-            con.executemany("INSERT INTO entries VALUES (?,?,?,?)", batch)
+            con.executemany("INSERT INTO entries VALUES (?,?,?,?,?)", batch)
             n += len(batch)
         print(f"  {direction} : {n:>7} entrées")
         total += n
     print("  index…")
     con.execute("CREATE INDEX idx_key_dir ON entries (key, dir)")
+    con.execute("CREATE INDEX idx_nkey_dir ON entries (nkey, dir)")
     con.commit()
     con.close()
     size = os.path.getsize(DB) / 1e6
