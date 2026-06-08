@@ -32,7 +32,8 @@ vaut la peine d'être mémorisé. Lexique sert aussi à : enrichir l'auto-save
 (lemme + genre **sans réseau**), et **détecter les cognats/faux-amis** — `table`
 (EN) reste `table` (FR), mais `pain` (EN→*douleur*) est signalé *« aussi français :
 un pain »*. Et `dico --mots-outils` sort l'échafaudage grammatical qui ne se
-devine pas (le, de, à, que, être, avoir…).
+devine pas (le, de, à, que, être, avoir…) **avec leur sens anglais** ; ajoute
+`-s` pour en faire des cartes Anki (`dico --mots-outils -s`).
 
 ## Vocabulaire : auto-save + store JSON
 

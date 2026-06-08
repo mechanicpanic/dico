@@ -14,7 +14,8 @@ Niveaux (cumulables) :
     dico --autosave on    enregistre AUTOMATIQUEMENT chaque recherche (persistant)
     dico --forget <mot>   retire un mot (curation soustractive)
     dico --render         régénère le markdown depuis le store
-    dico --mots-outils    noyau grammatical (articles, prépositions, pronoms…)
+    dico --mots-outils    noyau grammatical glosé (articles, prépositions, pronoms…)
+    dico --mots-outils -s en faire des cartes (front = mot, dos = sens anglais)
     dico -mda <mot>       tout en même temps
     dico                  mode interactif (tape des mots en boucle)
 
@@ -901,6 +902,65 @@ def lexique_lookup(word):
             "article": article, "band": _freq_band(ff)}
 
 
+# Glose anglaise (+ astuce d'usage pour les plus traîtres) des mots-outils.
+# Ensemble fermé → table écrite à la main, juste et hors-ligne. Sert à l'affichage
+# de « --mots-outils » et à en faire des cartes (« --mots-outils -s »).
+MOTS_OUTILS_GLOSS = {
+    # déterminants / articles
+    "le": "the (m.)", "la": "the (f.)", "les": "the (pl.)", "l'": "the (+ voyelle)",
+    "un": "a / one (m.)", "une": "a / one (f.)", "des": "some / (of) the (pl.)",
+    "du": "some / of the (m.)", "ce": "this/that (m.); it (ce + être)",
+    "cet": "this/that (m., + voyelle)", "cette": "this / that (f.)",
+    "ces": "these / those", "mon": "my (m.)", "ma": "my (f.)", "mes": "my (pl.)",
+    "ton": "your (m., informel)", "ta": "your (f.)", "tes": "your (pl.)",
+    "son": "his/her/its (m.)", "sa": "his/her/its (f.)", "ses": "his/her/its (pl.)",
+    "notre": "our", "nos": "our (pl.)", "votre": "your (poli/pl.)", "vos": "your (pl.)",
+    "leurs": "their (pl.)", "quel": "which / what (m.)", "quelle": "which / what (f.)",
+    "tout": "all / every / everything", "toute": "all / every (f.)", "chaque": "each",
+    "plusieurs": "several", "quelque": "some / a few", "aucun": "no / none",
+    "même": "same / even", "autre": "other",
+    # prépositions
+    "de": "of / from", "d'": "of / from (+ voyelle)", "à": "to / at / in",
+    "pour": "for / (in order) to", "dans": "in / inside", "sur": "on / about",
+    "sous": "under", "avec": "with", "sans": "without", "par": "by / through / per",
+    "chez": "at (someone's) place", "vers": "towards / around (heure)",
+    "entre": "between", "contre": "against", "depuis": "since / for (durée)",
+    "pendant": "during", "avant": "before", "après": "after", "devant": "in front of",
+    "derrière": "behind", "jusque": "until / up to", "jusqu'": "until (+ voyelle)",
+    "selon": "according to", "malgré": "despite", "parmi": "among",
+    "dès": "from / as early as", "hors": "outside / except", "envers": "towards (sentiment)",
+    # conjonctions
+    "et": "and", "ou": "or", "mais": "but", "donc": "so / therefore",
+    "car": "because / for", "ni": "nor / neither", "or": "now / yet (récit)",
+    "que": "that / than (conj.); whom / which (rel., objet)", "comme": "as / like / since",
+    "quand": "when", "si": "if / whether", "lorsque": "when", "puisque": "since (cause)",
+    "quoique": "although",
+    # pronoms personnels
+    "je": "I", "tu": "you (sg., informel)", "il": "he / it", "elle": "she / it",
+    "on": "one / we (informel)", "nous": "we / us", "vous": "you (poli / pl.)",
+    "ils": "they (m.)", "elles": "they (f.)", "me": "me / to me",
+    "m'": "me (+ voyelle)", "te": "you / to you", "t'": "you (+ voyelle)",
+    "se": "oneself (réfléchi)", "s'": "oneself (+ voyelle)", "lui": "(to) him / her",
+    "moi": "me (accentué)", "toi": "you (accentué)", "soi": "oneself (accentué)",
+    "eux": "them (m., accentué)", "leur": "(to) them; their",
+    "y": "there / to it  (remplace à + chose)",
+    "en": "in / by (prép.); of it / some  (pron. : remplace de + nom)",
+    # démonstratifs
+    "ça": "that / it (informel)", "c'": "it / this (c' + est)", "cela": "that",
+    "ceci": "this", "celui": "the one (m.)", "celle": "the one (f.)",
+    "ceux": "the ones (m.pl.)", "celles": "the ones (f.pl.)",
+    # relatifs / interrogatifs
+    "qui": "who / which (sujet); whom (après prép.)", "dont": "whose / of which / about which",
+    "où": "where / when (temps)", "lequel": "which one (m.)", "laquelle": "which one (f.)",
+    "quoi": "what (après prép. / seul)",
+    # indéfinis
+    "rien": "nothing", "personne": "no one / anyone", "chacun": "each one",
+    # auxiliaires
+    "avoir": "to have (auxiliaire du passé composé)",
+    "être": "to be (auxiliaire; + verbes de mouvement/pronominaux)",
+}
+
+
 def mots_outils(limit=120):
     """Top des mots-outils (classes fermées) par fréquence, dédupliqués par lemme.
     → [(lemme, cgram, freqfilms)]. C'est l'échafaudage grammatical à apprendre."""
@@ -919,8 +979,9 @@ def mots_outils(limit=120):
     return rows
 
 
-def show_mots_outils(limit=120):
-    """Affiche le noyau de mots-outils, groupé par catégorie."""
+def show_mots_outils(limit=120, save=False):
+    """Affiche le noyau de mots-outils (mot — sens), groupé par catégorie.
+    Avec save=True, ajoute au vocabulaire ceux qui ont une glose (→ cartes)."""
     rows = mots_outils(limit)
     if not rows:
         print(f"{YELLOW}Lexique absent — lance : python3 build_lexique.py{RESET}")
@@ -933,10 +994,30 @@ def show_mots_outils(limit=120):
              "pronom indéfini", "pronom relatif", "auxiliaire"]
     print(f"{BOLD}🧩 Noyau de mots-outils{RESET} {DIM}(les {len(rows)} plus "
           f"fréquents — la colle grammaticale){RESET}\n")
+    saved = 0
     for label in order:
-        if groups.get(label):
-            print(f"  {CYAN}{label}{RESET}")
-            print(f"     {', '.join(groups[label])}\n")
+        words = groups.get(label)
+        if not words:
+            continue
+        print(f"  {CYAN}{label}{RESET}")
+        width = max(len(w) for w in words)
+        for w in words:
+            gloss = MOTS_OUTILS_GLOSS.get(w, "")
+            tail = f"  {DIM}—{RESET} {gloss}" if gloss else ""
+            print(f"     {w.ljust(width)}{tail}")
+            if save and gloss:
+                store_upsert({"key": store_key(w), "front": w, "lemma": w,
+                              "sens": gloss, "pos": label, "gender": "",
+                              "example": "", "src_word": w, "src_lang": "fr",
+                              "tier": "mots-outils"})
+                saved += 1
+        print()
+    if save:
+        print(f"  {GREEN}💾 {saved} mots-outils ajoutés au vocabulaire "
+              f"(→ Anki){RESET}")
+    else:
+        print(f"  {DIM}astuce : « dico --mots-outils {limit} -s » pour les "
+              f"ajouter à tes cartes.{RESET}")
 
 
 # --------------------------------------------------------------------------- #
@@ -1248,7 +1329,7 @@ def main():
     args = p.parse_args()
 
     if args.mots_outils is not None:
-        show_mots_outils(args.mots_outils)
+        show_mots_outils(args.mots_outils, save=(args.save or args.save_main))
         return
     if args.autosave is not None:
         if args.autosave == "status":
