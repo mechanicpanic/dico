@@ -11,6 +11,9 @@ uv run build_conjugations.py
 echo "==> Index inverse des formes (doit → devoir)…"
 python3 build_conj_forms.py
 
+echo "==> Lexique 3.83 (fréquence, lemmes, genres, mots-outils)…"
+python3 build_lexique.py
+
 BUNDLES="$HOME/Library/Dictionaries"
 if [ -d "$BUNDLES/multitran_rufr.dictionary" ] && [ -d "$BUNDLES/multitran_frru.dictionary" ]; then
   for dir in rufr frru; do

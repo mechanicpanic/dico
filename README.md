@@ -17,11 +17,22 @@ pensé pour un apprenant russophone/anglophone. Cœur **zéro dépendance**
 | `dico -a house` | **Claude Haiku** — fiche rapide | oui |
 | `dico -p house` | **Claude Opus** — fiche d'étude | oui |
 | `dico -s house` | enregistre ce mot (store de vocabulaire) | oui |
+| `dico --mots-outils` | **noyau grammatical** (Lexique) : articles, prépositions, pronoms… | **non** 🔌 |
 
 Cumulables : `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap mot`…
 Mode interactif : tape `dico`, puis `!m` `!c` `!f` `!d` `!a` `!p` `!s` devant un mot.
 
 **Pas besoin de taper les accents** : `etre` trouve *être*, `creche` trouve *crèche*.
+
+### Lexique 3.83 — savoir, hors-ligne (badge sur chaque recherche)
+
+Chaque mot français affiche un **badge** `📊 fréquence · nature · genre`
+(*très courant → rare*, via [Lexique](http://www.lexique.org)), pour savoir s'il
+vaut la peine d'être mémorisé. Lexique sert aussi à : enrichir l'auto-save
+(lemme + genre **sans réseau**), et **détecter les cognats/faux-amis** — `table`
+(EN) reste `table` (FR), mais `pain` (EN→*douleur*) est signalé *« aussi français :
+un pain »*. Et `dico --mots-outils` sort l'échafaudage grammatical qui ne se
+devine pas (le, de, à, que, être, avoir…).
 
 ## Vocabulaire : auto-save + store JSON
 

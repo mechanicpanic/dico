@@ -14,8 +14,13 @@ Niveaux (cumulables) :
     dico --autosave on    enregistre AUTOMATIQUEMENT chaque recherche (persistant)
     dico --forget <mot>   retire un mot (curation soustractive)
     dico --render         régénère le markdown depuis le store
+    dico --mots-outils    noyau grammatical (articles, prépositions, pronoms…)
     dico -mda <mot>       tout en même temps
     dico                  mode interactif (tape des mots en boucle)
+
+Chaque mot français affiche un badge « 📊 fréquence · nature · genre » (Lexique
+3.83, hors-ligne) et les cognats/faux-amis sont signalés (« table » reste
+« table », « pain » EN est signalé « aussi français : un pain »).
 
 Le store JSON (dico_vocab.json, à côté du markdown) est la SOURCE DE VÉRITÉ :
 le .md n'en est qu'une vue régénérée automatiquement, et Anki le lit directement.
@@ -827,6 +832,114 @@ def _split_tense(word):
 
 
 # --------------------------------------------------------------------------- #
+#  Niveau 6 : Lexique 3.83 hors-ligne (lemme, nature, genre, fréquence)       #
+# --------------------------------------------------------------------------- #
+LEXIQUE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "data", "lexique.db")
+
+_CGRAM_LABEL = {
+    "NOM": "nom", "VER": "verbe", "ADJ": "adjectif", "ADV": "adverbe",
+    "PRE": "préposition", "CON": "conjonction", "AUX": "auxiliaire",
+    "ART:def": "article défini", "ART:ind": "article indéfini",
+    "PRO:per": "pronom personnel", "PRO:dem": "pronom démonstratif",
+    "PRO:pos": "pronom possessif", "PRO:ind": "pronom indéfini",
+    "PRO:rel": "pronom relatif", "ONO": "onomatopée", "LIA": "liaison",
+}
+
+# Classes fermées = les « mots-outils » (la colle grammaticale qui ne se devine pas).
+MOTS_OUTILS_CGRAM = ("ART:def", "ART:ind", "PRE", "CON", "AUX",
+                     "PRO:per", "PRO:dem", "PRO:pos", "PRO:ind", "PRO:rel")
+
+
+def _cgram_label(cgram):
+    return _CGRAM_LABEL.get(cgram, (cgram or "").lower())
+
+
+def _freq_band(ff):
+    """freqfilms2 = occurrences par million (sous-titres). → étiquette lisible."""
+    if ff >= 500:
+        return "très courant"
+    if ff >= 50:
+        return "courant"
+    if ff >= 5:
+        return "moyen"
+    if ff >= 0.5:
+        return "peu courant"
+    return "rare"
+
+
+def lexique_lookup(word):
+    """Hors-ligne : une forme (même sans accents) → son meilleur enregistrement
+    Lexique (le plus fréquent, pour lever les homographes : « doit » → devoir,
+    « de » → préposition). Renvoie un dict ou None."""
+    if not os.path.exists(LEXIQUE_DB):
+        return None
+    w = (word or "").strip().lower()
+    if not w:
+        return None
+    cols = "ortho,lemme,cgram,genre,nombre,freqfilms,freqlivres"
+    try:
+        con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
+        rows = con.execute(f"SELECT {cols} FROM lexique WHERE ortho=? "
+                           "ORDER BY freqfilms DESC LIMIT 1", (w,)).fetchone()
+        if rows is None:                      # tapé sans accents : etre → être
+            rows = con.execute(f"SELECT {cols} FROM lexique WHERE northo=? "
+                               "ORDER BY freqfilms DESC LIMIT 1",
+                               (_deaccent(w),)).fetchone()
+        con.close()
+    except Exception:
+        return None
+    if not rows:
+        return None
+    ortho, lemme, cgram, genre, nombre, ff, fl = rows
+    article = None
+    if (cgram or "").startswith("NOM"):
+        article = {"m": "un", "f": "une"}.get(genre)
+    return {"ortho": ortho, "lemma": lemme, "cgram": cgram,
+            "pos": _cgram_label(cgram), "genre": genre or None,
+            "nombre": nombre or None, "freqfilms": ff, "freqlivres": fl,
+            "article": article, "band": _freq_band(ff)}
+
+
+def mots_outils(limit=120):
+    """Top des mots-outils (classes fermées) par fréquence, dédupliqués par lemme.
+    → [(lemme, cgram, freqfilms)]. C'est l'échafaudage grammatical à apprendre."""
+    if not os.path.exists(LEXIQUE_DB):
+        return []
+    qs = ",".join("?" * len(MOTS_OUTILS_CGRAM))
+    try:
+        con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
+        rows = con.execute(
+            f"SELECT lemme, cgram, MAX(freqfilms) f FROM lexique "
+            f"WHERE cgram IN ({qs}) GROUP BY lemme "
+            f"ORDER BY f DESC LIMIT ?", (*MOTS_OUTILS_CGRAM, limit)).fetchall()
+        con.close()
+    except Exception:
+        return []
+    return rows
+
+
+def show_mots_outils(limit=120):
+    """Affiche le noyau de mots-outils, groupé par catégorie."""
+    rows = mots_outils(limit)
+    if not rows:
+        print(f"{YELLOW}Lexique absent — lance : python3 build_lexique.py{RESET}")
+        return
+    groups = {}
+    for lemme, cgram, f in rows:
+        groups.setdefault(_cgram_label(cgram), []).append(lemme)
+    order = ["article défini", "article indéfini", "préposition", "conjonction",
+             "pronom personnel", "pronom démonstratif", "pronom possessif",
+             "pronom indéfini", "pronom relatif", "auxiliaire"]
+    print(f"{BOLD}🧩 Noyau de mots-outils{RESET} {DIM}(les {len(rows)} plus "
+          f"fréquents — la colle grammaticale){RESET}\n")
+    for label in order:
+        if groups.get(label):
+            print(f"  {CYAN}{label}{RESET}")
+            print(f"     {', '.join(groups[label])}\n")
+
+
+# --------------------------------------------------------------------------- #
 #  Affichage                                                                  #
 # --------------------------------------------------------------------------- #
 def show(word, want_dict=False, want_ai=False, want_save=False,
@@ -866,6 +979,20 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
                 return
             print(f"  {DIM}(hors-ligne : pas de traduction rapide){RESET}")
     src = detected or src_guess
+
+    # Cognat / faux-ami : le mot TAPÉ est-il lui-même un mot français courant ?
+    # (« table » EN → Google dit « tableau », mais « table » EST français.)
+    cognate = None
+    if (translation and not input_is_french and len(word.strip()) >= 3):
+        c = lexique_lookup(word)
+        if (c and c["freqfilms"] >= 1 and c["cgram"][:3] in ("NOM", "ADJ", "VER")
+                and _deaccent(c["lemma"]) != _deaccent(translation)):
+            cands = {a.strip().lower() for a in [translation, *alts]}
+            if word.strip().lower() in cands or c["ortho"].lower() in cands:
+                translation = c["ortho"]      # Google le propose aussi → on le préfère
+            else:
+                cognate = c                   # sinon : simple alerte « aussi français »
+
     if translation and not input_is_french:
         print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}  {DIM}→{RESET}  "
               f"🇫🇷 {BOLD}{GREEN}{translation}{RESET}")
@@ -874,6 +1001,23 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     elif not translation and not offline_ok:
         print(f"{YELLOW}Aucune traduction trouvée pour « {word} ».{RESET}")
         return
+
+    if cognate:                               # faux-ami potentiel : on le signale
+        art = (cognate["article"] + " ") if cognate["article"] else ""
+        g = (" " + ("masc." if cognate["genre"] == "m" else "fém.")) \
+            if cognate["genre"] else ""
+        print(f"  {YELLOW}↔ « {word} » est aussi un mot français{RESET} : "
+              f"{BOLD}{art}{cognate['lemma']}{RESET} {DIM}({cognate['pos']}{g}, "
+              f"{cognate['band']}) — « !f {word} » pour le sens{RESET}")
+
+    # Badge fréquence + nature (Lexique 3.83, hors-ligne) : sait si le mot vaut
+    # la peine d'être mémorisé, et fournit le genre pour l'auto-save.
+    lex_fr = lexique_lookup(translation) if translation else None
+    if lex_fr:
+        bits = [lex_fr["band"], lex_fr["pos"]]
+        if lex_fr["genre"]:
+            bits.append("masc." if lex_fr["genre"] == "m" else "fém.")
+        print(f"  {DIM}📊 {' · '.join(bits)}{RESET}")
 
     if want_multi:
         lines, direction, err = multitran_lookup(word)
@@ -922,25 +1066,35 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 
     auto = autosave_on()
     if (auto or want_save or want_save_main) and translation:
-        entry = wikt_entry                         # réutilise la fiche déjà chargée
-        if entry is None:
+        # Enrichissement : 1) fiche Wiktionnaire déjà affichée (-f/-d, riche),
+        # 2) Lexique HORS-LIGNE (lemme/genre/nature, sans réseau),
+        # 3) en tout dernier recours seulement, une requête Wiktionnaire.
+        entry, lex = wikt_entry, lex_fr
+        if entry is None and lex is None:
             try:
-                entry = wiktionary(translation)    # sinon : genre (un/une) + lemme
+                entry = wiktionary(translation)
             except Exception:
                 entry = None
-        front = vocab_front(translation, entry)
+        lemma = ((entry.get("lemma") if entry else None)
+                 or (lex.get("lemma") if lex else None) or translation)
+        article = ARTICLE_FOR.get((entry.get("gender") if entry else "") or "")
+        if not article and lex:
+            article = lex.get("article")
+        front = f"{article} {lemma}" if article else lemma
         if input_is_french and entry and entry["defs"]:
             d = entry["defs"][0]
             sens = d[:55] + ("…" if len(d) > 55 else "")
         else:
             sens = word                            # le mot d'origine (ru/en) = le sens
         record = {
-            "key": store_key((entry.get("lemma") if entry else None) or translation),
+            "key": store_key(lemma),
             "front": front,
-            "lemma": (entry.get("lemma") if entry else None) or translation,
+            "lemma": lemma,
             "sens": sens,
-            "pos": (entry.get("pos") if entry else "") or "",
-            "gender": (entry.get("gender") if entry else "") or "",
+            "pos": ((entry.get("pos") if entry else None)
+                    or (lex.get("pos") if lex else "") or ""),
+            "gender": ((entry.get("gender") if entry else None)
+                       or (lex.get("genre") if lex else "") or ""),
             "example": "",
             "src_word": word,
             "src_lang": src,
@@ -1088,8 +1242,14 @@ def main():
                    help="régénère le markdown depuis le store JSON, puis quitte")
     p.add_argument("--forget", metavar="MOT",
                    help="retire un mot du vocabulaire (curation soustractive)")
+    p.add_argument("--mots-outils", nargs="?", const=120, type=int, metavar="N",
+                   help="affiche le NOYAU de mots-outils (articles, prépositions, "
+                        "pronoms, conjonctions, auxiliaires) — l'échafaudage grammatical")
     args = p.parse_args()
 
+    if args.mots_outils is not None:
+        show_mots_outils(args.mots_outils)
+        return
     if args.autosave is not None:
         if args.autosave == "status":
             print(f"auto-save : {'ON' if autosave_on() else 'off'}")
