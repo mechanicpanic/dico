@@ -8,6 +8,9 @@ mkdir -p data
 echo "==> Conjugaisons (verbecc)…"
 uv run build_conjugations.py
 
+echo "==> Index inverse des formes (doit → devoir)…"
+python3 build_conj_forms.py
+
 BUNDLES="$HOME/Library/Dictionaries"
 if [ -d "$BUNDLES/multitran_rufr.dictionary" ] && [ -d "$BUNDLES/multitran_frru.dictionary" ]; then
   for dir in rufr frru; do

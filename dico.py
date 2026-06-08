@@ -6,12 +6,19 @@ Niveaux (cumulables) :
     dico -m <mot>         + Multitran HORS-LIGNE      (riche, ru↔fr, sans internet)
     dico -d <mot>         + Wiktionnaire APRÈS trad   (RU/EN → français)
     dico -f <mot-fr>      + Wiktionnaire DIRECT       (le mot est déjà français)
-    dico -c <verbe>       + conjugaison HORS-LIGNE    (présent, passé composé, futur…)
+    dico -c <verbe>       + conjugaison HORS-LIGNE    (7 temps)
+    dico -c <verbe> <temps>  un seul temps           (ex: « dico -c manger present »)
     dico -a <mot>         + explication IA rapide     (Claude Haiku : fiche courte)
     dico -p <mot>         + explication APPROFONDIE   (Claude Opus : fiche d'étude)
-    dico -s  <mot>        sauvegarde aussi le mot dans vocabulaire.md
+    dico -s  <mot>        enregistre CE mot dans le vocabulaire (store JSON)
+    dico --autosave on    enregistre AUTOMATIQUEMENT chaque recherche (persistant)
+    dico --forget <mot>   retire un mot (curation soustractive)
+    dico --render         régénère le markdown depuis le store
     dico -mda <mot>       tout en même temps
     dico                  mode interactif (tape des mots en boucle)
+
+Le store JSON (dico_vocab.json, à côté du markdown) est la SOURCE DE VÉRITÉ :
+le .md n'en est qu'une vue régénérée automatiquement, et Anki le lit directement.
 
 Détecte la langue source (russe si cyrillique, sinon anglais). ATTENTION : la
 traduction rapide va SEULEMENT RU/EN → FR (jamais l'inverse). Pour comprendre un
@@ -35,6 +42,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 
 try:
     import readline  # flèche ↑ = rappeler la commande précédente (interactif)
@@ -151,6 +159,55 @@ def _clean_wiki(s):
     return s.strip(" ;,.")
 
 
+_ETYL_LANG = {
+    "la": "latin", "grc": "grec ancien", "fro": "ancien français",
+    "frm": "moyen français", "gem": "germanique", "gaul": "gaulois",
+    "got": "gotique", "en": "anglais", "it": "italien", "es": "espagnol",
+    "de": "allemand", "ar": "arabe", "nl": "néerlandais", "pt": "portugais",
+    "ru": "russe", "xno": "anglo-normand",
+}
+
+
+def _render_etym(s):
+    """Rend lisibles les principaux modèles d'étymologie du Wiktionnaire."""
+    def etyl(m):
+        parts = m.group(1).split("|")
+        lang = _ETYL_LANG.get(parts[0].strip(), parts[0].strip()) if parts else ""
+        kw = dict(p.split("=", 1) for p in parts if "=" in p)
+        pos = [p.strip() for p in parts if "=" not in p]
+        mot = kw.get("mot") or (pos[2] if len(pos) > 2 else "")
+        out = lang + (f" « {mot} »" if mot else "")
+        return out + (f" ({kw['sens']})" if kw.get("sens") else "")
+    s = re.sub(r"(?is)<ref[^>]*>.*?</ref>", "", s)       # notes de bas de page
+    s = re.sub(r"\{\{étyl\|([^{}]*)\}\}", etyl, s)
+    s = re.sub(r"\{\{(?:lien|polytonique|recons)\|([^|{}]+)[^{}]*\}\}", r"\1", s)
+    s = re.sub(r"\{\{[^{}]*\}\}", "", s)                  # autres modèles → vide
+    s = re.sub(r"\[\[[^\]|]*\|([^\]]*)\]\]", r"\1", s)
+    s = re.sub(r"\[\[([^\]]*)\]\]", r"\1", s)
+    s = s.replace("'''", "").replace("''", "")
+    s = re.sub(r"<[^>]+>", "", s)
+    s = re.sub(r"\s*\b[\w-]+=[^\s,;()«»]+", "", s)        # paramètres de modèle résiduels
+    return re.sub(r"\s+", " ", s).strip(" ;,.")
+
+
+def _etymology(sec):
+    m = re.search(r"\{\{S\|étymologie[^{}]*\}\}", sec)
+    if not m:
+        return None
+    rest = sec[m.end():]
+    nxt = re.search(r"\n===? ", rest)
+    block = rest[:nxt.start()] if nxt else rest
+    out = []
+    for line in block.splitlines():
+        line = line.strip()
+        if line[:1] in (":", "*", "#"):
+            t = _render_etym(line.lstrip(":*# ").strip())
+            if t:
+                out.append(t)
+    text = " ".join(out)
+    return (text[:240] + "…") if len(text) > 240 else (text or None)
+
+
 def _parse_wiktionary(wikitext):
     sec = _fr_section(wikitext)
     if not sec:
@@ -173,7 +230,8 @@ def _parse_wiktionary(wikitext):
             break
     if not (defs or ipa or gender):
         return None
-    return {"pos": pos, "ipa": ipa, "gender": gender, "defs": defs}
+    return {"pos": pos, "ipa": ipa, "gender": gender, "defs": defs,
+            "etym": _etymology(sec)}
 
 
 def _wikt_fetch(title):
@@ -263,8 +321,11 @@ def _show_wikt(lookup_word):
         print(head)
         for i, d in enumerate(entry["defs"], 1):
             print(f"     {DIM}{i}.{RESET} {d}")
+        if entry.get("etym"):
+            print(f"     {DIM}🌱 étym. {entry['etym']}{RESET}")
     else:
         print(f"  {DIM}📖 (pas de fiche Wiktionnaire pour « {lookup_word} »){RESET}")
+    return entry
 
 
 # --------------------------------------------------------------------------- #
@@ -424,8 +485,37 @@ def _show_ai(word, deep):
 # Cible de --save : DICO_VOCAB si défini (ex. ton coffre de notes), sinon local.
 VOCAB = os.environ.get("DICO_VOCAB") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "vocabulaire.md")
-SAVE_HEADER = "## Ajouts du dico"
-SAVE_SEP = "|-----|------|---------|"
+# Cible de -S : la liste « propre » (vocabulaire.md) ; sinon = le journal.
+VOCAB_MAIN = os.environ.get("DICO_VOCAB_MAIN") or VOCAB
+# La VÉRITÉ, c'est le store JSON (à côté du markdown). Le .md n'en est qu'une
+# vue régénérée. DICO_STORE peut le placer ailleurs.
+STORE = os.environ.get("DICO_STORE") or os.path.join(
+    os.path.dirname(os.path.abspath(VOCAB)), "dico_vocab.json")
+# Réglages persistants (ex. l'auto-save activé une fois pour toutes).
+CONFIG_PATH = os.path.expanduser("~/.dico_config.json")
+
+
+def config_load():
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def config_set(key, value):
+    cfg = config_load()
+    cfg[key] = value
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+    return cfg
+
+
+def autosave_on():
+    return bool(config_load().get("autosave", False))
 
 
 ARTICLE_FOR = {"nom masculin (le / un)": "un", "nom féminin (la / une)": "une"}
@@ -443,31 +533,144 @@ def vocab_front(french, entry=None):
     return front
 
 
-def save_to_vocab(front, sens):
-    """Ajoute « | front | sens |  | » au tableau « Ajouts du dico ».
-    Renvoie (statut, front)."""
-    row = f"| {front} | {sens} |  |"
+# --- Le store JSON : source de vérité unique ------------------------------- #
+def _now_iso():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def store_key(text):
+    """Clé de dédup : sans article de tête, sans accents, minuscule."""
+    parts = (text or "").strip().lower().split()
+    while len(parts) > 1 and parts[0] in _FR_ARTICLES:
+        parts = parts[1:]
+    return _deaccent(" ".join(parts))
+
+
+def _md_rows(path):
+    """Lit les lignes d'un tableau markdown → [(mot, sens, exemple), …]."""
+    out = []
     try:
-        with open(VOCAB, encoding="utf-8") as f:
-            content = f.read()
-    except FileNotFoundError:
-        content = "# 📒 Vocabulaire\n"
-    if f"| {front} |" in content:
-        return "déjà présent", front
-    if SAVE_HEADER not in content:
-        block = (f"\n{SAVE_HEADER}\n*Mots ajoutés automatiquement avec "
-                 f"`dico --save`.*\n\n| Mot | Sens | Exemple |\n{SAVE_SEP}\n{row}\n")
-        content = content.rstrip() + "\n" + block
-    else:
-        sidx = content.find(SAVE_SEP, content.index(SAVE_HEADER))
-        if sidx == -1:
-            content = content.rstrip() + "\n" + row + "\n"
-        else:
-            at = sidx + len(SAVE_SEP)
-            content = content[:at] + "\n" + row + content[at:]
-    with open(VOCAB, "w", encoding="utf-8") as f:
-        f.write(content)
-    return "ajouté", front
+        with open(path, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return out
+    for ln in lines:
+        ln = ln.strip()
+        if not ln.startswith("|"):
+            continue
+        cells = [c.strip() for c in ln.strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        mot, sens = cells[0], cells[1]
+        ex = cells[2] if len(cells) > 2 else ""
+        if not mot or mot.lower() == "mot" or set(mot) <= set("-: "):
+            continue
+        out.append((mot, sens, ex))
+    return out
+
+
+def _seed_entries():
+    """Migration unique : récupère l'ancien journal markdown dans le store."""
+    now, seen, entries = _now_iso(), set(), []
+    for mot, sens, ex in _md_rows(VOCAB):
+        k = store_key(mot)
+        if not k or k in seen:
+            continue
+        seen.add(k)
+        entries.append({
+            "key": k, "front": mot, "lemma": mot.split()[-1], "sens": sens,
+            "pos": "", "gender": "", "example": ex, "src_word": "",
+            "src_lang": "", "tier": "import",
+            "first_seen": now, "last_seen": now, "count": 1})
+    return entries
+
+
+def store_load():
+    try:
+        with open(STORE, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data.get("entries"), list):
+            return {"version": 1, "entries": data["entries"]}
+    except (OSError, ValueError):
+        pass
+    data = {"version": 1, "entries": _seed_entries()}     # 1re fois : migration
+    if data["entries"]:
+        store_save(data)                                  # rend la migration durable
+    return data
+
+
+def store_save(data):
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(STORE)), exist_ok=True)
+        with open(STORE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"  {YELLOW}💾 store illisible :{RESET} {e}")
+
+
+_STORE_FIELDS = ("front", "lemma", "sens", "pos", "gender", "example",
+                 "src_word", "src_lang", "tier")
+
+
+def store_upsert(record):
+    """Ajoute ou met à jour un mot. Renvoie (statut, count)."""
+    data = store_load()
+    now = _now_iso()
+    for e in data["entries"]:
+        if e.get("key") == record["key"]:
+            e["count"] = e.get("count", 1) + 1
+            e["last_seen"] = now
+            for k in _STORE_FIELDS:           # complète les trous, sans écraser
+                if not e.get(k) and record.get(k):
+                    e[k] = record[k]
+            store_save(data)
+            store_render()
+            return "déjà vu", e["count"]
+    rec = {k: record.get(k, "") for k in _STORE_FIELDS}
+    rec.update(key=record["key"], count=1, first_seen=now, last_seen=now)
+    data["entries"].append(rec)
+    store_save(data)
+    store_render()
+    return "ajouté", 1
+
+
+def store_forget(word):
+    data = store_load()
+    k = store_key(word)
+    before = len(data["entries"])
+    data["entries"] = [e for e in data["entries"] if e.get("key") != k]
+    store_save(data)
+    store_render()
+    return before - len(data["entries"])
+
+
+def store_render(path=None):
+    """Régénère la vue markdown depuis le store (tri : vus récemment d'abord)."""
+    path = path or VOCAB
+    entries = sorted(store_load()["entries"],
+                     key=lambda e: e.get("last_seen", ""), reverse=True)
+    head = [
+        "# 🔎 Mots du dico",
+        "",
+        f"*{len(entries)} mots — généré automatiquement depuis "
+        "`dico_vocab.json` (la source de vérité). **Ne pas éditer à la main** : "
+        "régénéré à chaque recherche. Tout ce que tu cherches atterrit ici. "
+        "Pour en retirer un : `dico --forget <mot>`.*",
+        "",
+        "| Mot | Sens | Exemple | Vu |",
+        "|-----|------|---------|----|",
+    ]
+    for e in entries:
+        mot = e.get("front") or e.get("lemma") or ""
+        cnt = e.get("count", 1)
+        head.append(f"| {mot} | {e.get('sens','')} | {e.get('example','')} | "
+                    f"{('×' + str(cnt)) if cnt > 1 else ''} |")
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(head) + "\n")
+    except OSError:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -548,32 +751,87 @@ def _conj_query(verb):
     return row[0], json.loads(row[1]), None
 
 
+def _form_to_infinitive(word):
+    """Forme conjuguée → infinitif, hors-ligne (« doit » → « devoir »). Renvoie
+    None si la table `forms` est absente (vieille base) ou le mot inconnu."""
+    if not os.path.exists(CONJ_DB):
+        return None
+    nform = _deaccent(word.strip().lower())
+    if not nform:
+        return None
+    try:
+        con = sqlite3.connect(f"file:{CONJ_DB}?mode=ro", uri=True)
+        rows = con.execute(
+            "SELECT verb FROM forms WHERE nform=? LIMIT 12", (nform,)).fetchall()
+        con.close()
+    except Exception:                         # table `forms` absente / SQLite KO
+        return None
+    if not rows:
+        return None
+    # ambigu (« suis » → être/suivre) : on garde l'infinitif le plus court,
+    # souvent le plus courant.
+    return min((r[0] for r in rows), key=len)
+
+
 def conjugate_lookup(word):
-    """Trouve l'infinitif français puis ses conjugaisons. Cherche d'abord tel
-    quel (hors-ligne) ; sinon traduit le mot vers le français, puis réessaie.
-    Renvoie (infinitif, temps, erreur)."""
-    real, data, err = _conj_query(word.strip().lower())
+    """Trouve l'infinitif français puis ses conjugaisons. Essaie : (1) le mot tel
+    quel, (2) comme forme conjuguée (« doit » → « devoir », hors-ligne),
+    (3) via traduction. Renvoie (infinitif, temps, erreur, vient_du_français)."""
+    w = word.strip().lower()
+    real, data, err = _conj_query(w)
     if data:
-        return real, data, None
+        return real, data, None, True
     if err:                                   # base absente / erreur SQLite
-        return None, None, err
+        return None, None, err, False
+    inf = _form_to_infinitive(w)              # forme conjuguée ? (hors-ligne)
+    if inf:
+        real, data, _ = _conj_query(inf)
+        if data:
+            return real, data, None, True
     try:                                      # pas trouvé → tenter une traduction
         translation, _, _ = translate(word)
     except Exception:
-        return None, None, None
+        return None, None, None, False
     parts = (translation or "").strip().lower().split()
     if parts:
         real, data, _ = _conj_query(parts[0])
         if data:
-            return real, data, None
-    return None, None, None
+            return real, data, None, False    # vient d'une traduction (mot étranger)
+    return None, None, None, False
+
+
+# Temps demandé après le verbe : « dico -c manger present » / « !c manger futur ».
+TENSE_ALIASES = {
+    "present": "présent", "pres": "présent",
+    "passe": "passé composé", "pc": "passé composé", "passecompose": "passé composé",
+    "imparfait": "imparfait", "imp": "imparfait",
+    "futur": "futur simple", "fut": "futur simple", "futursimple": "futur simple",
+    "conditionnel": "conditionnel", "cond": "conditionnel",
+    "subjonctif": "subjonctif", "subj": "subjonctif", "sub": "subjonctif",
+    "imperatif": "impératif", "imper": "impératif",
+}
+
+
+def _norm_tense(s):
+    return TENSE_ALIASES.get(_deaccent(s or "").replace(" ", "")) if s else None
+
+
+def _split_tense(word):
+    """« manger present » → (« manger », « présent »). Sinon (word, None)."""
+    parts = word.split()
+    if len(parts) >= 2:
+        t = _norm_tense(parts[-1])
+        if t:
+            return " ".join(parts[:-1]), t
+    return word, None
 
 
 # --------------------------------------------------------------------------- #
 #  Affichage                                                                  #
 # --------------------------------------------------------------------------- #
 def show(word, want_dict=False, want_ai=False, want_save=False,
-         want_multi=False, want_conj=False, want_deep=False, want_fr=False):
+         want_multi=False, want_conj=False, want_deep=False, want_fr=False,
+         want_save_main=False):
     src_guess = detect_lang(word)
     offline_ok = want_multi or want_conj      # sections qui marchent hors-ligne
 
@@ -581,9 +839,14 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     # français »), inutile et trompeur de le faire traduire par Google
     # (« manger » est aussi un mot anglais → « crèche »).
     conj_inf = conj_tenses = conj_err = None
+    conj_tense = None
+    conj_from_fr = False
     if want_conj:
-        conj_inf, conj_tenses, conj_err = conjugate_lookup(word)
-    direct_fr_verb = bool(conj_inf) and _deaccent(conj_inf) == _deaccent(word)
+        word, conj_tense = _split_tense(word)   # « manger present » → temps filtré
+        conj_inf, conj_tenses, conj_err, conj_from_fr = conjugate_lookup(word)
+    # -c a trouvé un verbe français (infinitif OU forme conjuguée) → pas de
+    # « traduction » Google fr→fr inutile (doit → doit).
+    direct_fr_verb = bool(conj_inf) and conj_from_fr
     # Multitran est ru↔fr : un mot en alphabet latin EST du français → pas de
     # « traduction » Google fr→fr inutile (eventail → eventail).
     multi_fr = want_multi and detect_lang(word) == "en"
@@ -627,42 +890,69 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
             print(f"  {DIM}📚 (pas dans Multitran {arrow} : « {word} »){RESET}")
 
     if want_conj:
-        if conj_tenses:
+        shown = conj_tenses
+        if conj_tenses and conj_tense:
+            shown = {k: v for k, v in conj_tenses.items() if k == conj_tense}
+        if shown:
+            if conj_inf and _deaccent(conj_inf) != _deaccent(word):
+                print(f"  {DIM}« {word} » → forme de{RESET} {BOLD}{conj_inf}{RESET}")
             print(f"  {CYAN}🔄 {conj_inf}{RESET}  {DIM}(conjugaison){RESET}")
-            width = max((len(lbl) for lbl in conj_tenses), default=0)
+            width = max((len(lbl) for lbl in shown), default=0)
             sep = "  " + DIM + "·" + RESET + "  "
-            for label, forms in conj_tenses.items():
+            for label, forms in shown.items():
                 print(f"     {DIM}{label.ljust(width)}{RESET}  {sep.join(forms)}")
+        elif conj_tenses and conj_tense:
+            print(f"  {DIM}🔄 (« {conj_tense} » indisponible pour « {conj_inf} »){RESET}")
         elif conj_err:
             print(f"  {DIM}🔄 conjugaison : {conj_err}{RESET}")
         else:
             print(f"  {DIM}🔄 (verbe introuvable : « {word} »){RESET}")
 
+    wikt_entry = None
     if want_fr:                               # Wiktionnaire du mot tel quel
-        _show_wikt(word)
+        wikt_entry = _show_wikt(word)
 
     if want_dict and translation:             # Wiktionnaire de la traduction
-        _show_wikt(translation)
+        wikt_entry = _show_wikt(translation)
 
     if want_ai:
         _show_ai(word, deep=False)
     if want_deep:
         _show_ai(word, deep=True)
 
-    if want_save and translation:
-        try:
-            entry = wiktionary(translation)        # genre (un/une) + accent du lemme
-        except Exception:
-            entry = None
+    auto = autosave_on()
+    if (auto or want_save or want_save_main) and translation:
+        entry = wikt_entry                         # réutilise la fiche déjà chargée
+        if entry is None:
+            try:
+                entry = wiktionary(translation)    # sinon : genre (un/une) + lemme
+            except Exception:
+                entry = None
         front = vocab_front(translation, entry)
         if input_is_french and entry and entry["defs"]:
             d = entry["defs"][0]
             sens = d[:55] + ("…" if len(d) > 55 else "")
         else:
             sens = word                            # le mot d'origine (ru/en) = le sens
+        record = {
+            "key": store_key((entry.get("lemma") if entry else None) or translation),
+            "front": front,
+            "lemma": (entry.get("lemma") if entry else None) or translation,
+            "sens": sens,
+            "pos": (entry.get("pos") if entry else "") or "",
+            "gender": (entry.get("gender") if entry else "") or "",
+            "example": "",
+            "src_word": word,
+            "src_lang": src,
+            "tier": ("wiktionnaire" if input_is_french
+                     else "multitran" if want_multi else "google"),
+        }
         try:
-            status, front = save_to_vocab(front, sens)
-            print(f"  {GREEN}💾 « {front} » → {status} dans vocabulaire.md{RESET}")
+            status, cnt = store_upsert(record)
+            tag = f"  {DIM}×{cnt}{RESET}" if cnt > 1 else ""
+            badge = (f"  {DIM}auto{RESET}"
+                     if auto and not (want_save or want_save_main) else "")
+            print(f"  {GREEN}💾 « {front} » → {status}{RESET}{tag}{badge}")
         except Exception as e:
             print(f"  {YELLOW}💾 échec de la sauvegarde :{RESET} {e}")
 
@@ -670,14 +960,38 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 # --------------------------------------------------------------------------- #
 #  Mode interactif                                                            #
 # --------------------------------------------------------------------------- #
-def _parse_inline(line, base_d, base_a, base_s, base_m, base_c, base_p, base_f):
-    """Préfixe : '!f' (Wikt. français) '!d' '!m' '!c' '!a' '!p' '!s'…"""
-    m = re.match(r"^!([damscpf]+)\s+(.*)$", line)
+def _parse_inline(line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S):
+    """Préfixe : '!f' '!d' '!m' '!c' '!a' '!p' '!s' (journal) '!S' (vocab propre)…"""
+    m = re.match(r"^!([damscpfS]+)\s+(.*)$", line)
     if m:
         flags = m.group(1)
         return (m.group(2).strip(), "d" in flags, "a" in flags, "s" in flags,
-                "m" in flags, "c" in flags, "p" in flags, "f" in flags)
-    return line, base_d, base_a, base_s, base_m, base_c, base_p, base_f
+                "m" in flags, "c" in flags, "p" in flags, "f" in flags, "S" in flags)
+    return line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S
+
+
+def _repl_command(line):
+    """Commandes « : » du mode interactif (réglages, pas des recherches)."""
+    parts = line[1:].split()
+    cmd = parts[0].lower() if parts else ""
+    arg = " ".join(parts[1:]).strip()
+    if cmd in ("save", "autosave"):
+        if arg.lower() in ("on", "off"):
+            config_set("autosave", arg.lower() == "on")
+            etat = "activé" if arg.lower() == "on" else "désactivé"
+            print(f"  {GREEN}✓ auto-save {etat}{RESET}")
+        else:
+            print(f"  auto-save : {'ON' if autosave_on() else 'off'}"
+                  f"   {DIM}(:save on | :save off){RESET}")
+    elif cmd == "forget" and arg:
+        n = store_forget(arg)
+        print(f"  {GREEN}✓ « {arg} » retiré{RESET}" if n
+              else f"  {DIM}« {arg} » introuvable{RESET}")
+    elif cmd == "render":
+        store_render()
+        print(f"  {GREEN}✓ markdown régénéré{RESET}")
+    else:
+        print(f"  {DIM}commandes : :save on|off · :forget <mot> · :render{RESET}")
 
 
 def _load_history():
@@ -699,7 +1013,7 @@ def _save_history():
 
 
 def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
-                base_c=False, base_p=False, base_f=False):
+                base_c=False, base_p=False, base_f=False, base_S=False):
     _load_history()                            # ↑ rappelle les mots précédents
     # On entoure les couleurs de \001..\002 pour que readline compte bien la
     # largeur du prompt (sinon décalage du curseur en rappelant l'historique).
@@ -710,9 +1024,12 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
     print(f"{BOLD}📖 dico{RESET} — russe/anglais → français")
     print(f"{DIM}Tape un mot puis Entrée.  Astuce : « !f » Wikt. français · "
           f"« !d » Wikt.+trad · « !m » Multitran · « !c » conjugaison · « !a » IA · "
-          f"« !p » IA profonde · « !s » sauver.{RESET}")
+          f"« !p » IA profonde · « !s » journal · « !S » vocab.{RESET}")
     print(f"{DIM}⚠ Trad. rapide = RU/EN → FR seulement. Pour FR→russe : « !m » ; "
           f"sens d'un mot FR : « !f » ou « !a »/« !p ».{RESET}")
+    etat = "ON" if autosave_on() else "off"
+    print(f"{DIM}💾 auto-save : {etat}  ·  « :save on|off » · « :forget <mot> » · "
+          f"« :render ».{RESET}")
     print(f"{DIM}↑ = commande précédente · « q » ou Ctrl-D pour quitter.{RESET}\n")
     try:
         while True:
@@ -726,10 +1043,13 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
             if line.lower() in ("q", "quit", "exit", "quitter"):
                 print(f"{DIM}À bientôt ! 👋{RESET}")
                 break
-            word, d, a, s, m, c, pf, f = _parse_inline(
-                line, base_d, base_a, base_s, base_m, base_c, base_p, base_f)
+            if line.startswith(":"):           # réglage, pas une recherche
+                _repl_command(line)
+                continue
+            word, d, a, s, m, c, pf, f, sv = _parse_inline(
+                line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S)
             if word:
-                show(word, d, a, s, m, c, pf, f)
+                show(word, d, a, s, m, c, pf, f, sv)
     finally:
         _save_history()
 
@@ -747,7 +1067,8 @@ def main():
     p.add_argument("-m", "--multitran", action="store_true",
                    help="ajoute l'entrée Multitran hors-ligne (riche, ru↔fr)")
     p.add_argument("-c", "--conj", action="store_true",
-                   help="ajoute la conjugaison hors-ligne (présent, passé composé, futur…)")
+                   help="conjugaison hors-ligne ; « -c manger present » pour un seul temps "
+                        "(present, passe, imparfait, futur, conditionnel, subjonctif, imperatif)")
     p.add_argument("-f", "--francais", action="store_true",
                    help="Wiktionnaire du mot tel quel (déjà français, sans traduction)")
     p.add_argument("-d", "--dico", action="store_true",
@@ -757,14 +1078,41 @@ def main():
     p.add_argument("-p", "--profond", action="store_true",
                    help="ajoute une explication APPROFONDIE (Opus : fiche d'étude)")
     p.add_argument("-s", "--save", action="store_true",
-                   help="sauvegarde le mot dans vocabulaire.md")
+                   help="enregistre CE mot maintenant (dans le store de vocabulaire)")
+    p.add_argument("-S", "--save-main", action="store_true",
+                   help="alias de -s (même store unique ; gardé par habitude)")
+    p.add_argument("--autosave", nargs="?", const="status",
+                   choices=["on", "off", "status"], metavar="on|off",
+                   help="enregistre AUTOMATIQUEMENT chaque recherche (réglage persistant)")
+    p.add_argument("--render", action="store_true",
+                   help="régénère le markdown depuis le store JSON, puis quitte")
+    p.add_argument("--forget", metavar="MOT",
+                   help="retire un mot du vocabulaire (curation soustractive)")
     args = p.parse_args()
+
+    if args.autosave is not None:
+        if args.autosave == "status":
+            print(f"auto-save : {'ON' if autosave_on() else 'off'}")
+        else:
+            config_set("autosave", args.autosave == "on")
+            print(f"✓ auto-save {'activé' if args.autosave == 'on' else 'désactivé'}.")
+        return
+    if args.forget:
+        n = store_forget(args.forget)
+        print(f"✓ « {args.forget} » retiré ({n})." if n
+              else f"« {args.forget} » introuvable dans le store.")
+        return
+    if args.render:
+        store_render()
+        print(f"✓ markdown régénéré → {VOCAB}")
+        return
+
     if args.mots:
         show(" ".join(args.mots), args.dico, args.ai, args.save,
-             args.multitran, args.conj, args.profond, args.francais)
+             args.multitran, args.conj, args.profond, args.francais, args.save_main)
     else:
         interactive(args.dico, args.ai, args.save, args.multitran,
-                    args.conj, args.profond, args.francais)
+                    args.conj, args.profond, args.francais, args.save_main)
 
 
 if __name__ == "__main__":

@@ -11,16 +11,36 @@ pensé pour un apprenant russophone/anglophone. Cœur **zéro dépendance**
 | `dico кошка` | Google (rapide) | oui |
 | `dico -m кошка` | **Multitran** (riche, ru↔fr) | **non** 🔌 |
 | `dico -c manger` | **Conjugaison** (~7000 verbes, 7 temps) | **non** 🔌 |
+| `dico -c doit` | **Forme conjuguée** → infinitif (*doit → devoir*) | **non** 🔌 |
 | `dico -f manger` | **Wiktionnaire** — mot déjà français | oui |
 | `dico -d house` | **Wiktionnaire** — après traduction | oui |
 | `dico -a house` | **Claude Haiku** — fiche rapide | oui |
 | `dico -p house` | **Claude Opus** — fiche d'étude | oui |
-| `dico -s house` | sauvegarde → `vocabulaire.md` | oui |
+| `dico -s house` | enregistre ce mot (store de vocabulaire) | oui |
 
 Cumulables : `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap mot`…
 Mode interactif : tape `dico`, puis `!m` `!c` `!f` `!d` `!a` `!p` `!s` devant un mot.
 
 **Pas besoin de taper les accents** : `etre` trouve *être*, `creche` trouve *crèche*.
+
+## Vocabulaire : auto-save + store JSON
+
+Tout ce que tu cherches peut être **enregistré automatiquement**. La **source de
+vérité** est `dico_vocab.json` (à côté du markdown) ; le `.md` n'en est qu'une
+**vue régénérée** — tu n'édites plus jamais le markdown à la main, et `push_anki.py`
+lit le store directement. La curation est **soustractive** : on sauve tout, tu
+*retires* le déchet.
+
+| Commande | Effet |
+|---|---|
+| `dico --autosave on` / `off` | active/désactive l'enregistrement auto (persistant) |
+| `dico -s mot` | enregistre ce mot maintenant (même si l'auto-save est off) |
+| `dico --forget mot` | retire un mot (curation soustractive) |
+| `dico --render` | régénère le markdown depuis le store JSON |
+
+En mode interactif : `:save on|off` · `:forget <mot>` · `:render`.
+Chaque sauvegarde enrichit le mot avec le **genre** (→ *un/une*), le lemme accentué,
+la nature et la langue source ; les répétitions incrémentent un compteur `×N`.
 
 ## Installation
 
