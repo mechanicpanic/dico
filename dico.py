@@ -800,7 +800,12 @@ def conjugate_lookup(word):
         return None, None, None, False
     parts = (translation or "").strip().lower().split()
     if parts:
-        real, data, _ = _conj_query(parts[0])
+        cand = parts[0]
+        real, data, _ = _conj_query(cand)
+        if not data:
+            inf = _form_to_infinitive(cand)   # trad. = forme conjuguée ? (doit → devoir)
+            if inf:
+                real, data, _ = _conj_query(inf)
         if data:
             return real, data, None, False    # vient d'une traduction (mot étranger)
     return None, None, None, False
@@ -1165,8 +1170,14 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
         if input_is_french and entry and entry["defs"]:
             d = entry["defs"][0]
             sens = d[:55] + ("…" if len(d) > 55 else "")
+        elif want_conj and input_is_french:
+            sens = ""                              # carte de conj. : le verso = les formes
         else:
             sens = word                            # le mot d'origine (ru/en) = le sens
+        # Conjugaison → on met le PRÉSENT au dos de la carte (autres temps : plus tard).
+        example = ""
+        if want_conj and conj_tenses and conj_tenses.get("présent"):
+            example = "prés. : " + ", ".join(conj_tenses["présent"])
         record = {
             "key": store_key(lemma),
             "front": front,
@@ -1176,7 +1187,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
                     or (lex.get("pos") if lex else "") or ""),
             "gender": ((entry.get("gender") if entry else None)
                        or (lex.get("genre") if lex else "") or ""),
-            "example": "",
+            "example": example,
             "src_word": word,
             "src_lang": src,
             "tier": ("wiktionnaire" if input_is_french
