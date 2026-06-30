@@ -1156,17 +1156,28 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
         # 2) Lexique HORS-LIGNE (lemme/genre/nature, sans réseau),
         # 3) en tout dernier recours seulement, une requête Wiktionnaire.
         entry, lex = wikt_entry, lex_fr
-        if entry is None and lex is None:
+        # Locution (plusieurs mots, hors article de tête) ? On garde le GROUPE
+        # entier (« éteindre le feu ») au lieu de le réduire à « un feu ».
+        core = translation.strip().split()
+        while len(core) > 1 and core[0].lower() in _FR_ARTICLES:
+            core = core[1:]
+        is_phrase = len(core) > 1
+        if not is_phrase and entry is None and lex is None:
             try:
-                entry = wiktionary(translation)
+                entry = wiktionary(translation)    # réseau, seulement pour un mot seul
             except Exception:
                 entry = None
-        lemma = ((entry.get("lemma") if entry else None)
-                 or (lex.get("lemma") if lex else None) or translation)
-        article = ARTICLE_FOR.get((entry.get("gender") if entry else "") or "")
-        if not article and lex:
-            article = lex.get("article")
-        front = f"{article} {lemma}" if article else lemma
+        if is_phrase:
+            lemma = " ".join(core)
+            front = lemma                          # pas d'article devant une locution
+        else:
+            lemma = ((entry.get("lemma") if entry else None)
+                     or (lex.get("lemma") if lex else None)
+                     or (core[0] if core else translation))
+            article = ARTICLE_FOR.get((entry.get("gender") if entry else "") or "")
+            if not article and lex:
+                article = lex.get("article")
+            front = f"{article} {lemma}" if article else lemma
         if input_is_french and entry and entry["defs"]:
             d = entry["defs"][0]
             sens = d[:55] + ("…" if len(d) > 55 else "")
@@ -1207,8 +1218,9 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 #  Mode interactif                                                            #
 # --------------------------------------------------------------------------- #
 def _parse_inline(line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S):
-    """Préfixe : '!f' '!d' '!m' '!c' '!a' '!p' '!s' (journal) '!S' (vocab propre)…"""
-    m = re.match(r"^!([damscpfS]+)\s+(.*)$", line)
+    """Préfixe : '!f' '!d' '!m' '!c' '!a' '!p' '!s' (journal) '!S' (vocab propre)…
+    Tolère une espace après le « ! » (« ! c mot » == « !c mot »)."""
+    m = re.match(r"^!\s*([damscpfS]+)\s+(.*)$", line)
     if m:
         flags = m.group(1)
         return (m.group(2).strip(), "d" in flags, "a" in flags, "s" in flags,
