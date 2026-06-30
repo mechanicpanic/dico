@@ -1261,6 +1261,11 @@ def _save_history():
 def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 base_c=False, base_p=False, base_f=False, base_S=False):
     _load_history()                            # ↑ rappelle les mots précédents
+    try:                                       # pour détecter un REPL devenu obsolète
+        src_mtime = os.path.getmtime(os.path.abspath(__file__))
+    except OSError:
+        src_mtime = 0
+    warned_stale = False
     # On entoure les couleurs de \001..\002 pour que readline compte bien la
     # largeur du prompt (sinon décalage du curseur en rappelant l'historique).
     if sys.stdout.isatty() and readline:
@@ -1286,6 +1291,15 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 break
             if not line:
                 continue
+            if not warned_stale:                # dico.py modifié depuis le lancement ?
+                try:
+                    if os.path.getmtime(os.path.abspath(__file__)) > src_mtime:
+                        warned_stale = True
+                        print(f"{YELLOW}⚠ dico.py a changé depuis le lancement de "
+                              f"cette session — tape « q » puis relance « dico » "
+                              f"pour la dernière version.{RESET}")
+                except OSError:
+                    pass
             if line.lower() in ("q", "quit", "exit", "quitter"):
                 print(f"{DIM}À bientôt ! 👋{RESET}")
                 break
