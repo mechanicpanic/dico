@@ -882,11 +882,16 @@ def _conj_lines(shown):
     widths = [max([len(headers[ti])] + [len(cells[pi][ti]) for pi in range(6)])
               for ti in range(len(tenses))]
     pw = max(len(p) for p in _CONJ_PERSONS)
-    hdr = "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)).rstrip()
-    out = [f"{DIM}{' ' * pw}   {hdr}{RESET}"]
+    pres = tenses.index("présent") if "présent" in tenses else -1
+    # en-tête : le présent ressort (gras), le reste est atténué
+    hparts = [(f"{RESET}{BOLD}{h.ljust(widths[i])}{RESET}{DIM}" if i == pres
+               else h.ljust(widths[i])) for i, h in enumerate(headers)]
+    out = [f"{DIM}{' ' * pw}   " + "  ".join(hparts).rstrip() + RESET]
     for pi, p in enumerate(_CONJ_PERSONS):
-        row = "  ".join(cells[pi][ti].ljust(widths[ti]) for ti in range(len(tenses)))
-        out.append(f"{DIM}{p.ljust(pw)}{RESET}   {row.rstrip()}")
+        parts = [(f"{BOLD}{GREEN}{cells[pi][ti].ljust(widths[ti])}{RESET}"
+                  if ti == pres else cells[pi][ti].ljust(widths[ti]))
+                 for ti in range(len(tenses))]
+        out.append(f"{DIM}{p.ljust(pw)}{RESET}   " + "  ".join(parts).rstrip())
     return out
 
 
