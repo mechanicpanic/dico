@@ -1340,16 +1340,25 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
         prompt = f"\001{BLUE}\002»\001{RESET}\002 "
     else:
         prompt = f"{BLUE}»{RESET} "
-    print(f"{BOLD}📖 dico{RESET} — russe/anglais → français")
-    print(f"{DIM}Tape un mot puis Entrée.  Astuce : « !f » Wikt. français · "
-          f"« !d » Wikt.+trad · « !m » Multitran · « !c » conjugaison · « !a » IA · "
-          f"« !p » IA profonde · « !s » journal · « !S » vocab.{RESET}")
-    print(f"{DIM}⚠ Trad. rapide = RU/EN → FR seulement. Pour FR→russe : « !m » ; "
-          f"sens d'un mot FR : « !f » ou « !a »/« !p ».{RESET}")
-    etat = "ON" if autosave_on() else "off"
-    print(f"{DIM}💾 auto-save : {etat}  ·  « :save on|off » · « :forget <mot> » · "
-          f"« :render ».{RESET}")
-    print(f"{DIM}↑ = commande précédente · « q » ou Ctrl-D pour quitter.{RESET}\n")
+    print(f"\n{BOLD}📖 dico{RESET}  —  russe / anglais → français")
+    print(f"{DIM}Tape un mot, ou un préfixe :{RESET}\n")
+    rows = [
+        ("!f", "Wiktionnaire (mot déjà FR)", "!a", "IA rapide (Haiku)"),
+        ("!d", "Wiktionnaire + traduction",  "!p", "IA profonde (Opus)"),
+        ("!m", "Multitran (ru↔fr, offline)", "!s", "sauver ce mot"),
+        ("!c", "conjugaison",                "",   ""),
+    ]
+    w = max(len(r[1]) for r in rows)
+    for lf, ld, rf, rd in rows:
+        left = f"{BOLD}{CYAN}{lf}{RESET} {ld.ljust(w)}"
+        right = f"{BOLD}{CYAN}{rf}{RESET} {rd}" if rf else ""
+        print(f"   {left}    {right}".rstrip())
+    etat = f"{GREEN}ON{RESET}" if autosave_on() else f"{DIM}off{RESET}"
+    print(f"\n{DIM}⚠ Trad. rapide : RU/EN → FR seulement"
+          f"   ·   FR→russe : !m   ·   sens d'un mot FR : !f / !a / !p{RESET}")
+    print(f"{DIM}💾 auto-save{RESET} {etat} {DIM}·  :save on|off · :forget <mot> · "
+          f":render{RESET}")
+    print(f"{DIM}↑ précédent   ·   « q » / Ctrl-D : quitter{RESET}\n")
     try:
         while True:
             try:
