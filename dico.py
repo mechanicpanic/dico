@@ -837,6 +837,59 @@ def _split_tense(word):
     return word, None
 
 
+# --- Tableau de conjugaison : grille pronom × temps (lisible d'un coup d'œil) -- #
+_CONJ_PERSONS = ["je", "tu", "il", "nous", "vous", "ils"]
+_CONJ_IMP = {0: 1, 1: 3, 2: 4}              # impératif (tu/nous/vous) → lignes 1,3,4
+_CONJ_SUBJ = ("je", "j'", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles")
+_CONJ_SHORT = {
+    "présent": "prés.", "passé composé": "passé c.", "imparfait": "imparf.",
+    "futur simple": "futur", "conditionnel": "cond.", "subjonctif": "subj.",
+    "impératif": "impér.",
+}
+
+
+def _bare_form(form):
+    """« je doive » / « qu'il doive » / « j'ai dû » → la forme sans pronom sujet."""
+    s = form.strip()
+    low = s.lower()
+    if low.startswith("que "):
+        s = s[4:].strip()
+    elif low.startswith("qu'"):
+        s = s[3:].strip()
+    low = s.lower()
+    for p in _CONJ_SUBJ:
+        if p.endswith("'") and low.startswith(p):
+            return s[len(p):].strip()
+        if not p.endswith("'") and low.startswith(p + " "):
+            return s[len(p) + 1:].strip()
+    return s                                  # impératif (« éteins ») : pas de pronom
+
+
+def _conj_lines(shown):
+    """Lignes colorées d'une grille pronom × temps à partir de {temps: [formes]}."""
+    tenses = list(shown.keys())
+    cells = [["" for _ in tenses] for _ in _CONJ_PERSONS]
+    for ti, t in enumerate(tenses):
+        forms = shown[t]
+        if len(forms) == 3:                   # impératif
+            for fi, pi in _CONJ_IMP.items():
+                if fi < len(forms):
+                    cells[pi][ti] = _bare_form(forms[fi])
+        else:
+            for pi in range(min(len(forms), 6)):
+                cells[pi][ti] = _bare_form(forms[pi])
+    headers = [_CONJ_SHORT.get(t, t) for t in tenses]
+    widths = [max([len(headers[ti])] + [len(cells[pi][ti]) for pi in range(6)])
+              for ti in range(len(tenses))]
+    pw = max(len(p) for p in _CONJ_PERSONS)
+    hdr = "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)).rstrip()
+    out = [f"{DIM}{' ' * pw}   {hdr}{RESET}"]
+    for pi, p in enumerate(_CONJ_PERSONS):
+        row = "  ".join(cells[pi][ti].ljust(widths[ti]) for ti in range(len(tenses)))
+        out.append(f"{DIM}{p.ljust(pw)}{RESET}   {row.rstrip()}")
+    return out
+
+
 # --------------------------------------------------------------------------- #
 #  Niveau 6 : Lexique 3.83 hors-ligne (lemme, nature, genre, fréquence)       #
 # --------------------------------------------------------------------------- #
@@ -1127,10 +1180,8 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
             if conj_inf and _deaccent(conj_inf) != _deaccent(word):
                 print(f"  {DIM}« {word} » → forme de{RESET} {BOLD}{conj_inf}{RESET}")
             print(f"  {CYAN}🔄 {conj_inf}{RESET}  {DIM}(conjugaison){RESET}")
-            width = max((len(lbl) for lbl in shown), default=0)
-            sep = "  " + DIM + "·" + RESET + "  "
-            for label, forms in shown.items():
-                print(f"     {DIM}{label.ljust(width)}{RESET}  {sep.join(forms)}")
+            for line in _conj_lines(shown):       # grille pronom × temps, alignée
+                print(f"     {line}")
         elif conj_tenses and conj_tense:
             print(f"  {DIM}🔄 (« {conj_tense} » indisponible pour « {conj_inf} »){RESET}")
         elif conj_err:
