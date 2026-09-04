@@ -100,6 +100,19 @@ struct PanelView: View {
         )
         // (shadow: native, through NSPanel.hasShadow — a SwiftUI shadow would be clipped at the window edges)
         .overlay(alignment: .bottom) { toast }
+        .overlay {
+            if model.showShortcuts {
+                ZStack {
+                    // Click anywhere beside the sheet to put it away.
+                    Color.black.opacity(0.18)
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.showShortcuts = false }
+                    ShortcutsSheet { model.showShortcuts = false }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.16), value: model.showShortcuts)
         // Springy appearance
         .scaleEffect(model.shown ? 1 : 0.90)
         .opacity(model.shown ? 1 : 0)
@@ -122,6 +135,7 @@ struct PanelView: View {
                     .focused($focused)
                     .onSubmit { model.submit() }
                     .onChange(of: model.query) { _, _ in model.inputChanged() }
+                    .help("Type and press ⏎. ⌘K clears, ⌘/ lists every shortcut.")
                 if model.busy {
                     ProgressView().controlSize(.small).scaleEffect(0.7)
                 } else if !model.query.isEmpty {
@@ -129,7 +143,7 @@ struct PanelView: View {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
-                    .help("Clear")
+                    .help("Clear the field (⌘K)")
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 9)
@@ -155,6 +169,7 @@ struct PanelView: View {
                         .foregroundStyle(model.mode == m ? Color.white : Color.primary.opacity(0.75))
                     }
                     .buttonStyle(.plain)
+                    .help("\(m.label) mode \(m.icon) — ⌘⇧\((Mode.allCases.firstIndex(of: m) ?? 0) + 1)")
                 }
                 Spacer(minLength: 0)
                 if model.mode == .demander, let c = model.askContext, !c.isEmpty {
@@ -221,12 +236,24 @@ struct PanelView: View {
         }
     }
 
+    /// One line, always: how to see the rest, how to get out, how to get in.
     private var footer: some View {
-        HStack {
-            Text("⌘1-9 save · Esc clear/close · ⌥D anywhere")
+        HStack(spacing: 0) {
+            Button { model.showShortcuts = true } label: {
+                Text("⌘/ shortcuts").font(rounded(10, .medium)).foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .help("Show every keyboard shortcut (⌘/)")
+            Text(" · Esc clear/close · \(model.hotkeyLabel) anywhere")
                 .font(rounded(10, .regular)).foregroundStyle(.tertiary)
+                .help("\(model.hotkeyLabel) opens the panel from any app — change it in Settings (⌘,)")
             Spacer()
-            Text("dico").font(rounded(10, .medium)).foregroundStyle(.tertiary)
+            Button { NotificationCenter.default.post(name: .dicoOpenSettings, object: nil) } label: {
+                Text("⚙︎").font(rounded(11, .medium)).foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .help("Settings (⌘,)")
+            Text(" dico").font(rounded(10, .medium)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14).padding(.vertical, 7)
     }
@@ -365,4 +392,7 @@ struct IssueView: View {
 
 extension Notification.Name {
     static let dicoFocusField = Notification.Name("dicoFocusField")
+    /// Posted by the ⚙︎ button; the delegate opens the window (and wires the
+    /// hotkey callback, which only it can honour).
+    static let dicoOpenSettings = Notification.Name("dicoOpenSettings")
 }

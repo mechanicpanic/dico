@@ -8,9 +8,23 @@ struct WordView: View {
     @ObservedObject var model: DicoModel
 
     private var isFrench: Bool { lookup.direction == "fr" }
+
+    /// The flag of the QUERY — `src_lang` when the CLI says so, otherwise
+    /// Cyrillic → 🇷🇺, else 🇬🇧. Never 🇫🇷 unless the query itself is French.
+    static func flag(forQuery q: String, srcLang: String?) -> String {
+        switch (srcLang ?? "").lowercased().prefix(2) {
+        case "ru": return "🇷🇺"
+        case "en": return "🇬🇧"
+        case "fr": return "🇫🇷"
+        default: break
+        }
+        let cyrillic = q.unicodeScalars.contains { (0x0400...0x04FF).contains($0.value) }
+        return cyrillic ? "🇷🇺" : "🇬🇧"
+    }
+
     private var flag: String {
-        if isFrench { return "🇫🇷" }
-        return lookup.src_lang == "ru" ? "🇷🇺" : "🇬🇧"
+        isFrench ? "🇫🇷"
+                 : WordView.flag(forQuery: lookup.query ?? "", srcLang: lookup.src_lang)
     }
     /// Senses grouped by part of speech, in order of appearance, keeping the
     /// global number (the one used by the ⌘1…⌘9 shortcuts).
@@ -78,7 +92,12 @@ struct WordView: View {
                         .font(rounded(10, .medium)).foregroundStyle(.tertiary)
                 }
             } else if let t = lookup.translation, !t.isEmpty {
-                Text("→ \(t)").font(rounded(13, .medium)).foregroundStyle(Palette.bleu)
+                // « 🇷🇺 сказать → 🇫🇷 dire » — each side keeps its own flag.
+                HStack(spacing: 5) {
+                    Text("→").font(rounded(13, .medium)).foregroundStyle(.tertiary)
+                    Text("🇫🇷").font(.system(size: 12))
+                    Text(t).font(rounded(15, .semibold)).foregroundStyle(Palette.bleu)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -92,12 +111,14 @@ struct WordView: View {
                 ForEach(offered) { s in
                     ActionButton(icon: s.icon, label: s.label,
                                  active: model.open.contains(s),
-                                 busy: isLoading(s)) {
+                                 busy: isLoading(s),
+                                 help: "\(s.label) (\(s.shortcut)) — \(s.blurb)") {
                         withAnimation(.easeOut(duration: 0.15)) { model.toggle(s) }
                     }
                 }
                 ActionButton(icon: "bubble.left.and.text.bubble.right", label: "Ask ?",
-                             active: false, busy: false) {
+                             active: false, busy: false,
+                             help: "Ask the tutor about \u{ab} \(model.cardTerm) \u{bb} (⌘L)") {
                     model.askAbout(model.cardTerm)
                 }
             }
@@ -157,6 +178,7 @@ struct ActionButton: View {
     let label: String
     let active: Bool
     let busy: Bool
+    var help: String = ""
     let action: () -> Void
     @State private var hover = false
 
@@ -187,6 +209,7 @@ struct ActionButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+        .help(help.isEmpty ? label : help)
     }
 }
 
@@ -270,15 +293,129 @@ struct DefinitionBody: View {
     }
 }
 
+/// The Multitran entry, in full: one section per part of speech, one row per
+/// sense (number + domain tag on the left, the translations flowing on the
+/// right). Notes are shown right after their translation and NEVER truncated —
+/// they can be whole example sentences. No line caps, no fixed height: the
+/// card scrolls.
 struct MultitranBody: View {
     let entry: Multitran
     private var arrow: String { entry.direction == "rufr" ? "ru → fr" : "fr → ru" }
 
+    // MARK: The flowing translation list of one sense
+
+    /// " · "-separated translations, each followed by its note in small italic
+    /// grey. A single wrapping Text, so nothing can ever be cut off.
+    static func translations(_ items: [MultitranItem]) -> Text {
+        var out = Text("")
+        var first = true
+        for it in items {
+            let tr = (it.tr ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if tr.isEmpty { continue }
+            if !first {
+                out = out + Text(" · ").font(rounded(11.5, .regular))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+            }
+            first = false
+            out = out + Text(tr)
+                .font(.system(size: 12, weight: .regular, design: .rounded))
+                .foregroundStyle(Color.primary.opacity(0.88))
+            let note = (it.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !note.isEmpty {
+                out = out + Text(" " + note)
+                    .font(.system(size: 10.5, weight: .regular, design: .rounded))
+                    .italic()
+                    .foregroundStyle(Color.secondary.opacity(0.85))
+            }
+        }
+        return out
+    }
+
+    /// The same thing as plain text — what `--selftest` checks for completeness.
+    static func plain(_ items: [MultitranItem]) -> String {
+        items.compactMap { it -> String? in
+            let tr = (it.tr ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !tr.isEmpty else { return nil }
+            let note = (it.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return note.isEmpty ? tr : "\(tr) \(note)"
+        }.joined(separator: " · ")
+    }
+
+    /// Everything this view renders, flattened — the self-test's hook.
+    var plainText: String {
+        var out: [String] = []
+        for g in entry.usableGroups {
+            let pos = (g.pos ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !pos.isEmpty { out.append(pos) }
+            for sense in g.senses ?? [] {
+                let head = [(sense.n ?? ""), (sense.domain ?? "")]
+                    .filter { !$0.isEmpty }.joined(separator: " ")
+                out.append((head.isEmpty ? "" : head + " ") + MultitranBody.plain(sense.items ?? []))
+            }
+        }
+        if out.isEmpty { out = entry.lines ?? [] }
+        return out.joined(separator: "\n")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 9) {
             Text(arrow).font(rounded(9.5, .medium)).foregroundStyle(.quaternary)
-            ForEach(Array((entry.lines ?? []).prefix(24).enumerated()), id: \.offset) { _, line in
-                // A heading like "гл." carries no digit and no separator.
+            if !entry.usableGroups.isEmpty {
+                ForEach(Array(entry.usableGroups.enumerated()), id: \.offset) { _, g in
+                    posGroup(g)
+                }
+            } else {
+                fallbackLines
+            }
+        }
+    }
+
+    private func posGroup(_ g: MultitranGroup) -> some View {
+        let pos = (g.pos ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return VStack(alignment: .leading, spacing: 5) {
+            if !pos.isEmpty {
+                Text(pos.uppercased())
+                    .font(rounded(9.5, .bold)).tracking(0.8)
+                    .foregroundStyle(Palette.bleu.opacity(0.85))
+            }
+            ForEach(Array((g.senses ?? []).enumerated()), id: \.offset) { _, sense in
+                senseRow(sense)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func senseRow(_ sense: MultitranSense) -> some View {
+        let n = (sense.n ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let domain = (sense.domain ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return HStack(alignment: .top, spacing: 7) {
+            VStack(alignment: .trailing, spacing: 2) {
+                if !n.isEmpty {
+                    Text(n).font(rounded(10.5, .bold)).foregroundStyle(.secondary)
+                }
+                if !domain.isEmpty {
+                    Text(domain)
+                        .font(rounded(9, .medium))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .padding(.horizontal, 4).padding(.vertical, 1.5)
+                        .background(Color.primary.opacity(0.08),
+                                    in: RoundedRectangle(cornerRadius: 4))
+                        .foregroundStyle(.secondary)
+                        .help("Multitran domain")
+                }
+            }
+            .frame(width: 60, alignment: .trailing)
+
+            MultitranBody.translations(sense.items ?? [])
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Only when `groups` is empty: the flat `lines` the CLI also returns.
+    private var fallbackLines: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(Array((entry.lines ?? []).enumerated()), id: \.offset) { _, line in
                 let heading = !line.contains(")") && line.count <= 12
                 Text(line)
                     .font(rounded(heading ? 11 : 12, heading ? .bold : .regular))
@@ -416,17 +553,51 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - 🔁 Conjugate
+// MARK: - 🔁 Conjugate — a real grid
 
+/// The je/tu/il/nous/vous/ils × seven-tenses table: full French tense names in
+/// the header, a muted pronoun gutter, alternating row bands, the présent
+/// column on a tinted rounded panel, compound forms with a dimmed auxiliary
+/// and « — » where the impératif has no form.
+///
+/// Everything is sized from a width budget so the grid never scrolls sideways.
 struct ConjugationView: View {
     let conj: Conjugation
     /// Inside a Word-card section the grid gets a little less room.
     var compact: Bool = false
 
-    private let pronouns = ["je", "tu", "il", "nous", "vous", "ils"]
-    private var colWidth: CGFloat { compact ? 66 : 72 }
-    private var spacing: CGFloat { compact ? 2 : 3 }
+    static let pronouns = ["je", "tu", "il", "nous", "vous", "ils"]
+    /// The impératif only has tu / nous / vous.
+    static let imperativeRow: [Int?] = [nil, 0, nil, 1, 2, nil]
+
+    // MARK: Geometry — the grid must fit the panel without scrolling sideways
+
+    /// The panel is 600 pt wide; the results area keeps 16 pt on each side,
+    /// and a card section eats 20 pt more.
+    static let fullBudget: CGFloat = PanelSize.width - 32          // 568
+    static let compactBudget: CGFloat = PanelSize.width - 32 - 40  // 528
+
+    private var budget: CGFloat { compact ? ConjugationView.compactBudget : ConjugationView.fullBudget }
+    private var gutter: CGFloat { 32 }
+    private var colSpacing: CGFloat { 2 }
+    private var colPad: CGFloat { 2 }
+    private var rowSpacing: CGFloat { 1.5 }
+    private var rowHeight: CGFloat { compact ? 16.5 : 18 }
+    private var headerHeight: CGFloat { compact ? 22 : 24 }
     private var bodySize: CGFloat { compact ? 10.5 : 11 }
+    private var columnCount: CGFloat { CGFloat(max(1, conj.orderedTenses.count)) }
+
+    /// What is left for one tense column once the gutter and the gaps are paid.
+    var colWidth: CGFloat {
+        let overhead = (colSpacing + 2 * colPad) * columnCount
+        return max(44, ((budget - gutter - overhead) / columnCount).rounded(.down))
+    }
+    /// The grid's own width — `--selftest` asserts this fits the budget.
+    var gridWidth: CGFloat {
+        gutter + (colWidth + 2 * colPad + colSpacing) * columnCount
+    }
+
+    // MARK: Text
 
     /// "que je mange" → "mange"; "j'ai mangé" → "ai mangé"; "va" → "va".
     static func strip(_ form: String) -> String {
@@ -438,52 +609,112 @@ struct ConjugationView: View {
         return s
     }
 
+    /// The auxiliaries a compound tense is built with — shown dimmed.
+    static let auxiliaries: Set<String> = ["ai", "as", "a", "avons", "avez", "ont",
+                                           "suis", "es", "est", "sommes", "êtes", "sont"]
+
+    /// "ai dit" → ("ai", "dit"); "dis" → (nil, "dis").
+    static func split(_ form: String) -> (String?, String) {
+        let s = strip(form)
+        let parts = s.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        if parts.count == 2, ConjugationView.auxiliaries.contains(String(parts[0]).lowercased()) {
+            return (String(parts[0]), String(parts[1]))
+        }
+        return (nil, s)
+    }
+
+    /// The form at (tense, row), or nil when there is none.
+    static func form(_ name: String, _ forms: [String], row i: Int) -> String? {
+        let idx: Int? = (name == "impératif") ? imperativeRow[i] : (i < forms.count ? i : nil)
+        guard let idx, idx < forms.count else { return nil }
+        return forms[idx]
+    }
+
+    // MARK: Body
+
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+        VStack(alignment: .leading, spacing: compact ? 6 : 9) {
             if !compact {
                 HStack(spacing: 7) {
                     Text("🔁").font(.system(size: 15))
                     Text(conj.infinitive ?? "").font(rounded(20, .bold))
-                    Spacer()
+                    Spacer(minLength: 0)
+                    Text("hover a column for what the tense is for")
+                        .font(rounded(9.5, .regular)).foregroundStyle(.quaternary)
                 }
             }
-            Grid(alignment: .leading, horizontalSpacing: spacing, verticalSpacing: 3) {
-                GridRow {
-                    Text("").frame(width: 30)
-                    ForEach(conj.orderedTenses, id: \.0) { name, _ in
-                        Text(Conjugation.shortLabels[name] ?? name)
-                            .font(rounded(9, .bold)).tracking(0.3)
-                            .foregroundStyle(name == "présent" ? Palette.bleu : Color.secondary)
-                            .lineLimit(1).minimumScaleFactor(0.8)
-                            .frame(width: colWidth, alignment: .leading)
-                            .help(Conjugation.hints[name] ?? name)
-                    }
+            HStack(alignment: .top, spacing: colSpacing) {
+                pronounGutter
+                ForEach(conj.orderedTenses, id: \.0) { name, forms in
+                    column(name: name, forms: forms)
                 }
-                ForEach(Array(pronouns.enumerated()), id: \.offset) { i, pron in
-                    GridRow {
-                        Text(pron).font(rounded(10.5, .medium)).foregroundStyle(.tertiary)
-                            .frame(width: 30, alignment: .trailing)
-                        ForEach(conj.orderedTenses, id: \.0) { name, forms in
-                            let isImp = (name == "impératif")
-                            // The impératif only has 3 forms: tu / nous / vous.
-                            let idx: Int? = isImp ? [nil, 0, nil, 1, 2, nil][i] : (i < forms.count ? i : nil)
-                            Text(idx.map { ConjugationView.strip(forms[$0]) } ?? "—")
-                                .font(.system(size: bodySize, weight: name == "présent" ? .semibold : .regular,
-                                              design: .rounded))
-                                .foregroundStyle(idx == nil ? Color.secondary.opacity(0.35) : .primary)
-                                .lineLimit(1).minimumScaleFactor(0.62)
-                                .frame(width: colWidth, alignment: .leading)
-                                .padding(.vertical, 2.5).padding(.horizontal, 3)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(name == "présent" ? Palette.bleu.opacity(0.10) : .clear)
-                                )
-                                .help(Conjugation.hints[name] ?? name)
-                        }
-                    }
-                }
+            }
+            .frame(width: gridWidth, alignment: .leading)
+        }
+    }
+
+    private var pronounGutter: some View {
+        VStack(spacing: rowSpacing) {
+            Color.clear.frame(width: gutter, height: headerHeight)
+            ForEach(0..<6, id: \.self) { i in
+                Text(ConjugationView.pronouns[i])
+                    .font(rounded(10.5, .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: gutter, height: rowHeight, alignment: .trailing)
+                    .background(band(i))
             }
         }
+    }
+
+    private func column(name: String, forms: [String]) -> some View {
+        let present = (name == "présent")
+        return VStack(spacing: rowSpacing) {
+            Text(name)
+                .font(rounded(9.5, .bold)).tracking(0.2)
+                .foregroundStyle(present ? Palette.bleu : Color.secondary)
+                .lineLimit(2).minimumScaleFactor(0.68)
+                .multilineTextAlignment(.leading)
+                .frame(width: colWidth, height: headerHeight, alignment: .bottomLeading)
+            ForEach(0..<6, id: \.self) { i in
+                cell(name: name, forms: forms, row: i, present: present)
+            }
+        }
+        .padding(.horizontal, colPad).padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(present ? Palette.bleu.opacity(0.11) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Palette.bleu.opacity(present ? 0.22 : 0), lineWidth: 1)
+        )
+        .help(Conjugation.hints[name] ?? name)
+    }
+
+    @ViewBuilder
+    private func cell(name: String, forms: [String], row i: Int, present: Bool) -> some View {
+        let raw = ConjugationView.form(name, forms, row: i)
+        Group {
+            if let raw {
+                let (aux, rest) = ConjugationView.split(raw)
+                (aux.map { Text($0 + " ").foregroundStyle(Color.secondary.opacity(0.7)) } ?? Text(""))
+                    + Text(rest).foregroundStyle(Color.primary)
+            } else {
+                Text("—").foregroundStyle(Color.secondary.opacity(0.30))
+            }
+        }
+        .font(.system(size: bodySize, weight: present ? .semibold : .regular, design: .rounded))
+        .lineLimit(1).minimumScaleFactor(0.55)
+        .frame(width: colWidth, height: rowHeight, alignment: .leading)
+        .background(band(i))
+        .help(raw.map { "\(ConjugationView.pronouns[i]) — \(name): \($0)" }
+              ?? (Conjugation.hints[name] ?? name))
+    }
+
+    /// The subtle alternating row band, drawn on top of the column tint.
+    private func band(_ i: Int) -> some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(i % 2 == 1 ? Color.primary.opacity(0.045) : Color.clear)
     }
 }
 
@@ -546,7 +777,8 @@ struct GrammarView: View {
                         .foregroundStyle(Palette.vert)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
-                    CopyButton(text: c, model: model)
+                    CopyButton(text: c, label: "Copy", model: model)
+                        .help("Copy the corrected sentence (⌘⇧C)")
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)

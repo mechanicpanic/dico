@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// The five modes of the panel.
 enum Mode: String, CaseIterable, Identifiable {
@@ -95,6 +96,24 @@ enum Section: String, CaseIterable, Identifiable {
         case .conjugaison: return "arrow.triangle.2.circlepath"
         }
     }
+    /// The keyboard shortcut that opens it — shown in the button's tooltip.
+    var shortcut: String {
+        switch self {
+        case .definitions: return "⌘D"
+        case .russe: return "⌘R"
+        case .exemples: return "⌘E"
+        case .conjugaison: return "⌘J"
+        }
+    }
+    /// What it fetches, in one line — the rest of the tooltip.
+    var blurb: String {
+        switch self {
+        case .definitions: return "the Wiktionary entry: IPA, definitions, etymology"
+        case .russe: return "the offline Multitran entry, in full"
+        case .exemples: return "Tatoeba example sentences"
+        case .conjugaison: return "the seven-tense grid, inline"
+        }
+    }
 }
 
 enum SectionContent {
@@ -118,6 +137,10 @@ final class DicoModel: ObservableObject {
     @Published var busy: Bool = false
     @Published var toast: String? = nil
     @Published var shown: Bool = false          // drives the appearance animation
+    /// The ⌘/ sheet.
+    @Published var showShortcuts: Bool = false
+    /// The configured global hotkey, as text — the footer and the sheet show it.
+    @Published var hotkeyLabel: String = HotkeyChoice.fallback.display
 
     /// The last queries, most recent first — shown when the field is empty.
     @Published private(set) var recent: [String] = []
@@ -150,7 +173,11 @@ final class DicoModel: ObservableObject {
     init(recentKey: String = "dico.recent") {
         self.recentKey = recentKey
         recent = (UserDefaults.standard.array(forKey: recentKey) as? [String]) ?? []
+        hotkeyLabel = Shortcuts.globalHotkey
     }
+
+    /// Called after Settings changed the hotkey.
+    func refreshHotkeyLabel() { hotkeyLabel = Shortcuts.globalHotkey }
 
     // MARK: Recent list
 
@@ -373,6 +400,51 @@ final class DicoModel: ObservableObject {
             }
             await MainActor.run { [weak self] in self?.flash(msg) }
         }
+    }
+
+    // MARK: What the keyboard shortcuts drive
+
+    /// ⌘⇧1…⌘⇧5 — switch mode, and re-run the current query in it.
+    func setMode(_ m: Mode) {
+        guard mode != m else { return }
+        mode = m
+        if !query.trimmingCharacters(in: .whitespaces).isEmpty { submit() }
+    }
+
+    /// The sections the current card offers — nil when there is no card.
+    var offeredSections: [Section]? {
+        guard case .mot = outcome else { return nil }
+        var s: [Section] = [.definitions, .russe, .exemples]
+        if cardIsVerb { s.append(.conjugaison) }
+        return s
+    }
+
+    /// ⌘D / ⌘R / ⌘E / ⌘J — open (or close) a section of the Word card.
+    /// Returns false when there is no card, or the card does not offer it.
+    @discardableResult
+    func toggleSectionShortcut(_ s: Section) -> Bool {
+        guard let offered = offeredSections, offered.contains(s) else { return false }
+        toggle(s)
+        return true
+    }
+
+    /// ⌘L — ask the tutor about the word the card is on.
+    @discardableResult
+    func askAboutCurrentCard() -> Bool {
+        guard case .mot = outcome, !cardTerm.isEmpty else { return false }
+        askAbout(cardTerm)
+        return true
+    }
+
+    /// ⌘⇧C — copy the corrected sentence of a Grammar result.
+    @discardableResult
+    func copyCorrected() -> Bool {
+        guard case .grammaire(let g, _) = outcome,
+              let c = g.corrected, !c.isEmpty else { return false }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(c, forType: .string)
+        flash("✓ corrected sentence copied")
+        return true
     }
 
     func flash(_ message: String) {

@@ -135,10 +135,38 @@ struct Definition: Decodable {
 }
 private struct DefinitionEnvelope: Decodable { var definition: Definition? }
 
+/// One translation inside a sense, with the optional note Multitran attaches
+/// to it (a gloss, a domain hint — or a whole example sentence).
+struct MultitranItem: Decodable, Hashable {
+    var tr: String?
+    var note: String?
+}
+
+/// A numbered sense inside a part-of-speech group, tagged with its domain
+/// (общ., юр., тех., gener., mech.eng. …).
+struct MultitranSense: Decodable, Hashable {
+    var n: String?
+    var domain: String?
+    var items: [MultitranItem]?
+}
+
+/// A part-of-speech group. `pos` may be empty, or a short code ("n", "гл.").
+struct MultitranGroup: Decodable, Hashable {
+    var pos: String?
+    var senses: [MultitranSense]?
+}
+
 struct Multitran: Decodable {
     var direction: String?      // "frru" | "rufr"
     var lines: [String]?
+    var groups: [MultitranGroup]?
     var error: String?
+
+    /// Every group that actually carries something.
+    var usableGroups: [MultitranGroup] {
+        (groups ?? []).filter { !(($0.senses ?? []).isEmpty) }
+    }
+    var isEmpty: Bool { usableGroups.isEmpty && (lines ?? []).isEmpty }
 }
 private struct MultitranEnvelope: Decodable { var multitran: Multitran? }
 
@@ -189,6 +217,16 @@ enum DicoError: LocalizedError {
     /// Maps a raw CLI message onto the right case.
     static func from(message: String) -> DicoError {
         meansMissingData(message) ? .setupNeeded : .cli(message)
+    }
+
+    /// The friendly wording for "Multitran is not there" — it is optional, and
+    /// it needs the Apple dictionaries.
+    static let multitranMissing =
+        "Multitran not installed — it needs the Apple dictionaries (optional, see README)"
+
+    /// Multitran's own `error` field, dressed up.
+    static func multitranProblem(_ raw: String) -> DicoError {
+        raw.lowercased().contains("not installed") ? .cli(multitranMissing) : .cli(raw)
     }
 }
 
@@ -360,8 +398,8 @@ enum DicoClient {
     static func multitran(_ word: String) throws -> Multitran {
         let env = try call(MultitranEnvelope.self, ["--json", "-m", word])
         guard let m = env.multitran else { throw DicoError.cli("No Multitran answer") }
-        if let e = m.error, !e.isEmpty { throw DicoError.cli(e) }
-        if (m.lines ?? []).isEmpty {
+        if let e = m.error, !e.isEmpty { throw DicoError.multitranProblem(e) }
+        if m.isEmpty {
             throw DicoError.cli("Nothing in Multitran for \u{ab} \(word) \u{bb}.")
         }
         return m
@@ -374,4 +412,99 @@ enum DicoClient {
         guard let p = env.examples else { throw DicoError.cli("No examples for \u{ab} \(word) \u{bb}.") }
         return p
     }
+
+    // MARK: Long-running calls, streamed (Settings ▸ Offline data)
+
+    /// Runs the CLI and hands every stdout/stderr line to `onLine` as it comes,
+    /// then the exit status to `onExit`. Both on the main queue. Non-blocking.
+    static func stream(_ args: [String],
+                       onLine: @escaping (String) -> Void,
+                       onExit: @escaping (Int32) -> Void) {
+        guard let (exe, prefix) = resolve() else {
+            onLine(DicoError.notFound.errorDescription ?? "dico not found")
+            onExit(127)
+            return
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: exe)
+        task.arguments = prefix + args
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = searchPath.joined(separator: ":")
+        env["PYTHONIOENCODING"] = "utf-8"
+        task.environment = env
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+        do { try task.run() } catch {
+            onLine(DicoError.notFound.errorDescription ?? "dico could not be started")
+            onExit(127)
+            return
+        }
+        DispatchQueue.global(qos: .utility).async {
+            var buffer = Data()
+            let handle = pipe.fileHandleForReading
+            while true {
+                let chunk = handle.availableData
+                if chunk.isEmpty { break }
+                buffer.append(chunk)
+                while let nl = buffer.firstIndex(of: 0x0A) {
+                    let line = String(decoding: buffer[buffer.startIndex..<nl], as: UTF8.self)
+                    buffer.removeSubrange(buffer.startIndex...nl)
+                    let clean = stripANSI(line).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !clean.isEmpty { DispatchQueue.main.async { onLine(clean) } }
+                }
+            }
+            if !buffer.isEmpty {
+                let clean = stripANSI(String(decoding: buffer, as: UTF8.self))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !clean.isEmpty { DispatchQueue.main.async { onLine(clean) } }
+            }
+            task.waitUntilExit()
+            let status = task.terminationStatus
+            DispatchQueue.main.async { onExit(status) }
+        }
+    }
+
+    /// The CLI paints its output; the log view wants plain text.
+    static func stripANSI(_ s: String) -> String {
+        var out = ""
+        var skipping = false
+        for ch in s {
+            if skipping {
+                if ch.isLetter { skipping = false }
+                continue
+            }
+            if ch == "\u{1B}" { skipping = true; continue }
+            out.append(ch)
+        }
+        return out
+    }
+
+    // MARK: Probing a local model server (Settings ▸ Tutor)
+
+    /// `GET <base>/models` — the model ids an OpenAI-compatible server offers.
+    /// Returns nil when nothing answers within `timeout`.
+    static func models(at base: String, key: String = "", timeout: TimeInterval = 2.5) -> [String]? {
+        guard let url = URL(string: base.hasSuffix("/") ? base + "models" : base + "/models")
+        else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        if !key.isEmpty { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        var ids: [String]?
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            defer { sem.signal() }
+            guard let data,
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let list = obj["data"] as? [[String: Any]] else { return }
+            let found = list.compactMap { $0["id"] as? String }
+            if !found.isEmpty { ids = found }
+        }.resume()
+        _ = sem.wait(timeout: .now() + timeout + 1)
+        return ids
+    }
+
+    /// The two local servers the CLI auto-detects.
+    static let localServers = [("LM Studio", "http://localhost:1234/v1"),
+                               ("Ollama", "http://localhost:11434/v1")]
 }
