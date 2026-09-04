@@ -49,6 +49,16 @@ struct Conjugation: Decodable {
     /// The tenses come in an (unordered) dictionary: we impose the order.
     static let order = ["présent", "passé composé", "imparfait", "futur simple",
                         "conditionnel", "subjonctif", "impératif"]
+    /// Tooltips: what each tense is for, in English.
+    static let hints: [String: String] = [
+        "présent": "Présent — what is happening now, or generally true",
+        "passé composé": "Passé composé — a finished action in the past",
+        "imparfait": "Imparfait — an ongoing or habitual past",
+        "futur simple": "Futur simple — what will happen",
+        "conditionnel": "Conditionnel — what would happen",
+        "subjonctif": "Subjonctif — after « que »: wish, doubt, emotion",
+        "impératif": "Impératif — orders (tu / nous / vous only)",
+    ]
     static let shortLabels: [String: String] = [
         "présent": "présent", "passé composé": "passé c.", "imparfait": "imparfait",
         "futur simple": "futur", "conditionnel": "cond.", "subjonctif": "subj.",
@@ -96,6 +106,23 @@ struct XrayToken: Decodable, Hashable {
 }
 private struct XrayEnvelope: Decodable { var xray: [XrayToken]? }
 
+struct Definition: Decodable {
+    var word: String?
+    var ipa: String?
+    var gender: String?
+    var pos: String?
+    var defs: [String]?
+    var etym: String?
+}
+private struct DefinitionEnvelope: Decodable { var definition: Definition? }
+
+struct Multitran: Decodable {
+    var direction: String?      // "frru" | "rufr"
+    var lines: [String]?
+    var error: String?
+}
+private struct MultitranEnvelope: Decodable { var multitran: Multitran? }
+
 struct Answer: Decodable {
     var answer: String?
     var error: String?
@@ -114,6 +141,7 @@ struct SaveResult: Decodable {
 
 enum DicoError: LocalizedError {
     case notFound
+    case setupNeeded
     case timeout
     case badOutput(String)
     case cli(String)
@@ -122,6 +150,8 @@ enum DicoError: LocalizedError {
         switch self {
         case .notFound:
             return "dico not found — install it: uv tool install git+https://github.com/mechanicpanic/dico"
+        case .setupNeeded:
+            return "Offline data not built — run: dico --setup"
         case .timeout:
             return "Too slow… (30 s) — is the local model answering?"
         case .badOutput(let s):
@@ -129,6 +159,17 @@ enum DicoError: LocalizedError {
         case .cli(let s):
             return s
         }
+    }
+
+    /// Does this CLI message mean "the offline databases were never built"?
+    static func meansMissingData(_ message: String) -> Bool {
+        let l = message.lowercased()
+        return l.contains("--setup") || l.contains("not built") || l.contains("not installed — run")
+    }
+
+    /// Maps a raw CLI message onto the right case.
+    static func from(message: String) -> DicoError {
+        meansMissingData(message) ? .setupNeeded : .cli(message)
     }
 }
 
@@ -253,8 +294,11 @@ enum DicoClient {
 
     static func conjugate(_ verb: String) throws -> Conjugation {
         let env = try call(ConjEnvelope.self, ["--json", "-c", verb])
-        guard let c = env.conjugation else { throw DicoError.cli("No conjugation for \u{201c}\(verb)\u{201d}") }
-        if let e = c.error, !e.isEmpty { throw DicoError.cli(e) }
+        guard let c = env.conjugation else { throw DicoError.cli("No conjugation for \u{ab} \(verb) \u{bb}") }
+        if let e = c.error, !e.isEmpty { throw DicoError.from(message: e) }
+        guard c.infinitive != nil, let t = c.tenses, !t.isEmpty else {
+            throw DicoError.cli("\u{ab} \(verb) \u{bb} is not a verb I know how to conjugate.")
+        }
         return c
     }
 
@@ -274,11 +318,41 @@ enum DicoClient {
         var args = ["--json", "-a", question]
         if let c = context, !c.isEmpty { args += ["--context", c] }
         let a = try call(Answer.self, args)
-        if let e = a.error, !e.isEmpty { throw DicoError.cli(e) }
+        if let e = a.error, !e.isEmpty { throw DicoError.from(message: e) }
         return a
     }
 
     static func save(term: String, sens: String) throws -> SaveResult {
         try call(SaveResult.self, ["--json", "--save-term", term, "--sens", sens])
+    }
+
+    // MARK: The word-card sections
+
+    /// Wiktionary entry for a word that is already French (`-f`).
+    static func definition(_ word: String) throws -> Definition {
+        let env = try call(DefinitionEnvelope.self, ["--json", "-f", word])
+        guard let d = env.definition, !(d.defs ?? []).isEmpty else {
+            throw DicoError.cli("No Wiktionary entry for \u{ab} \(word) \u{bb} (needs the internet).")
+        }
+        return d
+    }
+
+    /// Offline Multitran entry (`-m`). The `error` field means "not installed".
+    static func multitran(_ word: String) throws -> Multitran {
+        let env = try call(MultitranEnvelope.self, ["--json", "-m", word])
+        guard let m = env.multitran else { throw DicoError.cli("No Multitran answer") }
+        if let e = m.error, !e.isEmpty { throw DicoError.cli(e) }
+        if (m.lines ?? []).isEmpty {
+            throw DicoError.cli("Nothing in Multitran for \u{ab} \(word) \u{bb}.")
+        }
+        return m
+    }
+
+    /// The example sentences of a French word — a plain lookup, examples only.
+    static func examples(_ word: String) throws -> [[String]] {
+        let l = try lookup(word)
+        let ex = (l.examples ?? []).filter { $0.count >= 2 }
+        if ex.isEmpty { throw DicoError.cli("No example sentence for \u{ab} \(word) \u{bb}.") }
+        return ex
     }
 }

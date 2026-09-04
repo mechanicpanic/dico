@@ -26,6 +26,13 @@ struct WordView: View {
         return order.map { ($0, dict[$0] ?? []) }
     }
 
+    /// The sections offered under the senses.
+    private var offered: [Section] {
+        var s: [Section] = [.definitions, .russe, .exemples]
+        if model.cardIsVerb { s.append(.conjugaison) }
+        return s
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             header
@@ -46,18 +53,11 @@ struct WordView: View {
                 Text("← " + back.prefix(6).joined(separator: ", "))
                     .font(rounded(11, .regular)).foregroundStyle(.tertiary)
             }
-            if let ex = lookup.examples?.first, ex.count >= 2 {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(ex[0]).font(.system(size: 12.5, weight: .regular, design: .rounded))
-                        .italic().foregroundStyle(.primary.opacity(0.85))
-                    Text(ex[1]).font(rounded(11, .regular)).foregroundStyle(.tertiary)
-                }
-                .padding(.leading, 9)
-                .overlay(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2).fill(Palette.bleu.opacity(0.35)).frame(width: 3)
-                }
-                .padding(.top, 2)
+            ForEach(Array((lookup.examples ?? []).prefix(2).enumerated()), id: \.offset) { _, ex in
+                if ex.count >= 2 { ExampleLine(fr: ex[0], en: ex[1]) }
             }
+            actions
+            sections
         }
     }
 
@@ -81,6 +81,214 @@ struct WordView: View {
                 Text("→ \(t)").font(rounded(13, .medium)).foregroundStyle(Palette.bleu)
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    /// One button per section, plus "Ask ?" — no flags, no syntax.
+    private var actions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider().opacity(0.3)
+            FlowLayout(spacing: 6) {
+                ForEach(offered) { s in
+                    ActionButton(icon: s.icon, label: s.label,
+                                 active: model.open.contains(s),
+                                 busy: isLoading(s)) {
+                        withAnimation(.easeOut(duration: 0.15)) { model.toggle(s) }
+                    }
+                }
+                ActionButton(icon: "bubble.left.and.text.bubble.right", label: "Ask ?",
+                             active: false, busy: false) {
+                    model.askAbout(model.cardTerm)
+                }
+            }
+            if !model.cardTerm.isEmpty {
+                Text("about \u{ab} \(model.cardTerm) \u{bb}")
+                    .font(rounded(10, .regular)).foregroundStyle(.quaternary)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func isLoading(_ s: Section) -> Bool {
+        if case .chargement = model.sections[s] { return true }
+        return false
+    }
+
+    private var sections: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(offered.filter { model.open.contains($0) }) { s in
+                SectionView(section: s, state: model.sections[s], model: model).id(s)
+            }
+        }
+    }
+}
+
+struct ExampleLine: View {
+    let fr: String
+    let en: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(fr).font(.system(size: 12.5, weight: .regular, design: .rounded))
+                .italic().foregroundStyle(.primary.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(en).font(rounded(11, .regular)).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.leading, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(Palette.bleu.opacity(0.35)).frame(width: 3)
+        }
+    }
+}
+
+/// A flat button in the action row of the Word card.
+struct ActionButton: View {
+    let icon: String
+    let label: String
+    let active: Bool
+    let busy: Bool
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if busy {
+                    ProgressView().controlSize(.small).scaleEffect(0.55).frame(width: 11, height: 11)
+                } else {
+                    Image(systemName: icon).font(.system(size: 10, weight: .medium))
+                }
+                Text(label).font(rounded(11.5, .medium))
+                if active {
+                    Image(systemName: "chevron.up").font(.system(size: 7, weight: .bold))
+                }
+            }
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(active ? Palette.bleu.opacity(0.16)
+                                 : Color.primary.opacity(hover ? 0.12 : 0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Palette.bleu.opacity(active ? 0.45 : 0), lineWidth: 1)
+            )
+            .foregroundStyle(active ? Palette.bleu : Color.primary.opacity(0.8))
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+    }
+}
+
+/// One expanded section under the senses.
+struct SectionView: View {
+    let section: Section
+    let state: SectionState?
+    @ObservedObject var model: DicoModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(section.label.uppercased())
+                .font(rounded(9.5, .bold)).foregroundStyle(.tertiary).tracking(0.6)
+            content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder private var content: some View {
+        switch state {
+        case .none, .some(.chargement):
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.small).scaleEffect(0.7)
+                Text("loading…").font(rounded(11, .regular)).foregroundStyle(.secondary)
+            }
+        case .some(.erreur(let issue)):
+            VStack(alignment: .leading, spacing: 6) {
+                IssueView(issue: issue, model: model)
+                Button { model.reload(section) } label: {
+                    Text("Try again").font(rounded(10.5, .medium)).foregroundStyle(Palette.bleu)
+                }
+                .buttonStyle(.plain)
+            }
+        case .some(.pret(let payload)):
+            switch payload {
+            case .definition(let d):   DefinitionBody(def: d)
+            case .multitran(let m):    MultitranBody(entry: m)
+            case .examples(let ex):    ExamplesBody(examples: ex)
+            case .conjugation(let c):  ConjugationView(conj: c, compact: true)
+            }
+        }
+    }
+}
+
+struct DefinitionBody: View {
+    let def: Definition
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                Text(def.word ?? "").font(rounded(14, .bold))
+                if let p = def.ipa, !p.isEmpty {
+                    Text("[\(p)]").font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+                if let p = def.pos, !p.isEmpty {
+                    Text(p).font(rounded(10, .medium)).foregroundStyle(.secondary)
+                }
+                if let g = def.gender, !g.isEmpty {
+                    Text(g).font(rounded(10, .bold)).foregroundStyle(Palette.genderTint(g))
+                }
+                Spacer(minLength: 0)
+            }
+            ForEach(Array((def.defs ?? []).enumerated()), id: \.offset) { i, d in
+                HStack(alignment: .top, spacing: 7) {
+                    Text("\(i + 1)").font(rounded(9, .bold))
+                        .frame(width: 15, height: 15)
+                        .background(Circle().fill(Palette.bleu.opacity(0.18)))
+                        .foregroundStyle(Palette.bleu)
+                    Text(d).font(rounded(12, .regular))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if let e = def.etym, !e.isEmpty {
+                Text(e).font(rounded(10.5, .regular)).italic().foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+struct MultitranBody: View {
+    let entry: Multitran
+    private var arrow: String { entry.direction == "rufr" ? "ru → fr" : "fr → ru" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(arrow).font(rounded(9.5, .medium)).foregroundStyle(.quaternary)
+            ForEach(Array((entry.lines ?? []).prefix(24).enumerated()), id: \.offset) { _, line in
+                // A heading like "гл." carries no digit and no separator.
+                let heading = !line.contains(")") && line.count <= 12
+                Text(line)
+                    .font(rounded(heading ? 11 : 12, heading ? .bold : .regular))
+                    .foregroundStyle(heading ? Color.secondary : Color.primary.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, heading ? 3 : 0)
+            }
+        }
+    }
+}
+
+struct ExamplesBody: View {
+    let examples: [[String]]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(examples.enumerated()), id: \.offset) { _, ex in
+                ExampleLine(fr: ex[0], en: ex.count > 1 ? ex[1] : "")
+            }
         }
     }
 }
@@ -128,7 +336,7 @@ struct SenseChip: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.12), value: hover)
-        .help("Click to save \u{201c}\(text)\u{201d} (⌘\(number))")
+        .help("Click to save \u{ab} \(text) \u{bb} (⌘\(number))")
     }
 }
 
@@ -164,7 +372,13 @@ struct FlowLayout: Layout {
 
 struct ConjugationView: View {
     let conj: Conjugation
+    /// Inside a Word-card section the grid gets a little less room.
+    var compact: Bool = false
+
     private let pronouns = ["je", "tu", "il", "nous", "vous", "ils"]
+    private var colWidth: CGFloat { compact ? 66 : 72 }
+    private var spacing: CGFloat { compact ? 2 : 3 }
+    private var bodySize: CGFloat { compact ? 10.5 : 11 }
 
     /// "que je mange" → "mange"; "j'ai mangé" → "ai mangé"; "va" → "va".
     static func strip(_ form: String) -> String {
@@ -177,43 +391,46 @@ struct ConjugationView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Text("🔁").font(.system(size: 15))
-                Text(conj.infinitive ?? "").font(rounded(20, .bold))
-                Spacer()
+        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+            if !compact {
+                HStack(spacing: 7) {
+                    Text("🔁").font(.system(size: 15))
+                    Text(conj.infinitive ?? "").font(rounded(20, .bold))
+                    Spacer()
+                }
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 3) {
-                    GridRow {
-                        Text("").frame(width: 34)
-                        ForEach(conj.orderedTenses, id: \.0) { name, _ in
-                            Text(Conjugation.shortLabels[name] ?? name)
-                                .font(rounded(9.5, .bold)).tracking(0.4)
-                                .foregroundStyle(name == "présent" ? Palette.bleu : Color.secondary)
-                                .frame(width: 86, alignment: .leading)
-                        }
+            Grid(alignment: .leading, horizontalSpacing: spacing, verticalSpacing: 3) {
+                GridRow {
+                    Text("").frame(width: 30)
+                    ForEach(conj.orderedTenses, id: \.0) { name, _ in
+                        Text(Conjugation.shortLabels[name] ?? name)
+                            .font(rounded(9, .bold)).tracking(0.3)
+                            .foregroundStyle(name == "présent" ? Palette.bleu : Color.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                            .frame(width: colWidth, alignment: .leading)
+                            .help(Conjugation.hints[name] ?? name)
                     }
-                    ForEach(Array(pronouns.enumerated()), id: \.offset) { i, pron in
-                        GridRow {
-                            Text(pron).font(rounded(10.5, .medium)).foregroundStyle(.tertiary)
-                                .frame(width: 34, alignment: .trailing)
-                            ForEach(conj.orderedTenses, id: \.0) { name, forms in
-                                let isImp = (name == "impératif")
-                                // The impératif only has 3 forms: tu / nous / vous.
-                                let idx: Int? = isImp ? [nil, 0, nil, 1, 2, nil][i] : (i < forms.count ? i : nil)
-                                Text(idx.map { ConjugationView.strip(forms[$0]) } ?? "—")
-                                    .font(.system(size: 11.5, weight: name == "présent" ? .semibold : .regular,
-                                                  design: .rounded))
-                                    .foregroundStyle(idx == nil ? Color.secondary.opacity(0.35) : .primary)
-                                    .lineLimit(1)
-                                    .frame(width: 86, alignment: .leading)
-                                    .padding(.vertical, 2.5).padding(.horizontal, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 5)
-                                            .fill(name == "présent" ? Palette.bleu.opacity(0.10) : .clear)
-                                    )
-                            }
+                }
+                ForEach(Array(pronouns.enumerated()), id: \.offset) { i, pron in
+                    GridRow {
+                        Text(pron).font(rounded(10.5, .medium)).foregroundStyle(.tertiary)
+                            .frame(width: 30, alignment: .trailing)
+                        ForEach(conj.orderedTenses, id: \.0) { name, forms in
+                            let isImp = (name == "impératif")
+                            // The impératif only has 3 forms: tu / nous / vous.
+                            let idx: Int? = isImp ? [nil, 0, nil, 1, 2, nil][i] : (i < forms.count ? i : nil)
+                            Text(idx.map { ConjugationView.strip(forms[$0]) } ?? "—")
+                                .font(.system(size: bodySize, weight: name == "présent" ? .semibold : .regular,
+                                              design: .rounded))
+                                .foregroundStyle(idx == nil ? Color.secondary.opacity(0.35) : .primary)
+                                .lineLimit(1).minimumScaleFactor(0.62)
+                                .frame(width: colWidth, alignment: .leading)
+                                .padding(.vertical, 2.5).padding(.horizontal, 3)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(name == "présent" ? Palette.bleu.opacity(0.10) : .clear)
+                                )
+                                .help(Conjugation.hints[name] ?? name)
                         }
                     }
                 }
@@ -281,17 +498,7 @@ struct GrammarView: View {
                         .foregroundStyle(Palette.vert)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(c, forType: .string)
-                        model.flash("✓ copied")
-                    } label: {
-                        Text("Copy").font(rounded(10.5, .medium))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Palette.vert.opacity(0.16), in: Capsule())
-                            .foregroundStyle(Palette.vert)
-                    }
-                    .buttonStyle(.plain)
+                    CopyButton(text: c, model: model)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -332,8 +539,8 @@ struct XrayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                cell("word", 74, .bold); cell("lemma", 70, .bold); cell("pos", 88, .bold)
-                cell("tense", 96, .bold); cell("role", 78, .bold); cell("meaning", 80, .bold)
+                cell("word", 84, .bold); cell("lemma", 80, .bold); cell("pos", 96, .bold)
+                cell("tense", 104, .bold); cell("role", 88, .bold); cell("meaning", 100, .bold)
             }
             .foregroundStyle(.tertiary).padding(.bottom, 3)
             Divider().opacity(0.4)
@@ -341,10 +548,10 @@ struct XrayView: View {
                 HStack(spacing: 0) {
                     Text(t.text ?? "").font(rounded(12, .semibold))
                         .foregroundStyle(Palette.genderTint(t.gender))
-                        .frame(width: 74, alignment: .leading).lineLimit(1)
-                    cell(t.lemma ?? "", 70); cell(t.pos ?? "", 88)
-                    cell((t.tense ?? "").split(separator: ";").first.map(String.init) ?? "", 96)
-                    cell(t.role ?? "", 78); cell(t.gloss ?? "", 80)
+                        .frame(width: 84, alignment: .leading).lineLimit(1)
+                    cell(t.lemma ?? "", 80); cell(t.pos ?? "", 96)
+                    cell((t.tense ?? "").split(separator: ";").first.map(String.init) ?? "", 104)
+                    cell(t.role ?? "", 88); cell(t.gloss ?? "", 100)
                 }
                 .padding(.vertical, 3.5)
                 .background(i % 2 == 1 ? Color.primary.opacity(0.035) : .clear)
@@ -364,9 +571,14 @@ struct XrayView: View {
 
 struct AnswerView: View {
     let answer: Answer
+    var context: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let c = context, !c.isEmpty {
+                Text("about \u{ab} \(c) \u{bb}")
+                    .font(rounded(10.5, .medium)).foregroundStyle(.tertiary)
+            }
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 if line.hasPrefix("- ") || line.hasPrefix("* ") {
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
