@@ -7,7 +7,7 @@ Pour pouvoir taper **`dico mot`** depuis n'importe où dans le terminal.
 Ajoute cette ligne à la fin de ton fichier `~/.zshrc` :
 
 ```sh
-alias dico="python3 /Users/aleph/Projects/vibes/francais/dico.py"
+uv tool install git+https://github.com/mechanicpanic/dico && dico --setup   # ou : alias dico="python3 $HOME/Projects/vibes/dico/dico.py"
 ```
 
 Puis recharge le terminal :
