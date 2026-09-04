@@ -2110,6 +2110,11 @@ def as_json(text, args):
     out = {"query": text}
     if not text:
         return out
+    if args.ai or args.profond:
+        q = text if len(text.split()) > 1 else None
+        ans, err = (ai_ask(q, args.profond) if q else ai_explain(text, deep=args.profond))
+        out.update({"answer": ans, "error": err, "model": _llm_label()})
+        return out
     if args.grammaire:
         gc = _grammalecte()
         gram, spell = gc.getParagraphErrors(text, bSpellSugg=True) if gc else ([], [])
@@ -2220,6 +2225,12 @@ def main():
                         "Grammalecte ; Multitran si les dictionnaires Apple sont présents)")
     p.add_argument("--json", action="store_true",
                    help="sortie JSON (pour une interface graphique / Raycast / etc.)")
+    p.add_argument("--save-term", metavar="TERME",
+                   help="enregistre ce terme français (avec --sens : le sens au dos)")
+    p.add_argument("--sens", metavar="TEXTE", default="",
+                   help="sens (mot d'origine / traduction) pour --save-term")
+    p.add_argument("--context", metavar="TEXTE", default="",
+                   help="contexte pour une question (-a) : dernier mot / dernière phrase")
     p.add_argument("--mots-outils", nargs="?", const=120, type=int, metavar="N",
                    help="affiche le NOYAU de mots-outils (articles, prépositions, "
                         "pronoms, conjonctions, auxiliaires) — l'échafaudage grammatical")
@@ -2227,6 +2238,14 @@ def main():
 
     if args.setup:
         return run_setup()
+    if args.save_term:
+        if args.json:
+            front, lex = _fr_head(args.save_term)
+            _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
+            return print(json.dumps({"saved": front, "sens": args.sens}, ensure_ascii=False))
+        return _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
+    if args.context:
+        _LAST["word"] = args.context
     if args.json:
         return print(json.dumps(as_json(" ".join(args.mots), args), ensure_ascii=False, indent=2))
     if args.mots_outils is not None:

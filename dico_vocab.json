@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "front": "un chat",
+      "lemma": "chat",
+      "sens": "chat",
+      "pos": "nom",
+      "gender": "m",
+      "example": "",
+      "src_word": "chat",
+      "src_lang": "en",
+      "tier": "google",
+      "key": "chat",
+      "count": 1,
+      "first_seen": "2026-09-04T15:00:10",
+      "last_seen": "2026-09-04T15:00:10"
+    }
+  ]
+}
