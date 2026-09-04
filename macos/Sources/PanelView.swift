@@ -36,6 +36,10 @@ func rounded(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
 struct VisualEffect: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let v = NSVisualEffectView()
+        v.wantsLayer = true
+        v.layer?.cornerRadius = 16
+        v.layer?.cornerCurve = .continuous
+        v.layer?.masksToBounds = true
         v.material = .hudWindow
         v.blendingMode = .behindWindow
         v.state = .active
@@ -65,7 +69,7 @@ struct PanelView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+        // (ombre : native, via NSPanel.hasShadow — une ombre SwiftUI serait rognée aux bords de la fenêtre)
         .overlay(alignment: .bottom) { toast }
         // Apparition élastique
         .scaleEffect(model.shown ? 1 : 0.90)

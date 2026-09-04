@@ -312,6 +312,11 @@ def _render_card_fr(word, lex, examples=True):
         print(f"     {DIM}{pos:10}{RESET} {line}")
         senses.extend(t for t, _ in terms[:6])
     _LAST["senses"] = [head]
+    if lex and lex["cgram"].startswith(("VER", "AUX")) and not _LAST.get("conj_shown"):
+        inf, data, _ = _conj_query(lex["lemma"])
+        if data and data.get("présent"):
+            print(f"     {DIM}présent{RESET}    " + "  ·  ".join(data["présent"])
+                  + f"   {DIM}(!c pour tout){RESET}")
     if examples:
         for fr, tr in _tatoeba(word, "eng"):
             print(f"     {DIM}« {fr} » — {tr}{RESET}")
@@ -1662,9 +1667,23 @@ def _show_grammar(sentence):
 # --------------------------------------------------------------------------- #
 #  Affichage                                                                  #
 # --------------------------------------------------------------------------- #
+def _looks_french_sentence(text):
+    """≥ 3 mots, pas de cyrillique, et la majorité des mots connus de Lexique."""
+    toks = [t for t in re.findall(r"[\w'’-]+", text) if not t.isdigit()]
+    if len(toks) < 3 or re.search(r"[\u0400-\u04FF]", text):
+        return False
+    hits = sum(1 for t in toks if lexique_lookup(t.strip("'’")) is not None)
+    return hits / len(toks) >= 0.6
+
+
 def show(word, want_dict=False, want_ai=False, want_save=False,
          want_multi=False, want_conj=False, want_deep=False, want_fr=False,
          want_save_main=False, want_gram=False, want_xray=False):
+    # Détection d'intention : une PHRASE française sans préfixe → grammaire.
+    if not any((want_dict, want_ai, want_save, want_multi, want_conj, want_deep,
+                want_fr, want_save_main, want_gram, want_xray)) and _looks_french_sentence(word):
+        want_gram = True
+        print(f"  {DIM}phrase française → grammaire  (« !x » pour les rayons X, « ? » pour demander){RESET}")
     if (want_ai or want_deep) and len(word.split()) > 1 and not (
             want_dict or want_fr or want_multi or want_conj):
         _show_ai(word, deep=bool(want_deep), question=word)   # question libre
@@ -1685,6 +1704,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     conj_inf = conj_tenses = conj_err = None
     conj_tense = None
     conj_from_fr = False
+    _LAST["conj_shown"] = bool(want_conj)
     if want_conj:
         word, conj_tense = _split_tense(word)   # « manger present » → temps filtré
         conj_inf, conj_tenses, conj_err, conj_from_fr = conjugate_lookup(word)

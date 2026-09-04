@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.level = .floating
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false                 // l'ombre est dessinée par SwiftUI
+        panel.hasShadow = true                  // ombre native, épouse les coins arrondis (fenêtre non opaque)
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
@@ -89,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.shown = false
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { [weak self] in self?.panel.invalidateShadow() }
         model.shown = true                       // déclenche l'animation élastique
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
             NotificationCenter.default.post(name: .dicoFocusField, object: nil)

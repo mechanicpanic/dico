@@ -45,6 +45,11 @@ se battre avec les drapeaux quand Google a choisi la mauvaise nature. Un mot
 fréquence, puis ses sens anglais. `:examples off` coupe les phrases Tatoeba.
 
 **Pas besoin de taper les accents** : `etre` trouve *être*, `creche` trouve *crèche*.
+**Sans préfixe, dico devine** : un mot RU/EN → carte ; un mot français → sa carte
+(un verbe : + son présent) ; une **phrase française** → correction grammaticale ;
+`? …` → le tuteur. Les préfixes ne servent qu'à forcer une vue (`!c` grille
+complète, `!x` rayons X, `!m` Multitran, `!f`/`!d` Wiktionnaire).
+
 **Préfixes tolérants** (mode interactif) : `!c manger`, `! c manger`, `manger !c`, `-c manger`,
 `--conj manger`, `!cf mot`, `!C MANGER` — tous équivalents. Préfixe inconnu → message clair.
 
