@@ -106,6 +106,25 @@ struct XrayToken: Decodable, Hashable {
 }
 private struct XrayEnvelope: Decodable { var xray: [XrayToken]? }
 
+/// One Tatoeba example: the French sentence plus one translation.
+struct ExampleSentence: Decodable, Hashable {
+    var fr: String?
+    var en: String?
+    var ru: String?
+    /// Whichever translation this sentence carries.
+    var gloss: String? { en ?? ru }
+}
+
+/// `--examples` returns two lists: English translations, then Russian ones.
+struct ExamplePack: Decodable {
+    var en: [ExampleSentence]?
+    var ru: [ExampleSentence]?
+
+    var isEmpty: Bool { (en ?? []).isEmpty && (ru ?? []).isEmpty }
+    static let empty = ExamplePack(en: [], ru: [])
+}
+private struct ExamplesEnvelope: Decodable { var examples: ExamplePack? }
+
 struct Definition: Decodable {
     var word: String?
     var ipa: String?
@@ -348,11 +367,11 @@ enum DicoClient {
         return m
     }
 
-    /// The example sentences of a French word — a plain lookup, examples only.
-    static func examples(_ word: String) throws -> [[String]] {
-        let l = try lookup(word)
-        let ex = (l.examples ?? []).filter { $0.count >= 2 }
-        if ex.isEmpty { throw DicoError.cli("No example sentence for \u{ab} \(word) \u{bb}.") }
-        return ex
+    /// The Tatoeba example sentences of a French word (`--examples`).
+    /// An empty pack is a valid answer — the view says "No examples found".
+    static func examples(_ word: String) throws -> ExamplePack {
+        let env = try call(ExamplesEnvelope.self, ["--json", "--examples", word])
+        guard let p = env.examples else { throw DicoError.cli("No examples for \u{ab} \(word) \u{bb}.") }
+        return p
     }
 }

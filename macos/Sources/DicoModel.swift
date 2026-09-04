@@ -100,7 +100,7 @@ enum Section: String, CaseIterable, Identifiable {
 enum SectionContent {
     case definition(Definition)
     case multitran(Multitran)
-    case examples([[String]])
+    case examples(ExamplePack)
     case conjugation(Conjugation)
 }
 
@@ -138,6 +138,9 @@ final class DicoModel: ObservableObject {
     private(set) var cardTerm: String = ""
     /// Is that term a verb? (drives the Conjugate button)
     private(set) var cardIsVerb: Bool = false
+    /// The example(s) that came with the card — kept at the top of the
+    /// Examples section when Tatoeba does not repeat them.
+    private(set) var cardExamples: [[String]] = []
 
     private var generation = 0
     private var toastTask: Task<Void, Never>?
@@ -263,6 +266,7 @@ final class DicoModel: ObservableObject {
     /// Works out what French term the card's sections should query.
     private func adopt(card l: Lookup, query q: String) {
         currentSource = q
+        cardExamples = (l.examples ?? []).filter { $0.count >= 2 }
         if l.direction == "fr" {
             cardTerm = l.lexique?.lemma ?? l.query ?? q
             cardIsVerb = (l.lexique?.pos ?? "").contains("verbe")

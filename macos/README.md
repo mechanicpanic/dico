@@ -37,7 +37,7 @@ The card is the whole dictionary, not just the translation:
 |---|---|---|
 | **Definitions** | the Wiktionary entry: IPA, part of speech, numbered definitions, etymology | `-f` |
 | **Russian** | the offline Multitran entry | `-m` |
-| **Examples** | the example sentences of the French term | plain lookup |
+| **Examples** | Tatoeba sentences: up to 4 with an English translation, then up to 2 with a Russian one (🇷🇺); the card's own example stays first unless Tatoeba already has it. “No examples found” when both lists are empty | `--examples` |
 | **Conjugate** | the conjugation grid, inline (verbs only) | `-c` |
 | **Ask ?** | switches to Ask with this word as the tutor's context | `-a --context` |
 
@@ -83,7 +83,7 @@ open build/Dico.app                          # then ⌥D
 ```
 
 `--selftest` runs every CLI call the panel makes (word, conjugation, grammar,
-x-ray, Wiktionary, Multitran, examples, tutor), lays the views out off screen —
+x-ray, Wiktionary, Multitran, `--examples` — both a full and an empty pack, tutor), lays the views out off screen —
 including a word card **with a section expanded** — and checks the recent list
 and the clear-on-erase behaviour. It prints one ✓ per line and exits non-zero on
 the first ✗.

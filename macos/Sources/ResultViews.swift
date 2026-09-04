@@ -126,18 +126,27 @@ struct WordView: View {
 struct ExampleLine: View {
     let fr: String
     let en: String
+    /// A small 🇷🇺 in front of a Russian translation.
+    var flag: String? = nil
+    var tint: Color = Palette.bleu
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(fr).font(.system(size: 12.5, weight: .regular, design: .rounded))
                 .italic().foregroundStyle(.primary.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
-            Text(en).font(rounded(11, .regular)).foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !en.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    if let f = flag { Text(f).font(.system(size: 9)) }
+                    Text(en).font(rounded(11, .regular)).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .padding(.leading, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2).fill(Palette.bleu.opacity(0.35)).frame(width: 3)
+            RoundedRectangle(cornerRadius: 2).fill(tint.opacity(0.35)).frame(width: 3)
         }
     }
 }
@@ -217,7 +226,7 @@ struct SectionView: View {
             switch payload {
             case .definition(let d):   DefinitionBody(def: d)
             case .multitran(let m):    MultitranBody(entry: m)
-            case .examples(let ex):    ExamplesBody(examples: ex)
+            case .examples(let pack):  ExamplesBody(pack: pack, own: model.cardExamples)
             case .conjugation(let c):  ConjugationView(conj: c, compact: true)
             }
         }
@@ -283,11 +292,50 @@ struct MultitranBody: View {
 }
 
 struct ExamplesBody: View {
-    let examples: [[String]]
+    let pack: ExamplePack
+    /// The example the card itself came with — kept first when Tatoeba
+    /// does not already have it.
+    var own: [[String]] = []
+
+    /// A French sentence, folded for the duplicate check.
+    private static func key(_ s: String) -> String {
+        s.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+    }
+
+    /// The card's own example(s) first, then everything Tatoeba returned.
+    private var english: [ExampleSentence] {
+        let fetched = pack.en ?? []
+        var seen = Set(fetched.compactMap { $0.fr.map(ExamplesBody.key) })
+        var out: [ExampleSentence] = []
+        for ex in own where ex.count >= 2 {
+            let k = ExamplesBody.key(ex[0])
+            if seen.contains(k) { continue }
+            seen.insert(k)
+            out.append(ExampleSentence(fr: ex[0], en: ex[1], ru: nil))
+        }
+        return out + fetched
+    }
+
+    private var russian: [ExampleSentence] { pack.ru ?? [] }
+
+    /// What `--selftest` prints: how the two lists came out after merging.
+    var debugSummary: String {
+        "merged \(english.count) en (+\(english.count - (pack.en ?? []).count) own) / \(russian.count) ru"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(examples.enumerated()), id: \.offset) { _, ex in
-                ExampleLine(fr: ex[0], en: ex.count > 1 ? ex[1] : "")
+            if english.isEmpty && russian.isEmpty {
+                Text("No examples found")
+                    .font(rounded(11.5, .regular)).foregroundStyle(.secondary)
+            }
+            ForEach(Array(english.enumerated()), id: \.offset) { _, ex in
+                ExampleLine(fr: ex.fr ?? "", en: ex.en ?? "")
+            }
+            ForEach(Array(russian.enumerated()), id: \.offset) { _, ex in
+                ExampleLine(fr: ex.fr ?? "", en: ex.ru ?? "",
+                            flag: "🇷🇺", tint: Palette.rose)
             }
         }
     }

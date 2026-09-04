@@ -247,9 +247,25 @@ func runSelfTest() -> Int32 {
         let m = try DicoClient.multitran("cuisiner")
         return "\(m.direction ?? "?") — \((m.lines ?? []).count) line(s): \((m.lines ?? []).prefix(2).joined(separator: " | "))"
     }
-    line("examples cuisiner") {
-        let ex = try DicoClient.examples("cuisiner")
-        return "\(ex.count) — \(ex.first?.first ?? "")"
+    line("examples --examples cuisiner") {
+        let p = try DicoClient.examples("cuisiner")
+        let en = p.en ?? [], ru = p.ru ?? []
+        guard !en.isEmpty, !ru.isEmpty else { throw Failed(why: "expected both lists, got \(en.count) en / \(ru.count) ru") }
+        // The card's own example must not be repeated once Tatoeba has it.
+        let own = [["Dois-tu cuisiner ?", "Do you have to cook?"], ["Une phrase inédite.", "A brand-new sentence."]]
+        let host = NSHostingView(rootView:
+            ExamplesBody(pack: p, own: own).frame(width: PanelSize.width - 60))
+        host.layoutSubtreeIfNeeded()
+        let merged = ExamplesBody(pack: p, own: own)
+        return "\(en.count) en / \(ru.count) ru — \(en.first?.fr ?? "") / \(ru.first?.ru ?? "") | body \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height)) | \(merged.debugSummary)"
+    }
+    line("examples: empty pack") {
+        let p = try DicoClient.examples("zzqqzzxyw")
+        guard p.isEmpty else { throw Failed(why: "expected an empty pack") }
+        let host = NSHostingView(rootView:
+            ExamplesBody(pack: p).frame(width: PanelSize.width - 60))
+        host.layoutSubtreeIfNeeded()
+        return "empty → \"No examples found\" (body \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height)))"
     }
     line("tutor tu ou vous") {
         let a = try DicoClient.ask("tu ou vous ?", context: "cuisiner")
