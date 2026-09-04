@@ -1144,6 +1144,11 @@ def _xray_tokens(sentence):
         w = raw.strip(".,;:!?…«»\"()[]")
         if w:
             toks.append(w)
+    # « j habitais » tapé sans apostrophe → j' (élision devant voyelle / h)
+    for i in range(len(toks) - 1):
+        if toks[i].lower() in ("j", "l", "d", "m", "n", "t", "s", "c", "qu") \
+                and toks[i + 1][:1].lower() in "aeiouyhàâéèêëîïôûùœ":
+            toks[i] += "'"
     return toks
 
 
