@@ -123,6 +123,36 @@ In interactive mode: `:save on|off` · `:forget <word>` · `:render` · `:spacy 
 Every save enriches the word with its **gender** (→ *un/une*), the accented lemma,
 the part of speech and the source language; repeats bump an `×N` counter.
 
+## Getting started
+
+```sh
+uv tool install git+https://github.com/mechanicpanic/dico
+dico --setup     # builds the offline data (~2 min), then asks about the tutor
+dico --tour      # a 2-minute guided walkthrough
+dico             # the interactive mode — just type
+```
+
+**No flags to learn.** dico guesses what you mean: an English/Russian word → a card
+with numbered senses; a French word → its card (verbs show their présent); a French
+sentence → grammar check with the rule; `? …` → the tutor. Then act on the card in
+plain words:
+
+```
+» cook                → card (1 cuisiner  2 cuire … 5 un cuisinier)
+» save 5              → saves « un cuisinier » (the noun, not the verb)
+» conj                → full conjugation grid
+» def                 → dictionary definitions (Wiktionary)
+» ru                  → Russian (Multitran, offline)
+» ex                  → example sentences (EN + RU)
+» ? is it formal      → ask the tutor about what you're looking at
+» help                → the cheat-sheet
+```
+
+**Tutor without a local model?** Run `dico --llm` and bring your own key — Anthropic,
+OpenAI, Mistral, Groq, Gemini or any OpenAI-compatible URL. It's tested once and
+stored in `~/.dico_config.json` (chmod 600). Or point LM Studio / Ollama at a model
+and dico finds it by itself.
+
 ## Installation
 
 ```sh

@@ -71,7 +71,7 @@ def main():
     con.commit()
     n = con.execute("SELECT count(*) FROM lexique").fetchone()[0]
     con.close()
-    print(f"✓ {n} forms → {os.path.relpath(DB, HERE)}")
+    print(f"✓ {n} forms → {DB}")
 
 
 if __name__ == "__main__":

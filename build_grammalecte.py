@@ -27,7 +27,7 @@ def latest_zip():
 
 def main():
     if os.path.isdir(os.path.join(DEST, "grammalecte")):
-        print(f"✓ Grammalecte already installed → {os.path.relpath(DEST, HERE)}")
+        print(f"✓ Grammalecte already installed → {DEST}")
         return
     os.makedirs(DATA, exist_ok=True)
     url, v = latest_zip()
@@ -37,7 +37,7 @@ def main():
     with zipfile.ZipFile(zpath) as z:
         z.extractall(DEST)
     os.remove(zpath)
-    print(f"✓ Grammalecte v{v} → {os.path.relpath(DEST, HERE)}  (dico -g \"sentence\")")
+    print(f"✓ Grammalecte v{v} → {DEST}  (dico -g \"sentence\")")
 
 
 if __name__ == "__main__":

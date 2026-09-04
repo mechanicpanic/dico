@@ -271,8 +271,8 @@ def _render_card_to_fr(word, src, translation, groups, examples=True):
         for fr, tr in _tatoeba(translation.split()[-1] if " " in translation else translation, "eng"):
             print(f"     {DIM}« {fr} » — {tr}{RESET}")
     _LAST["hints"] = _LAST.get("hints", 0) + 1
-    if _LAST["hints"] <= 2:
-        print(f"     {DIM}!s N saves sense N (default: 1){RESET}")
+    if _LAST["hints"] <= 3:
+        print(f"     {DIM}{_FOLLOW_HINT}{RESET}")
 
 
 def _render_card_fr(word, lex, examples=True):
@@ -312,6 +312,9 @@ def _render_card_fr(word, lex, examples=True):
         print(f"     {DIM}{pos:10}{RESET} {line}")
         senses.extend(t for t, _ in terms[:6])
     _LAST["senses"] = [head]
+    _LAST["hints"] = _LAST.get("hints", 0) + 1
+    if _LAST["hints"] <= 3:
+        print(f"     {DIM}{_FOLLOW_HINT}{RESET}")
     if lex and lex["cgram"].startswith(("VER", "AUX")) and not _LAST.get("conj_shown"):
         inf, data, _ = _conj_query(lex["lemma"])
         if data and data.get("présent"):
@@ -676,11 +679,13 @@ def _llm_reachable():
 
 def llm_complete(system, user, max_tokens=400, deep=False):
     """1) local/OpenAI-compatible endpoint if it answers, 2) Anthropic API, 3) `claude`."""
+    if config_load().get("llm") == "none":
+        return None, "no tutor configured — run: dico --llm"
     if os.environ.get("DICO_LLM_URL") or config_load().get("llm_url") or _llm_reachable():
         return _llm_openai(system, user, max_tokens)
     model = AI_MODEL_DEEP if deep else AI_MODEL
     prompt = system + "\n\n" + user
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or config_load().get("anthropic_key")
     if api_key:
         return _ai_via_api(prompt, api_key, model, max_tokens)
     return _ai_via_cli(prompt, model)
@@ -796,13 +801,24 @@ def config_load():
 
 def config_set(key, value):
     cfg = config_load()
-    cfg[key] = value
+    if value is None:
+        cfg.pop(key, None)
+    else:
+        cfg[key] = value
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
+        os.chmod(CONFIG_PATH, 0o600)          # may hold an API key
     except OSError:
         pass
     return cfg
+
+
+def _data_ready():
+    return os.path.exists(LEXIQUE_DB) and os.path.exists(CONJ_DB)
+
+
+_NO_AUTOSAVE = False                          # set during --tour
 
 
 def autosave_on():
@@ -991,7 +1007,7 @@ def multitran_lookup(word):
     Accent-tolerant through the nkey column. Returns (lines, direction, error)."""
     direction = "rufr" if detect_lang(word) == "ru" else "frru"
     if not os.path.exists(MULTI_DB):
-        return None, direction, "database missing (run build_multitran.py)"
+        return None, direction, "Multitran not installed (optional: needs the Apple dictionaries, see README)"
     key = word.strip().lower()
     nkey = _deaccent(key)
     try:
@@ -1022,7 +1038,7 @@ CONJ_DB = os.path.join(DATA_DIR, "conjugations.db")
 
 def _conj_query(verb):
     if not os.path.exists(CONJ_DB):
-        return None, None, "database missing (run: uv run build_conjugations.py)"
+        return None, None, "conjugation data not built — run: dico --setup"
     try:
         con = sqlite3.connect(f"file:{CONJ_DB}?mode=ro", uri=True)
         row = con.execute("SELECT verb, data FROM verbs WHERE verb=? LIMIT 1",
@@ -1333,7 +1349,7 @@ def show_mots_outils(limit=120, save=False):
     With save=True, add the ones that have a gloss to the vocabulary (→ cards)."""
     rows = mots_outils(limit)
     if not rows:
-        print(f"{YELLOW}Lexique missing — run: python3 build_lexique.py{RESET}")
+        print(f"{YELLOW}Lexique not built — run: dico --setup{RESET}")
         return
     groups = {}
     for lemme, cgram, f in rows:
@@ -1487,6 +1503,21 @@ def _gloss_for(lemma, token):
     return ""
 
 
+def _show_multitran(word):
+    lines, direction, err = multitran_lookup(word)
+    arrow = "ru→fr" if direction == "rufr" else "fr→ru"
+    if lines:
+        print(f"  {CYAN}📚 Multitran ({arrow}){RESET}")
+        for ln in lines[:14]:
+            print(f"     {ln}")
+        if len(lines) > 14:
+            print(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
+    elif err:
+        print(f"  {DIM}📚 Multitran: {err}{RESET}")
+    else:
+        print(f"  {DIM}📚 (not in Multitran {arrow}: « {word} »){RESET}")
+
+
 def _show_xray(sentence):
     """Every word: lemma · pos · tense/person · gender · frequency · role · meaning."""
     sentence = sentence.strip()
@@ -1617,8 +1648,7 @@ def _show_grammar(sentence):
     """Highlighted sentence → each mistake (what, why, suggestion) → fixed version."""
     gc = _grammalecte()
     if gc is None:
-        print(f"  {YELLOW}✗ Grammalecte missing — run: python3 build_grammalecte.py "
-              f"(or ./setup.sh){RESET}")
+        print(f"  {YELLOW}✗ Grammalecte not installed — run: dico --setup{RESET}")
         return
     text = sentence.strip()
     try:
@@ -1778,18 +1808,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
               f"{cognate['band']}) — \u00ab !f {word} \u00bb for its meaning{RESET}")
 
     if want_multi:
-        lines, direction, err = multitran_lookup(word)
-        arrow = "ru→fr" if direction == "rufr" else "fr→ru"
-        if lines:
-            print(f"  {CYAN}📚 Multitran ({arrow}){RESET}")
-            for ln in lines[:14]:
-                print(f"     {ln}")
-            if len(lines) > 14:
-                print(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
-        elif err:
-            print(f"  {DIM}📚 Multitran : {err}{RESET}")
-        else:
-            print(f"  {DIM}📚 (not in Multitran {arrow}: \u00ab {word} \u00bb){RESET}")
+        _show_multitran(word)
 
     if want_conj:
         shown = conj_tenses
@@ -1819,7 +1838,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
         q = word if len(word.split()) > 1 else None   # several words = free-form question
         _show_ai(word, deep=bool(want_deep), question=q)
 
-    auto = autosave_on()
+    auto = autosave_on() and not _NO_AUTOSAVE
     if (auto or want_save or want_save_main) and translation:
         # Enrichment: 1) the Wiktionary entry already shown (-f/-d, rich),
         # 2) OFFLINE Lexique (lemma/gender/pos, no network),
@@ -1930,6 +1949,53 @@ def _parse_line(line):
     return word, flags, err
 
 
+_FOLLOW_HINT = "↳  save N · conj · def · ru · ex · ? question"
+
+
+def _follow_up(line):
+    """Plain-word actions on the last card — no flags to remember. True if handled."""
+    low = line.strip().lower()
+    fr = _LAST.get("fr") or ""
+    m = re.match(r"^(?:save|s)\s+(\d+)$", low)
+    if m:
+        n = int(m.group(1)); senses = _LAST.get("senses") or []
+        if 1 <= n <= len(senses):
+            _save_term(senses[n - 1], _LAST.get("word", ""), detect_lang(_LAST.get("word", "")))
+        else:
+            print(f"  {DIM}sense {n}? the last card has {len(senses)}{RESET}")
+        return True
+    if low in ("help", "h", ":help", "?help"):
+        _print_cheatsheet()
+        return True
+    if low not in ("conj", "conjugate", "def", "definition", "define", "ru", "multitran",
+                   "ex", "examples", "x", "xray", "x-ray"):
+        return False
+    if not fr and not _LAST.get("sentence"):
+        print(f"  {DIM}look something up first — then « {low} » acts on it{RESET}")
+        return True
+    if low in ("conj", "conjugate"):
+        global _NO_AUTOSAVE
+        prev, _NO_AUTOSAVE = _NO_AUTOSAVE, True
+        try:
+            show(fr, want_conj=True)
+        finally:
+            _NO_AUTOSAVE = prev
+    elif low in ("def", "definition", "define"):
+        _show_wikt(fr)
+    elif low in ("ru", "multitran"):
+        _show_multitran(fr)
+    elif low in ("ex", "examples"):
+        exs = _tatoeba(fr, "eng", limit=3) + _tatoeba(fr, "rus", limit=1)
+        if exs:
+            for s, t in exs:
+                print(f"     {DIM}« {s} » — {t}{RESET}")
+        else:
+            print(f"  {DIM}no example sentences found for « {fr} »{RESET}")
+    else:
+        _show_xray(_LAST.get("sentence") or fr)
+    return True
+
+
 def _repl_command(line):
     """":" commands of the interactive mode (settings, not lookups)."""
     parts = line[1:].split()
@@ -2014,6 +2080,13 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
     base_flags = {k for k, v in (("d", base_d), ("a", base_a), ("s", base_s or base_S),
                                  ("m", base_m), ("c", base_c), ("p", base_p),
                                  ("f", base_f), ("g", base_g), ("x", base_x)) if v}
+    if not _data_ready():
+        print(f"\n{BOLD}👋 Welcome to dico.{RESET} The offline data (conjugations, Lexique, "
+              f"Grammalecte — ~50 MB, 2 min) isn't built yet.")
+        if sys.stdin.isatty() and _ask("   Build it now? [Y/n] ", "y").lower().startswith("y"):
+            run_setup()
+        else:
+            print(f"   {DIM}later: dico --setup{RESET}")
     _load_history()                            # ↑ recalls the previous words
     try:                                       # to detect a REPL that went stale
         src_mtime = os.path.getmtime(os.path.abspath(__file__))
@@ -2029,23 +2102,9 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
     state = f"{GREEN}ON{RESET}" if autosave_on() else f"{DIM}off{RESET}"
     print(f"\n{BOLD}📖 dico{RESET}  —  Russian / English → French"
           f"        {DIM}autosave{RESET} {state}   {DIM}tutor {_llm_label()}{RESET}\n")
-    left = [("word", "card: numbered senses · gender · example"),
-            ("!c verb", "conjugation"),
-            ("!g sentence", "grammar: fixes it + names the rule"),
-            ("!x sentence", "x-ray: lemma · tense · role · meaning"),
-            ("? question", "AI tutor (context: the last word)")]
-    right = [("!s N", "save sense N of the card"),
-             ("!f  !d", "Wiktionary: FR word / after translation"),
-             ("!m word", "Multitran ru<->fr, offline"),
-             ("!a  !p", "short / long AI card"),
-             ("q", "quit")]
-    kw, dw = max(len(k) for k, _ in left), max(len(d) for _, d in left)
-    kw2 = max(len(k) for k, _ in right)
-    for (k1, d1), (k2, d2) in zip(left, right):
-        print(f"   {BOLD}{CYAN}{k1.ljust(kw)}{RESET}  {d1.ljust(dw)}    "
-              f"{BOLD}{CYAN}{k2.ljust(kw2)}{RESET}  {d2}")
-    print(f"\n   {DIM}prefix before or after the word (\u00ab -c \u00bb = \u00ab !c \u00bb)  ·  "
-          f":save  :forget  :render  :spacy  :llm  ·  ↑ history{RESET}\n")
+    _print_cheatsheet()
+    print(f"\n   {DIM}prefixes still work for power users (!c !x !f !m — before or after the word)  ·  "
+          f"↑ history  ·  « help » shows this again{RESET}\n")
     try:
         while True:
             try:
@@ -2069,6 +2128,8 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 break
             if line.startswith(":"):           # a setting, not a lookup
                 _repl_command(line)
+                continue
+            if _follow_up(line):                  # "save 2", "conj", "def", "ru", "ex", "x", "help"
                 continue
             ms = re.match(r"^[!-]\s*s\s*(\d+)$", line, re.I)   # "!s 2": save sense 2
             if ms:
@@ -2103,7 +2164,139 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
         _save_history()
 
 
-def run_setup():
+_PROVIDERS = [
+    ("Anthropic (Claude)", "anthropic", None, "claude-haiku-4-5"),
+    ("OpenAI", "openai", "https://api.openai.com/v1", "gpt-4o-mini"),
+    ("Mistral (French-native)", "mistral", "https://api.mistral.ai/v1", "mistral-small-latest"),
+    ("Groq (very fast, free tier)", "groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    ("Google Gemini", "gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash"),
+    ("Custom OpenAI-compatible URL", "custom", "", ""),
+]
+
+
+def _detect_local_llm():
+    """(url, model) of a local server that answers: LM Studio, then Ollama."""
+    for url in ("http://localhost:1234/v1", "http://localhost:11434/v1"):
+        try:
+            ids = _llm_models(url, "")
+            if ids:
+                return url, ids[0]
+        except Exception:
+            pass
+    return None, None
+
+
+def _ask(prompt, default=""):
+    try:
+        v = input(prompt).strip()
+    except EOFError:
+        return default
+    return v or default
+
+
+def setup_llm():
+    """Interactive: local model, bring-your-own-key, or none. Saves to config."""
+    import getpass
+    print(f"\n{BOLD}🤖 Tutor{RESET} — answers « ? your question » and « -a » in simple French.")
+    url, model = _detect_local_llm()
+    if url:
+        print(f"   local model found: {GREEN}{model}{RESET} at {url}")
+    else:
+        print(f"   {DIM}no local model server found (LM Studio / Ollama){RESET}")
+    print("   1) local model (LM Studio or Ollama — free, private)")
+    print("   2) bring your own API key (Anthropic, OpenAI, Mistral, Groq, Gemini, custom)")
+    print("   3) none for now")
+    choice = _ask(f"   choose [{'1' if url else '2'}]: ", "1" if url else "2")
+    if choice == "1":
+        for k in ("llm_url", "llm_model", "llm_key", "anthropic_key"):
+            config_set(k, None)
+        config_set("llm", "local")
+        print(f"   {GREEN}✓{RESET} local model — auto-detected each time (LM Studio :1234, Ollama :11434)")
+        return
+    if choice == "3":
+        config_set("llm", "none")
+        print(f"   {DIM}ok — run « dico --llm » whenever you want a tutor{RESET}")
+        return
+    for i, (name, _, _, _) in enumerate(_PROVIDERS, 1):
+        print(f"   {i}) {name}")
+    pi = _ask("   provider [3]: ", "3")
+    try:
+        name, key_id, base, default_model = _PROVIDERS[int(pi) - 1]
+    except (ValueError, IndexError):
+        print("   ?"); return
+    key = getpass.getpass("   API key (hidden): ").strip() if sys.stdin.isatty() else _ask("   API key: ")
+    if not key:
+        print("   no key — skipped"); return
+    if key_id == "anthropic":
+        config_set("anthropic_key", key)
+        for k in ("llm_url", "llm_model", "llm_key"):
+            config_set(k, None)
+        config_set("llm", "anthropic")
+        text, err = _ai_via_api("Réponds juste « ok ».", key, AI_MODEL, 10)
+    else:
+        if key_id == "custom":
+            base = _ask("   base URL (…/v1): ")
+        model = _ask(f"   model [{default_model}]: ", default_model)
+        config_set("llm_url", base); config_set("llm_model", model); config_set("llm_key", key)
+        config_set("anthropic_key", None); config_set("llm", "byok")
+        text, err = _llm_openai("Reply with the single word: ok", "ok?", 10)
+    if err:
+        print(f"   {YELLOW}✗ test failed: {err}{RESET}  (saved anyway — fix with « dico --llm »)")
+    else:
+        print(f"   {GREEN}✓ {name} answers{RESET}  — key stored in {CONFIG_PATH} (chmod 600)")
+
+
+def _print_cheatsheet():
+    rows = [("a word (RU/EN)", "card: numbered senses · gender · example"),
+            ("a French word", "its card (+ présent if it's a verb)"),
+            ("a French sentence", "grammar check + the rule"),
+            ("save N", "save sense N of the last card"),
+            ("conj · def · ru · ex", "conjugation · dictionary definitions · Russian (Multitran) · examples"),
+            ("? question", "ask the tutor, in context (?? = detailed)"),
+            (":save on|off", "auto-save every lookup (also :forget word, :render, :llm, :spacy)"),
+            ("q", "quit")]
+    w = max(len(k) for k, _ in rows)
+    for k, d in rows:
+        print(f"   {BOLD}{CYAN}{k.ljust(w)}{RESET}  {d}")
+
+
+def run_tour():
+    """A 2-minute guided tour. Needs internet; does not auto-save your store."""
+    global _NO_AUTOSAVE
+    _NO_AUTOSAVE = True
+    steps = [
+        ("Type an English or Russian word. You get a card: senses numbered and grouped by "
+         "part of speech, each noun with its article and gender, ★ = how common.", "cook",
+         lambda: show("cook")),
+        ("The first sense is what auto-save keeps. Want another one? Just say « save 5 ».",
+         "save 5", lambda: _follow_up("save 5")),
+        ("A French word gives its own card: nature, gender, frequency, English senses, an example.",
+         "maison", lambda: show("maison")),
+        ("A French verb shows its présent right away. « conj » gives the whole grid.",
+         "aller  →  conj", lambda: (show("aller"), _follow_up("conj"))),
+        ("Type a French sentence and dico corrects it — and names the rule.",
+         "elle est parti hier et je mange un pomme",
+         lambda: show("elle est parti hier et je mange un pomme")),
+        ("Ask the tutor anything about what you're looking at: « ? … ».",
+         "? tu ou vous ?", lambda: _show_ai(None, False, question="tu ou vous ?")),
+    ]
+    print(f"\n{BOLD}📖 dico — the tour{RESET}  {DIM}(Enter = next, q = stop){RESET}")
+    for text, cmd, run in steps:
+        print(f"\n{text}\n{BLUE}»{RESET} {BOLD}{cmd}{RESET}")
+        try:
+            run()
+        except Exception as e:
+            print(f"  {DIM}(skipped: {e}){RESET}")
+        if _ask("").lower() == "q":
+            break
+    print(f"\n{BOLD}That's it.{RESET} Everything else:")
+    _print_cheatsheet()
+    print(f"\n{DIM}Auto-save is {'ON' if autosave_on() else 'off'} — your lookups become flashcards "
+          f"(Obsidian / Anki, see README). « dico --llm » sets up the tutor.{RESET}\n")
+    _NO_AUTOSAVE = False
+
+
+def run_setup(ask_llm=True):
     """Build the databases in DATA_DIR: conjugations (verbecc through uv), the
     form index, Lexique, Grammalecte, and Multitran if the Apple .dictionary
     bundles exist."""
@@ -2119,7 +2312,7 @@ def run_setup():
     else:
         print(f"{DIM}(Multitran: Apple dictionaries missing — the -m option stays inactive){RESET}")
     for label, cmd in steps:
-        print(f"{BOLD}==> {label}{RESET}")
+        print(f"{BOLD}==> {label}{RESET}", flush=True)
         if cmd[0] == "uv" and not shutil.which("uv"):
             print(f"  {YELLOW}uv missing — install it (https://docs.astral.sh/uv/) then run again{RESET}")
             continue
@@ -2127,6 +2320,9 @@ def run_setup():
         if r.returncode:
             print(f"  {YELLOW}✗ step failed ({r.returncode}){RESET}")
     print(f"{GREEN}✓ Done → {DATA_DIR}{RESET}")
+    if ask_llm and sys.stdin.isatty():
+        setup_llm()
+        print(f"\n{DIM}Try « dico --tour » for a 2-minute walkthrough.{RESET}")
 
 
 def as_json(text, args):
@@ -2173,6 +2369,26 @@ def as_json(text, args):
                           "gender": (lex["genre"] if lex else "") or "", "band": lex["band"] if lex else "",
                           "role": role, "gloss": _gloss_for(inf or (lex["lemma"] if lex else tx), tx)})
         out["xray"] = words
+        return out
+    if args.francais or args.dico:
+        target = text
+        if args.dico and detect_lang(text) != "fr":
+            try:
+                target = translate_rich(text)[0] or text
+            except Exception:
+                pass
+        e = None
+        try:
+            e = wiktionary(target)
+        except Exception:
+            pass
+        out["definition"] = ({"word": e["lemma"], "ipa": e["ipa"], "gender": e["gender"],
+                              "pos": e["pos"], "defs": e["defs"], "etym": e.get("etym")}
+                             if e else None)
+        return out
+    if args.multitran:
+        lines, direction, err = multitran_lookup(text)
+        out["multitran"] = {"direction": direction, "lines": lines or [], "error": err}
         return out
     if args.conj:
         w, tense = _split_tense(text)
@@ -2248,6 +2464,10 @@ def main():
     p.add_argument("--setup", action="store_true",
                    help="download/build the offline databases (conjugations, Lexique, "
                         "Grammalecte; Multitran if the Apple dictionaries are present)")
+    p.add_argument("--llm", action="store_true",
+                   help="set up the tutor: local model, your own API key, or none")
+    p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
+    p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
     p.add_argument("--json", action="store_true",
                    help="JSON output (for a graphical front-end / Raycast / etc.)")
     p.add_argument("--save-term", metavar="TERM",
@@ -2262,7 +2482,11 @@ def main():
     args = p.parse_args()
 
     if args.setup:
-        return run_setup()
+        return run_setup(ask_llm=not args.no_llm)
+    if args.llm:
+        return setup_llm()
+    if args.tour:
+        return run_tour()
     if args.save_term:
         if args.json:
             front, status, cnt = _save_term(args.save_term, args.sens,
@@ -2294,6 +2518,8 @@ def main():
         print(f"✓ markdown regenerated → {VOCAB}")
         return
 
+    if not _data_ready() and args.words:
+        print(f"  {DIM}(offline data not built — run: dico --setup){RESET}")
     if args.words:
         show(" ".join(args.words), args.dico, args.ai, args.save,
              args.multitran, args.conj, args.profond, args.francais, args.save_main,
