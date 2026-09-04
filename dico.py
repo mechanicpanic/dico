@@ -2004,27 +2004,26 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
         prompt = f"\001{BLUE}\002»\001{RESET}\002 "
     else:
         prompt = f"{BLUE}»{RESET} "
-    print(f"\n{BOLD}📖 dico{RESET}  —  russe / anglais → français")
-    print(f"{DIM}Tape un mot, ou un préfixe (avant ou après le mot ; « -c » marche aussi) :{RESET}\n")
-    rows = [
-        ("!f", "Wiktionnaire (mot déjà FR)", "!a", "IA rapide (Haiku)"),
-        ("!d", "Wiktionnaire + traduction",  "!p", "IA profonde (Opus)"),
-        ("!m", "Multitran (ru↔fr, offline)", "!s", "sauver ce mot"),
-        ("!c", "conjugaison",                "!g", "corriger une PHRASE (grammaire)"),
-        ("!x", "rayons X d'une PHRASE",      "",   ""),
-    ]
-    w = max(len(r[1]) for r in rows)
-    for lf, ld, rf, rd in rows:
-        left = f"{BOLD}{CYAN}{lf}{RESET} {ld.ljust(w)}"
-        right = f"{BOLD}{CYAN}{rf}{RESET} {rd}" if rf else ""
-        print(f"   {left}    {right}".rstrip())
     etat = f"{GREEN}ON{RESET}" if autosave_on() else f"{DIM}off{RESET}"
-    print(f"\n{DIM}⚠ Trad. rapide : RU/EN → FR seulement"
-          f"   ·   FR→russe : !m   ·   sens d'un mot FR : !f / !a / !p{RESET}")
-    print(f"{DIM}💾 auto-save{RESET} {etat} {DIM}·  :save on|off · :forget <mot> · "
-          f":render{RESET}")
-    print(f"{DIM}❓ « ? ta question » = tuteur IA ({_llm_label()}) avec le contexte du dernier mot{RESET}")
-    print(f"{DIM}↑ précédent   ·   « q » / Ctrl-D : quitter{RESET}\n")
+    print(f"\n{BOLD}📖 dico{RESET}  —  russe / anglais → français"
+          f"        {DIM}auto-save{RESET} {etat}   {DIM}tuteur {_llm_label()}{RESET}\n")
+    left = [("mot", "carte : sens numérotés · genre · exemple"),
+            ("!c verbe", "conjugaison"),
+            ("!g phrase", "grammaire : corrige + explique la règle"),
+            ("!x phrase", "rayons X : lemme · temps · rôle · sens"),
+            ("? question", "tuteur IA (contexte : le dernier mot)")]
+    right = [("!s N", "sauve le sens N de la carte"),
+             ("!f  !d", "Wiktionnaire : mot FR / après trad."),
+             ("!m mot", "Multitran ru↔fr, hors-ligne"),
+             ("!a  !p", "fiche IA courte / longue"),
+             ("q", "quitter")]
+    kw, dw = max(len(k) for k, _ in left), max(len(d) for _, d in left)
+    kw2 = max(len(k) for k, _ in right)
+    for (k1, d1), (k2, d2) in zip(left, right):
+        print(f"   {BOLD}{CYAN}{k1.ljust(kw)}{RESET}  {d1.ljust(dw)}    "
+              f"{BOLD}{CYAN}{k2.ljust(kw2)}{RESET}  {d2}")
+    print(f"\n   {DIM}préfixe avant ou après le mot (« -c » = « !c »)  ·  "
+          f":save  :forget  :render  :spacy  :llm  ·  ↑ historique{RESET}\n")
     try:
         while True:
             try:
