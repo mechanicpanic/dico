@@ -2370,6 +2370,10 @@ def as_json(text, args):
                           "role": role, "gloss": _gloss_for(inf or (lex["lemma"] if lex else tx), tx)})
         out["xray"] = words
         return out
+    if args.examples:
+        out["examples"] = {"en": [{"fr": s, "en": t} for s, t in _tatoeba(text, "eng", limit=4)],
+                           "ru": [{"fr": s, "ru": t} for s, t in _tatoeba(text, "rus", limit=2)]}
+        return out
     if args.francais or args.dico:
         target = text
         if args.dico and detect_lang(text) != "fr":
@@ -2468,6 +2472,8 @@ def main():
                    help="set up the tutor: local model, your own API key, or none")
     p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
     p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
+    p.add_argument("--examples", action="store_true",
+                   help="example sentences for a French word (Tatoeba, EN + RU); with --json for GUIs")
     p.add_argument("--json", action="store_true",
                    help="JSON output (for a graphical front-end / Raycast / etc.)")
     p.add_argument("--save-term", metavar="TERM",
@@ -2496,6 +2502,12 @@ def main():
         return _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
     if args.context:
         _LAST["word"] = args.context
+    if args.examples and not args.json:
+        w = " ".join(args.words if "words" in args else args.mots)
+        exs = _tatoeba(w, "eng", limit=4) + _tatoeba(w, "rus", limit=2)
+        for s, t in exs:
+            print(f"  « {s} » — {DIM}{t}{RESET}")
+        return None if exs else print(f"  {DIM}no examples found for « {w} »{RESET}")
     if args.json:
         return print(json.dumps(as_json(" ".join(args.words), args), ensure_ascii=False, indent=2))
     if args.mots_outils is not None:
