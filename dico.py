@@ -1963,7 +1963,7 @@ def _load_history():
     readline.set_history_length(1000)
 
 
-def _save_term(french, sens, src_lang="en", tier="google"):
+def _save_term(french, sens, src_lang="en", tier="google", quiet=False):
     """Sauve un terme français (recto avec article si nom) avec « sens » au dos."""
     front, lex = _fr_head(french)
     lemma = (lex["lemma"] if lex else french)
@@ -1971,8 +1971,11 @@ def _save_term(french, sens, src_lang="en", tier="google"):
            "pos": (lex["pos"] if lex else ""), "gender": (lex["genre"] if lex else "") or "",
            "example": "", "src_word": sens, "src_lang": src_lang, "tier": tier}
     status, cnt = store_upsert(rec)
+    if quiet:
+        return front, status, cnt
     tag = f"  {DIM}×{cnt}{RESET}" if cnt > 1 else ""
     print(f"  {GREEN}💾 « {front} » → {status}{RESET}{tag}")
+    return front, status, cnt
 
 
 def _save_history():
@@ -2240,9 +2243,10 @@ def main():
         return run_setup()
     if args.save_term:
         if args.json:
-            front, lex = _fr_head(args.save_term)
-            _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
-            return print(json.dumps({"saved": front, "sens": args.sens}, ensure_ascii=False))
+            front, status, cnt = _save_term(args.save_term, args.sens,
+                                            detect_lang(args.sens or "en"), quiet=True)
+            return print(json.dumps({"saved": front, "status": status, "count": cnt,
+                                     "sens": args.sens}, ensure_ascii=False))
         return _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
     if args.context:
         _LAST["word"] = args.context
