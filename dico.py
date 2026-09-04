@@ -779,13 +779,22 @@ def _show_ai(word, deep, question=None):
 #  Saving to the vocabulary                                                   #
 # --------------------------------------------------------------------------- #
 # --save target: DICO_VOCAB if set (e.g. your notes vault), otherwise local.
-VOCAB = os.environ.get("DICO_VOCAB") or os.path.join(
-    _HERE if _IN_REPO else DICO_HOME, "vocabulaire.md")
+def _early_cfg(key):
+    """Config value before config_load() exists (module import time)."""
+    try:
+        with open(os.path.expanduser("~/.dico_config.json"), encoding="utf-8") as f:
+            return json.load(f).get(key)
+    except Exception:
+        return None
+
+
+VOCAB = (os.environ.get("DICO_VOCAB") or _early_cfg("vocab_path")
+         or os.path.join(_HERE if _IN_REPO else DICO_HOME, "vocabulaire.md"))
 # -S target: the "clean" list (vocabulaire.md); otherwise the same log file.
 VOCAB_MAIN = os.environ.get("DICO_VOCAB_MAIN") or VOCAB
 # The TRUTH is the JSON store (next to the markdown). The .md is only a
 # regenerated view of it. DICO_STORE can put it somewhere else.
-STORE = os.environ.get("DICO_STORE") or os.path.join(
+STORE = os.environ.get("DICO_STORE") or _early_cfg("store_path") or os.path.join(
     os.path.dirname(os.path.abspath(VOCAB)), "dico_vocab.json")
 # Persistent settings (e.g. autosave turned on once and for all).
 CONFIG_PATH = os.path.expanduser("~/.dico_config.json")
