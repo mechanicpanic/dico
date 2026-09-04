@@ -403,7 +403,7 @@ def _etymology(sec):
             if t:
                 out.append(t)
     text = " ".join(out)
-    return (text[:240] + "…") if len(text) > 240 else (text or None)
+    return (text[:900] + "…") if len(text) > 900 else (text or None)   # asked for explicitly → (almost) whole
 
 
 def _parse_wiktionary(wikitext):
@@ -1508,9 +1508,9 @@ def _show_multitran(word):
     arrow = "ru→fr" if direction == "rufr" else "fr→ru"
     if lines:
         print(f"  {CYAN}📚 Multitran ({arrow}){RESET}")
-        for ln in lines[:14]:
+        for ln in lines[:40]:
             print(f"     {ln}")
-        if len(lines) > 14:
+        if len(lines) > 40:
             print(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
     elif err:
         print(f"  {DIM}📚 Multitran: {err}{RESET}")
