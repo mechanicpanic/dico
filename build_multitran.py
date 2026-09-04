@@ -14,7 +14,7 @@ import sqlite3
 import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "data")
+DATA = os.path.join(os.environ.get("DICO_DATA") or os.path.join(HERE, "data"))
 DB = os.path.join(DATA, "multitran.db")
 SOURCES = {"rufr": "multitran_rufr.txt", "frru": "multitran_frru.txt"}
 

@@ -20,7 +20,7 @@ import unicodedata
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "data")
+DATA = os.path.join(os.environ.get("DICO_DATA") or os.path.join(HERE, "data"))
 TSV = os.path.join(DATA, "Lexique383.tsv")
 DB = os.path.join(DATA, "lexique.db")
 URL = "http://www.lexique.org/databases/Lexique383/Lexique383.tsv"

@@ -58,6 +58,13 @@ try:
 except ImportError:
     readline = None
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+DICO_HOME = os.environ.get("DICO_HOME") or os.path.expanduser("~/.dico")
+# En dépôt git (dossier data/ à côté, ou dossier accessible en écriture hors
+# site-packages) : tout reste local. Installé comme outil : ~/.dico/.
+_IN_REPO = "site-packages" not in _HERE and os.path.isdir(os.path.join(_HERE, "data"))
+DATA_DIR = os.environ.get("DICO_DATA") or (os.path.join(_HERE, "data") if _IN_REPO
+                                           else os.path.join(DICO_HOME, "data"))
 HISTFILE = os.path.expanduser("~/.dico_history")
 
 TIMEOUT = 8
@@ -761,7 +768,7 @@ def _show_ai(word, deep, question=None):
 # --------------------------------------------------------------------------- #
 # Cible de --save : DICO_VOCAB si défini (ex. ton coffre de notes), sinon local.
 VOCAB = os.environ.get("DICO_VOCAB") or os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "vocabulaire.md")
+    _HERE if _IN_REPO else DICO_HOME, "vocabulaire.md")
 # Cible de -S : la liste « propre » (vocabulaire.md) ; sinon = le journal.
 VOCAB_MAIN = os.environ.get("DICO_VOCAB_MAIN") or VOCAB
 # La VÉRITÉ, c'est le store JSON (à côté du markdown). Le .md n'en est qu'une
@@ -953,8 +960,7 @@ def store_render(path=None):
 # --------------------------------------------------------------------------- #
 #  Niveau 4 : Multitran hors-ligne (base SQLite locale)                       #
 # --------------------------------------------------------------------------- #
-MULTI_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "data", "multitran.db")
+MULTI_DB = os.path.join(DATA_DIR, "multitran.db")
 
 
 def clean_multitran(body):
@@ -1004,8 +1010,7 @@ def multitran_lookup(word):
 # --------------------------------------------------------------------------- #
 #  Niveau 5 : conjugaison hors-ligne (base SQLite locale)                     #
 # --------------------------------------------------------------------------- #
-CONJ_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "data", "conjugations.db")
+CONJ_DB = os.path.join(DATA_DIR, "conjugations.db")
 
 
 def _conj_query(verb):
@@ -1172,8 +1177,7 @@ def _conj_lines(shown):
 # --------------------------------------------------------------------------- #
 #  Niveau 6 : Lexique 3.83 hors-ligne (lemme, nature, genre, fréquence)       #
 # --------------------------------------------------------------------------- #
-LEXIQUE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          "data", "lexique.db")
+LEXIQUE_DB = os.path.join(DATA_DIR, "lexique.db")
 
 _CGRAM_LABEL = {
     "NOM": "nom", "VER": "verbe", "ADJ": "adjectif", "ADV": "adverbe",
@@ -1570,8 +1574,7 @@ def _show_xray(sentence):
 # --------------------------------------------------------------------------- #
 #  Grammaire : Grammalecte hors-ligne (data/grammalecte, via build_grammalecte.py)
 # --------------------------------------------------------------------------- #
-GRAMMALECTE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "data", "grammalecte")
+GRAMMALECTE_DIR = os.path.join(DATA_DIR, "grammalecte")
 _GC = None
 _GRAM_TYPE = {
     "ppas": "participe passé", "gn": "accord (groupe nominal)", "conj": "conjugaison",
@@ -2076,6 +2079,104 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
         _save_history()
 
 
+def run_setup():
+    """Construit les bases dans DATA_DIR : conjugaisons (verbecc via uv), index des
+    formes, Lexique, Grammalecte, et Multitran si les .dictionary Apple existent."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    env = dict(os.environ, DICO_DATA=DATA_DIR)
+    steps = [("Conjugaisons (verbecc, via uv)", ["uv", "run", os.path.join(_HERE, "build_conjugations.py")]),
+             ("Index des formes (doit → devoir)", [sys.executable, os.path.join(_HERE, "build_conj_forms.py")]),
+             ("Lexique 3.83 (fréquence, genres)", [sys.executable, os.path.join(_HERE, "build_lexique.py")]),
+             ("Grammalecte (dico -g)", [sys.executable, os.path.join(_HERE, "build_grammalecte.py")])]
+    bundles = os.path.expanduser("~/Library/Dictionaries")
+    if all(os.path.isdir(os.path.join(bundles, f"multitran_{d}.dictionary")) for d in ("rufr", "frru")):
+        steps.append(("Multitran (dictionnaires Apple)", ["bash", os.path.join(_HERE, "setup.sh"), "--multitran-only"]))
+    else:
+        print(f"{DIM}(Multitran : dictionnaires Apple absents — l'option -m restera inactive){RESET}")
+    for label, cmd in steps:
+        print(f"{BOLD}==> {label}{RESET}")
+        if cmd[0] == "uv" and not shutil.which("uv"):
+            print(f"  {YELLOW}uv absent — installe-le (https://docs.astral.sh/uv/) puis relance{RESET}")
+            continue
+        r = subprocess.run(cmd, env=env)
+        if r.returncode:
+            print(f"  {YELLOW}✗ étape en échec ({r.returncode}){RESET}")
+    print(f"{GREEN}✓ Terminé → {DATA_DIR}{RESET}")
+
+
+def as_json(text, args):
+    """Représentation JSON d'une recherche — pour une interface graphique."""
+    text = text.strip()
+    out = {"query": text}
+    if not text:
+        return out
+    if args.grammaire:
+        gc = _grammalecte()
+        gram, spell = gc.getParagraphErrors(text, bSpellSugg=True) if gc else ([], [])
+        fixed = text
+        for e in sorted(gram, key=lambda e: -e["nStart"]):
+            if e.get("aSuggestions"):
+                fixed = fixed[:e["nStart"]] + e["aSuggestions"][0] + fixed[e["nEnd"]:]
+        out["grammar"] = {"errors": [{"start": e["nStart"], "end": e["nEnd"],
+                                      "text": text[e["nStart"]:e["nEnd"]],
+                                      "message": (e.get("sMessage") or "").replace("\xa0", " "),
+                                      "type": _GRAM_TYPE.get(e.get("sType", ""), e.get("sType", "")),
+                                      "suggestions": e.get("aSuggestions") or []} for e in gram],
+                          "spelling": [{"start": e["nStart"], "end": e["nEnd"], "text": e["sValue"],
+                                        "suggestions": (e.get("aSuggestions") or [])[:4]} for e in spell],
+                          "corrected": fixed}
+        return out
+    if args.xray:
+        sp = _spacy_tokens(text) if config_load().get("xray_spacy", True) else None
+        toks = ([(t["text"].strip("-–"), t["lemma"], t["pos"], _DEP_FR.get(t["dep"], t["dep"]))
+                 for t in sp if t["pos"] != "PUNCT"] if sp
+                else [(w, None, None, "") for w in _xray_tokens(text)])
+        words = []
+        for tx, lemma, pos, role in toks:
+            if not tx:
+                continue
+            lex = lexique_lookup(tx)
+            inf = _form_to_infinitive(tx)
+            words.append({"text": tx, "lemma": inf or (lex["lemma"] if lex else lemma or tx),
+                          "pos": (lex["pos"] if lex else _SPACY_POS_FR.get(pos or "", "")),
+                          "tense": (_conj_tense_of(inf, tx) if inf else "") or "",
+                          "gender": (lex["genre"] if lex else "") or "", "band": lex["band"] if lex else "",
+                          "role": role, "gloss": _gloss_for(inf or (lex["lemma"] if lex else tx), tx)})
+        out["xray"] = words
+        return out
+    if args.conj:
+        w, tense = _split_tense(text)
+        inf, data, err, _ = conjugate_lookup(w)
+        out["conjugation"] = {"infinitive": inf, "tenses": data, "error": err}
+        return out
+    lang = detect_lang(text)
+    lex = lexique_lookup(text)
+    if lang == "en" and lex and lex["freqfilms"] >= 1 and lex["cgram"][:3] in ("NOM", "ADJ", "VER", "ADV", "PRE", "PRO", "CON", "ART"):
+        head, lx = _fr_head(text)
+        try:
+            _, _, groups = translate_rich(text, tl="en", sl="fr")
+        except Exception:
+            groups = []
+        out.update({"direction": "fr", "head": head, "lexique": lx,
+                    "senses": [{"pos": p, "terms": [t for t, _ in ts]} for p, ts in groups],
+                    "examples": _tatoeba(text, "eng")})
+        return out
+    try:
+        tr, det, groups = translate_rich(text)
+    except Exception as e:
+        out["error"] = str(e)
+        return out
+    senses = []
+    for pos, terms in groups:
+        for term, back in terms:
+            front, lx = _fr_head(term)
+            senses.append({"pos": pos, "term": term, "front": front, "back": back,
+                           "gender": (lx["genre"] if lx else "") or "", "band": lx["band"] if lx else ""})
+    out.update({"direction": "to_fr", "src_lang": det or lang, "translation": tr,
+                "senses": senses, "examples": _tatoeba(tr, "eng") if tr else []})
+    return out
+
+
 def main():
     p = argparse.ArgumentParser(
         prog="dico", add_help=True,
@@ -2114,11 +2215,20 @@ def main():
                    help="régénère le markdown depuis le store JSON, puis quitte")
     p.add_argument("--forget", metavar="MOT",
                    help="retire un mot du vocabulaire (curation soustractive)")
+    p.add_argument("--setup", action="store_true",
+                   help="télécharge/construit les bases hors-ligne (conjugaisons, Lexique, "
+                        "Grammalecte ; Multitran si les dictionnaires Apple sont présents)")
+    p.add_argument("--json", action="store_true",
+                   help="sortie JSON (pour une interface graphique / Raycast / etc.)")
     p.add_argument("--mots-outils", nargs="?", const=120, type=int, metavar="N",
                    help="affiche le NOYAU de mots-outils (articles, prépositions, "
                         "pronoms, conjonctions, auxiliaires) — l'échafaudage grammatical")
     args = p.parse_args()
 
+    if args.setup:
+        return run_setup()
+    if args.json:
+        return print(json.dumps(as_json(" ".join(args.mots), args), ensure_ascii=False, indent=2))
     if args.mots_outils is not None:
         show_mots_outils(args.mots_outils, save=(args.save or args.save_main))
         return

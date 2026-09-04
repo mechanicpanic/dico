@@ -118,20 +118,36 @@ la nature et la langue source ; les répétitions incrémentent un compteur `×N
 ## Installation
 
 ```sh
-# alias (zsh)
-alias dico="python3 /Users/aleph/Projects/vibes/dico/dico.py"
+# outil autonome (recommandé) — commande « dico » dans le PATH
+uv tool install git+https://github.com/mechanicpanic/dico
+dico --setup            # télécharge / construit les bases hors-ligne (≈ 2 min)
 
-# (option) explication IA rapide via l'API — sinon repli sur la commande `claude`
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# (option) où --save écrit le vocabulaire (sinon : vocabulaire.md local)
-export DICO_VOCAB="/Users/aleph/Projects/vibes/francais/vocabulaire.md"
+# ou, depuis un clone (développement) :
+git clone https://github.com/mechanicpanic/dico && cd dico && ./setup.sh
+alias dico="python3 $PWD/dico.py"
 ```
 
-Besoins : **Python 3** (intégré au Mac). Aucune bibliothèque à installer pour le
-cœur. `-a`/`-p` utilisent l'API Anthropic (clé `ANTHROPIC_API_KEY`) ou la
-commande `claude`. Le modèle est réglable en haut de `dico.py` (`AI_MODEL`,
-`AI_MODEL_DEEP`).
+Besoins : **Python 3.10+** et [`uv`](https://docs.astral.sh/uv/) (pour les
+conjugaisons, spaCy et l'installation). Le cœur n'a **aucune dépendance**.
+Données et réglages : `~/.dico/` (ou le dossier du clone) ; `DICO_HOME`,
+`DICO_DATA`, `DICO_VOCAB`, `DICO_STORE` pour les déplacer.
+
+```sh
+# (option) tuteur IA : LM Studio sur localhost:1234 marche sans rien configurer ;
+# sinon un endpoint compatible OpenAI, ou l'API Anthropic :
+export DICO_LLM_URL="http://spark.local:8000/v1"  DICO_LLM_MODEL="…"
+export ANTHROPIC_API_KEY="sk-ant-..."
+# (option) où vivent tes cartes (un coffre Obsidian, par ex.)
+export DICO_VOCAB="$HOME/notes/francais/mots-cherches.md"
+```
+
+### Sources & licences
+
+- Code : **MIT**. Tout le reste est téléchargé chez son auteur par `dico --setup`, jamais redistribué ici.
+- **Lexique 3.83** (New, Pallier et al.) — CC BY-SA · **Tatoeba** — CC BY 2.0 fr ·
+  **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugaisons · **spaCy** `fr_core_news_md` — MIT/CC BY-SA ·
+  **Wiktionnaire** — CC BY-SA · **Multitran** : dictionnaires Apple propriétaires, *à fournir soi-même* (option `-m`).
+- La traduction rapide passe par un endpoint Google non officiel (limité en débit) avec repli MyMemory.
 
 ## Données hors-ligne (`data/`)
 

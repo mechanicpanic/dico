@@ -13,8 +13,7 @@ import re
 import sqlite3
 import unicodedata
 
-DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                  "data", "conjugations.db")
+DB = os.path.join(os.environ.get("DICO_DATA") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"), "conjugations.db")
 SKIP_TENSES = {"passé composé"}          # temps composés : 2 mots (aux + participe)
 
 

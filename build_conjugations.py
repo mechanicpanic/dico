@@ -18,7 +18,7 @@ import sqlite3
 from verbecc import CompleteConjugator, LangCodeISO639_1
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "data")
+DATA = os.path.join(os.environ.get("DICO_DATA") or os.path.join(HERE, "data"))
 DB = os.path.join(DATA, "conjugations.db")
 
 # étiquette affichée  ->  (mood verbecc, tense verbecc)

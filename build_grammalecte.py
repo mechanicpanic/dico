@@ -11,7 +11,7 @@ import urllib.request
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "data")
+DATA = os.path.join(os.environ.get("DICO_DATA") or os.path.join(HERE, "data"))
 DEST = os.path.join(DATA, "grammalecte")
 SITE = "https://grammalecte.net/"
 

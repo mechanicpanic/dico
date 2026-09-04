@@ -13,3 +13,4 @@ __pycache__/
 data/*.tsv
 data/grammalecte/
 data/*.zip
+dist/
