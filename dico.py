@@ -1002,6 +1002,82 @@ def clean_multitran(body):
     return lines
 
 
+def _mt_text(fragment):
+    """HTML fragment → text, keeping Multitran's blue notes as ⟨…⟩ markers."""
+    s = re.sub(r'(?is)<i><font color="blue">(.*?)</font></i>', lambda m: "⟨" + m.group(1) + "⟩", fragment)
+    s = re.sub(r"<[^>]+>", "", s)
+    return html.unescape(re.sub(r"\s+", " ", s)).strip()
+
+
+def _mt_split(text):
+    """« a ⟨note⟩, b, c (x, y) » → [{"tr": "a", "note": "note"}, {"tr": "b"}, …] —
+    split on commas that are outside (…) and ⟨…⟩."""
+    items, buf, depth = [], "", 0
+    for ch in text:
+        if ch in "(⟨":
+            depth += 1
+        elif ch in ")⟩":
+            depth = max(0, depth - 1)
+        if ch == "," and depth == 0:
+            items.append(buf); buf = ""
+        else:
+            buf += ch
+    items.append(buf)
+    out = []
+    for it in items:
+        it = it.strip(" ;")
+        if not it:
+            continue
+        notes = re.findall(r"⟨(.*?)⟩", it)
+        tr = re.sub(r"⟨.*?⟩", "", it).strip(" ,;")
+        d = {"tr": tr}
+        if notes:
+            d["note"] = " ".join(n.strip("() ") for n in notes)
+        if tr or notes:
+            out.append(d)
+    return out
+
+
+def multitran_structured(word):
+    """Multitran entry as data: [{"pos": "гл.", "senses": [{"n": "1)", "domain": "общ.",
+    "items": [{"tr": "…", "note": "…"}]}]}] — for the popup. Direction like multitran_lookup."""
+    direction = "rufr" if detect_lang(word) == "ru" else "frru"
+    if not os.path.exists(MULTI_DB):
+        return [], direction
+    key = word.strip().lower()
+    try:
+        con = sqlite3.connect(f"file:{MULTI_DB}?mode=ro", uri=True)
+        row = con.execute("SELECT body FROM entries WHERE key=? AND dir=? LIMIT 1",
+                          (key, direction)).fetchone()
+        if row is None:
+            row = con.execute("SELECT body FROM entries WHERE nkey=? AND dir=? LIMIT 1",
+                              (_deaccent(key), direction)).fetchone()
+        con.close()
+    except Exception:
+        return [], direction
+    if not row:
+        return [], direction
+    body = row[0].replace("\\n", "\n")
+    groups = []
+    # POS groups: <b>1.</b> <i class="p">…teal…POS…</i> then <p>…</p> senses until next <b>N.</b>
+    parts = re.split(r"(?is)<b>\s*\d+\.\s*</b>", body)
+    for part in parts[1:]:
+        mpos = re.search(r'(?is)<i class="p">.*?<font color="teal">(.*?)</font>', part)
+        pos = _mt_text(mpos.group(1)) if mpos else ""
+        senses = []
+        for p in re.findall(r"(?is)<p[^>]*>(.*?)</p>", part):
+            mn = re.match(r"\s*(\d+\))\s*", p)
+            n = mn.group(1) if mn else ""
+            p2 = p[mn.end():] if mn else p
+            md = re.match(r'(?is)\s*<i class="p">.*?<font color="green">(.*?)</font>\s*</font>\s*</i>\s*', p2)
+            domain = _mt_text(md.group(1)) if md else ""
+            rest = p2[md.end():] if md else p2
+            senses.append({"n": n, "domain": domain, "items": _mt_split(_mt_text(rest))})
+        if senses:
+            groups.append({"pos": pos, "senses": senses})
+    return groups, direction
+
+
 def multitran_lookup(word):
     """Look a word up in offline Multitran. Cyrillic → ru-fr, else fr-ru.
     Accent-tolerant through the nkey column. Returns (lines, direction, error)."""
@@ -2337,7 +2413,9 @@ def as_json(text, args):
         return out
     if args.multitran:
         lines, direction, err = multitran_lookup(text)
-        out["multitran"] = {"direction": direction, "lines": lines or [], "error": err}
+        groups, _ = multitran_structured(text)
+        out["multitran"] = {"direction": direction, "lines": lines or [], "groups": groups,
+                            "error": err}
         return out
     if args.conj:
         w, tense = _split_tense(text)
