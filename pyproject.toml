@@ -1,7 +1,7 @@
 [project]
 name = "dico"
 version = "0.9.0"
-description = "Dictionnaire de poche en ligne de commande : russe / anglais → français, avec grammaire, conjugaison et tuteur IA local."
+description = "Command-line pocket dictionary: Russian / English -> French, with grammar, conjugation and a local AI tutor."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

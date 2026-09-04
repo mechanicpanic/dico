@@ -1,11 +1,11 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Petite palette « tricolore douce »
+// MARK: - A small "soft tricolore" palette
 
 enum Palette {
-    static let bleu = Color(red: 0.30, green: 0.44, blue: 0.86)     // masculin, accents
-    static let rose = Color(red: 0.89, green: 0.42, blue: 0.60)     // féminin
+    static let bleu = Color(red: 0.30, green: 0.44, blue: 0.86)     // masculine, accents
+    static let rose = Color(red: 0.89, green: 0.42, blue: 0.60)     // feminine
     static let rouge = Color(red: 0.85, green: 0.32, blue: 0.34)
     static let vert = Color(red: 0.25, green: 0.65, blue: 0.44)
     static let jaune = Color(red: 0.95, green: 0.78, blue: 0.30)
@@ -17,7 +17,7 @@ enum Palette {
         default: return .secondary
         }
     }
-    /// ★ selon la fréquence.
+    /// ★ according to frequency.
     static func stars(_ band: String?) -> String {
         switch band {
         case "très courant": return "★★★"
@@ -32,7 +32,7 @@ func rounded(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
     .system(size: size, weight: weight, design: .rounded)
 }
 
-/// Le matériau translucide du panneau (clair ET sombre).
+/// The panel's translucent material (light AND dark).
 struct VisualEffect: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let v = NSVisualEffectView()
@@ -48,7 +48,7 @@ struct VisualEffect: NSViewRepresentable {
     func updateNSView(_ v: NSVisualEffectView, context: Context) {}
 }
 
-// MARK: - Le panneau
+// MARK: - The panel
 
 struct PanelView: View {
     @ObservedObject var model: DicoModel
@@ -69,9 +69,9 @@ struct PanelView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
         )
-        // (ombre : native, via NSPanel.hasShadow — une ombre SwiftUI serait rognée aux bords de la fenêtre)
+        // (shadow: native, through NSPanel.hasShadow — a SwiftUI shadow would be clipped at the window edges)
         .overlay(alignment: .bottom) { toast }
-        // Apparition élastique
+        // Springy appearance
         .scaleEffect(model.shown ? 1 : 0.90)
         .opacity(model.shown ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.68), value: model.shown)
@@ -81,7 +81,7 @@ struct PanelView: View {
         }
     }
 
-    // MARK: En-tête : champ + puces de mode
+    // MARK: Header: field + mode chips
 
     private var header: some View {
         VStack(spacing: 10) {
@@ -133,7 +133,7 @@ struct PanelView: View {
         .padding(.horizontal, 14).padding(.top, 13).padding(.bottom, 11)
     }
 
-    // MARK: Zone de résultats
+    // MARK: Results area
 
     private var results: some View {
         ScrollView {
@@ -144,7 +144,7 @@ struct PanelView: View {
                 case .chargement:
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(model.mode == .demander ? "réfléchit…" : "cherche…")
+                        Text(model.mode == .demander ? "thinking…" : "searching…")
                             .font(rounded(12, .regular)).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .center).padding(.top, 40)
@@ -169,7 +169,7 @@ struct PanelView: View {
 
     private var footer: some View {
         HStack {
-            Text("⌘1-9 sauver · Esc fermer · ⌥D partout")
+            Text("⌘1-9 save · Esc close · ⌥D anywhere")
                 .font(rounded(10, .regular)).foregroundStyle(.tertiary)
             Spacer()
             Text("dico").font(rounded(10, .medium)).foregroundStyle(.tertiary)
@@ -195,13 +195,13 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 10) {
             Text("📖").font(.system(size: 38))
-            Text("Tape un mot, puis Entrée")
+            Text("Type a word, then Enter")
                 .font(rounded(13, .medium)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 3) {
-                hint("-c", "conjuguer un verbe")
-                hint("-g", "corriger une phrase")
-                hint("-x", "disséquer une phrase")
-                hint("?", "demander au tuteur")
+                hint("-c", "conjugate a verb")
+                hint("-g", "correct a sentence")
+                hint("-x", "dissect a sentence")
+                hint("?", "ask the tutor")
             }
             .padding(.top, 4)
         }

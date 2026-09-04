@@ -2,13 +2,13 @@
 # requires-python = ">=3.10"
 # dependencies = ["verbecc"]
 # ///
-"""Construit data/conjugations.db : conjugaisons françaises HORS-LIGNE.
+"""Build data/conjugations.db: OFFLINE French conjugations.
 
-Utilise verbecc UNE FOIS pour conjuguer tous les verbes français connus
-(~7000), puis range les temps utiles dans une base SQLite. Ensuite, `dico -c`
-lit cette base avec la seule bibliothèque standard (aucune dépendance).
+Uses verbecc ONCE to conjugate every known French verb (~7000), then stores the
+useful tenses in a SQLite database. After that, `dico -c` reads that database
+with the standard library alone (no dependency).
 
-Lancement :
+Run with:
     uv run build_conjugations.py
 """
 import json
@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(os.environ.get("DICO_DATA") or os.path.join(HERE, "data"))
 DB = os.path.join(DATA, "conjugations.db")
 
-# étiquette affichée  ->  (mood verbecc, tense verbecc)
+# displayed label  ->  (verbecc mood, verbecc tense)
 TENSES = [
     ("présent",       ("indicatif", "présent")),
     ("passé composé", ("indicatif", "passé-composé")),
@@ -48,7 +48,7 @@ def main():
     os.makedirs(DATA, exist_ok=True)
     cc = CompleteConjugator(LangCodeISO639_1.fr)
     infinitives = cc.get_infinitives()
-    print(f"verbes à conjuguer : {len(infinitives)}")
+    print(f"verbs to conjugate: {len(infinitives)}")
     con = sqlite3.connect(DB)
     con.execute("PRAGMA journal_mode=OFF")
     con.execute("DROP TABLE IF EXISTS verbs")
@@ -81,7 +81,7 @@ def main():
     con.commit()
     con.close()
     size = os.path.getsize(DB) / 1e6
-    print(f"✓ {n} verbes → {DB}  ({size:.1f} Mo)")
+    print(f"✓ {n} verbs → {DB}  ({size:.1f} MB)")
 
 
 if __name__ == "__main__":

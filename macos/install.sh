@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installe Dico.app dans /Applications (construit d'abord si besoin).
+# Install Dico.app into /Applications (builds it first if needed).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -9,5 +9,5 @@ pkill -f "Dico.app/Contents/MacOS/Dico" 2>/dev/null || true
 rm -rf /Applications/Dico.app
 cp -R build/Dico.app /Applications/Dico.app
 echo "✓ /Applications/Dico.app"
-echo "  open /Applications/Dico.app  — puis ⌥D"
-echo "  (Réglages → Général → Ouverture pour le lancer à la connexion.)"
+echo "  open /Applications/Dico.app  — then ⌥D"
+echo "  (Settings → General → Login Items to launch it at login.)"

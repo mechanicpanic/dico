@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Construit data/lexique.db depuis Lexique 3.83 (lexique.org, licence CC-BY).
+"""Build data/lexique.db from Lexique 3.83 (lexique.org, CC-BY licence).
 
-Donne, HORS-LIGNE et sans dépendance, pour n'importe quelle forme tapée (même
-sans accents : « etre » → « être ») : le lemme, la nature (cgram), le genre
-(→ un/une), le nombre, et la fréquence (occurrences par million — sous-titres
-de films + livres). Sert à :
-  - enrichir l'auto-save (lemme/genre hors-ligne → plus de requête réseau) ;
-  - afficher un badge de fréquence (« très courant » … « rare ») ;
-  - extraire le noyau de mots-outils (`dico --mots-outils`).
+For any typed form (even unaccented: "etre" → "être") it gives, OFFLINE and
+without dependencies: the lemma, the part of speech (cgram), the gender
+(→ un/une), the number, and the frequency (occurrences per million — film
+subtitles + books). It is used to:
+  - enrich autosave (lemma/gender offline → no more network request);
+  - show a frequency badge ("très courant" … "rare");
+  - extract the core function words (`dico --mots-outils`).
 
-Télécharge Lexique383.tsv s'il est absent (≈ 26 Mo). Le TSV est conservé
-(source mise en cache, non versionnée) pour des reconstructions rapides.
+Downloads Lexique383.tsv if it is missing (~26 MB). The TSV is kept (a cached,
+un-versioned source) for fast rebuilds.
 
     python3 build_lexique.py
 """
@@ -42,7 +42,7 @@ def ensure_tsv():
     if os.path.exists(TSV):
         return
     os.makedirs(DATA, exist_ok=True)
-    print(f"… téléchargement de Lexique383.tsv depuis {URL}")
+    print(f"… downloading Lexique383.tsv from {URL}")
     urllib.request.urlretrieve(URL, TSV)
 
 
@@ -55,7 +55,7 @@ def main():
         genre TEXT, nombre TEXT, freqfilms REAL, freqlivres REAL)""")
     rows = []
     with open(TSV, encoding="utf-8") as f:
-        f.readline()                          # en-tête
+        f.readline()                          # header row
         for line in f:
             c = line.rstrip("\n").split("\t")
             if len(c) < 10 or not c[0]:
@@ -71,7 +71,7 @@ def main():
     con.commit()
     n = con.execute("SELECT count(*) FROM lexique").fetchone()[0]
     con.close()
-    print(f"✓ {n} formes → {os.path.relpath(DB, HERE)}")
+    print(f"✓ {n} forms → {os.path.relpath(DB, HERE)}")
 
 
 if __name__ == "__main__":

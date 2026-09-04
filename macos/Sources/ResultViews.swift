@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// MARK: - 📖 Mot
+// MARK: - 📖 Word
 
 struct WordView: View {
     let lookup: Lookup
@@ -12,8 +12,8 @@ struct WordView: View {
         if isFrench { return "🇫🇷" }
         return lookup.src_lang == "ru" ? "🇷🇺" : "🇬🇧"
     }
-    /// Les acceptions groupées par nature, dans l'ordre d'apparition,
-    /// en gardant le numéro global (celui des raccourcis ⌘1…⌘9).
+    /// Senses grouped by part of speech, in order of appearance, keeping the
+    /// global number (the one used by the ⌘1…⌘9 shortcuts).
     private var groups: [(String, [(Int, Sense)])] {
         let senses = lookup.senses ?? []
         var order: [String] = []
@@ -85,7 +85,7 @@ struct WordView: View {
     }
 }
 
-/// Une acception : puce numérotée cliquable qui sauve le terme.
+/// One sense: a clickable numbered chip that saves the term.
 struct SenseChip: View {
     let number: Int
     let sense: Sense
@@ -128,11 +128,11 @@ struct SenseChip: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.12), value: hover)
-        .help("Cliquer pour sauver « \(text) » (⌘\(number))")
+        .help("Click to save \u{201c}\(text)\u{201d} (⌘\(number))")
     }
 }
 
-/// Disposition en lignes qui se replient — pour les puces d'acceptions.
+/// A wrapping row layout — for the sense chips.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
@@ -160,13 +160,13 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - 🔁 Conjuguer
+// MARK: - 🔁 Conjugate
 
 struct ConjugationView: View {
     let conj: Conjugation
     private let pronouns = ["je", "tu", "il", "nous", "vous", "ils"]
 
-    /// « que je mange » → « mange » ; « j'ai mangé » → « ai mangé » ; « va » → « va ».
+    /// "que je mange" → "mange"; "j'ai mangé" → "ai mangé"; "va" → "va".
     static func strip(_ form: String) -> String {
         var s = form
         for p in ["que ", "qu'"] where s.hasPrefix(p) { s = String(s.dropFirst(p.count)) }
@@ -200,7 +200,7 @@ struct ConjugationView: View {
                                 .frame(width: 34, alignment: .trailing)
                             ForEach(conj.orderedTenses, id: \.0) { name, forms in
                                 let isImp = (name == "impératif")
-                                // L'impératif n'a que 3 formes : tu / nous / vous.
+                                // The impératif only has 3 forms: tu / nous / vous.
                                 let idx: Int? = isImp ? [nil, 0, nil, 1, 2, nil][i] : (i < forms.count ? i : nil)
                                 Text(idx.map { ConjugationView.strip(forms[$0]) } ?? "—")
                                     .font(.system(size: 11.5, weight: name == "présent" ? .semibold : .regular,
@@ -222,15 +222,15 @@ struct ConjugationView: View {
     }
 }
 
-// MARK: - ✅ Grammaire
+// MARK: - ✅ Grammar
 
 struct GrammarView: View {
     let grammar: Grammar
     let sentence: String
     @ObservedObject var model: DicoModel
 
-    /// Segmente la phrase selon les décalages (indices de points de code, façon Python).
-    private var segments: [(String, Int)] {   // 0 = normal, 1 = grammaire, 2 = orthographe
+    /// Split the sentence on the offsets (code-point indices, Python-style).
+    private var segments: [(String, Int)] {   // 0 = normal, 1 = grammar, 2 = spelling
         let scalars = Array(sentence.unicodeScalars)
         var kind = [Int](repeating: 0, count: scalars.count)
         for e in grammar.errors ?? [] {
@@ -252,7 +252,7 @@ struct GrammarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // La phrase avec les zones fautives surlignées.
+            // The sentence with the faulty spans highlighted.
             segments.reduce(Text("")) { acc, seg in
                 acc + Text(seg.0)
                     .font(.system(size: 14, weight: .regular, design: .rounded))
@@ -264,7 +264,7 @@ struct GrammarView: View {
             let errs = grammar.errors ?? []
             let sp = grammar.spelling ?? []
             if errs.isEmpty && sp.isEmpty {
-                Label("Aucune faute trouvée 🎉", systemImage: "checkmark.seal.fill")
+                Label("No mistakes found 🎉", systemImage: "checkmark.seal.fill")
                     .font(rounded(12, .medium)).foregroundStyle(Palette.vert)
             }
             ForEach(Array(errs.enumerated()), id: \.offset) { i, e in
@@ -272,7 +272,7 @@ struct GrammarView: View {
                       suggestions: e.suggestions ?? [], color: Palette.rouge)
             }
             ForEach(Array(sp.enumerated()), id: \.offset) { i, s in
-                issue(number: errs.count + i + 1, title: s.text ?? "", message: "Orthographe",
+                issue(number: errs.count + i + 1, title: s.text ?? "", message: "Spelling",
                       suggestions: s.suggestions ?? [], color: Color.orange)
             }
             if let c = grammar.corrected, !c.isEmpty {
@@ -284,9 +284,9 @@ struct GrammarView: View {
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(c, forType: .string)
-                        model.flash("✓ copié")
+                        model.flash("✓ copied")
                     } label: {
-                        Text("Copier").font(rounded(10.5, .medium))
+                        Text("Copy").font(rounded(10.5, .medium))
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Palette.vert.opacity(0.16), in: Capsule())
                             .foregroundStyle(Palette.vert)
@@ -324,7 +324,7 @@ struct GrammarView: View {
     }
 }
 
-// MARK: - 🔬 Rayons X
+// MARK: - 🔬 X-ray
 
 struct XrayView: View {
     let tokens: [XrayToken]
@@ -332,8 +332,8 @@ struct XrayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                cell("mot", 74, .bold); cell("lemme", 70, .bold); cell("nature", 88, .bold)
-                cell("temps", 96, .bold); cell("rôle", 78, .bold); cell("sens", 80, .bold)
+                cell("word", 74, .bold); cell("lemma", 70, .bold); cell("pos", 88, .bold)
+                cell("tense", 96, .bold); cell("role", 78, .bold); cell("meaning", 80, .bold)
             }
             .foregroundStyle(.tertiary).padding(.bottom, 3)
             Divider().opacity(0.4)
@@ -360,7 +360,7 @@ struct XrayView: View {
     }
 }
 
-// MARK: - 💬 Demander (tuteur)
+// MARK: - 💬 Ask (tutor)
 
 struct AnswerView: View {
     let answer: Answer
@@ -389,7 +389,7 @@ struct AnswerView: View {
         }
     }
 
-    /// Rendu markdown minimal : **gras** et *italique* via AttributedString.
+    /// Minimal markdown rendering: **bold** and *italic* through AttributedString.
     private func markdown(_ s: String) -> some View {
         let attributed = (try? AttributedString(markdown: s,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)

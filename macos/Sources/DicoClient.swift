@@ -1,9 +1,9 @@
 import Foundation
 
-// MARK: - Modèles décodés depuis `dico --json`
+// MARK: - Models decoded from `dico --json`
 
-/// Une acception : la forme "to_fr" porte term/front/back/gender/band,
-/// la forme "fr" porte pos/terms. On garde tout en optionnel.
+/// One sense: the "to_fr" shape carries term/front/back/gender/band, the "fr"
+/// shape carries pos/terms. Everything stays optional.
 struct Sense: Decodable, Hashable {
     var pos: String?
     var term: String?
@@ -13,9 +13,9 @@ struct Sense: Decodable, Hashable {
     var gender: String?
     var band: String?
 
-    /// Ce qu'on affiche sur la puce.
+    /// What the chip shows.
     var display: String { front ?? term ?? terms?.first ?? "?" }
-    /// Ce qu'on envoie à `--save-term`.
+    /// What we pass to `--save-term`.
     var saveTerm: String? { term }
 }
 
@@ -46,7 +46,7 @@ struct Conjugation: Decodable {
     var tenses: [String: [String]]?
     var error: String?
 
-    /// Les temps sont dans un dictionnaire (non ordonné) : on impose l'ordre.
+    /// The tenses come in an (unordered) dictionary: we impose the order.
     static let order = ["présent", "passé composé", "imparfait", "futur simple",
                         "conditionnel", "subjonctif", "impératif"]
     static let shortLabels: [String: String] = [
@@ -110,7 +110,7 @@ struct SaveResult: Decodable {
     var error: String?
 }
 
-// MARK: - Erreurs
+// MARK: - Errors
 
 enum DicoError: LocalizedError {
     case notFound
@@ -121,11 +121,11 @@ enum DicoError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notFound:
-            return "dico introuvable — installe-le : uv tool install git+https://github.com/mechanicpanic/dico"
+            return "dico not found — install it: uv tool install git+https://github.com/mechanicpanic/dico"
         case .timeout:
-            return "Trop long… (30 s) — le modèle local répond-il ?"
+            return "Too slow… (30 s) — is the local model answering?"
         case .badOutput(let s):
-            return "Réponse illisible de dico\n\(s.prefix(200))"
+            return "Unreadable answer from dico\n\(s.prefix(200))"
         case .cli(let s):
             return s
         }
@@ -134,10 +134,10 @@ enum DicoError: LocalizedError {
 
 // MARK: - Client
 
-/// Lance la CLI `dico` et décode le dernier objet JSON de sa sortie.
+/// Runs the `dico` CLI and decodes the last JSON object of its output.
 enum DicoClient {
 
-    /// PATH minimal mais suffisant pour trouver python3/uv/dico.
+    /// A minimal PATH, but enough to find python3/uv/dico.
     private static let searchPath = [
         "/opt/homebrew/bin",
         NSHomeDirectory() + "/.local/bin",
@@ -146,13 +146,13 @@ enum DicoClient {
         "/bin",
     ]
 
-    /// Emplacements possibles du script si le binaire `dico` n'existe pas.
+    /// Possible locations of the script when the `dico` binary does not exist.
     private static let scriptCandidates = [
         NSHomeDirectory() + "/Projects/vibes/dico/dico.py",
         NSHomeDirectory() + "/dico/dico.py",
     ]
 
-    /// Résout (exécutable, préfixe d'arguments).
+    /// Resolves (executable, argument prefix).
     private static func resolve() -> (String, [String])? {
         if let bin = ProcessInfo.processInfo.environment["DICO_BIN"],
            FileManager.default.isExecutableFile(atPath: bin) { return (bin, []) }
@@ -171,7 +171,7 @@ enum DicoClient {
         return nil
     }
 
-    /// Exécute la CLI et rend la sortie standard brute. Bloquant — à appeler hors du main thread.
+    /// Runs the CLI and returns raw stdout. Blocking — call it off the main thread.
     static func raw(_ args: [String], timeout: TimeInterval = 30) throws -> String {
         guard let (exe, prefix) = resolve() else { throw DicoError.notFound }
 
@@ -188,7 +188,7 @@ enum DicoClient {
         task.standardError = err
         do { try task.run() } catch { throw DicoError.notFound }
 
-        // Lecture en tâche de fond pour ne pas saturer le tube pendant qu'on attend.
+        // Read in the background so the pipe does not fill up while we wait.
         var stdoutData = Data(), stderrData = Data()
         let lock = NSLock()
         let group = DispatchGroup()
@@ -203,7 +203,7 @@ enum DicoClient {
             }
         }
 
-        // Attente avec délai maximal.
+        // Wait, with a deadline.
         let deadline = Date().addingTimeInterval(timeout)
         while task.isRunning && Date() < deadline { usleep(30_000) }
         if task.isRunning { task.terminate(); _ = group.wait(timeout: .now() + 1); throw DicoError.timeout }
@@ -212,18 +212,18 @@ enum DicoClient {
         let text = String(decoding: stdoutData, as: UTF8.self)
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let e = String(decoding: stderrData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw DicoError.cli(e.isEmpty ? "dico n'a rien répondu" : String(e.suffix(300)))
+            throw DicoError.cli(e.isEmpty ? "dico returned nothing" : String(e.suffix(300)))
         }
         return text
     }
 
-    /// Extrait le DERNIER objet JSON de la sortie (tolérant aux lignes parasites)
-    /// et le décode dans le type demandé.
+    /// Extracts the LAST JSON object from the output (tolerating stray lines)
+    /// and decodes it into the requested type.
     static func decode<T: Decodable>(_ type: T.Type, from text: String) throws -> T {
         guard let end = text.lastIndex(of: "}") else { throw DicoError.badOutput(text) }
         let head = String(text[text.startIndex...end])
 
-        // Débuts candidats : chaque "{" en début de ligne, du dernier au premier.
+        // Candidate starts: every "{" at the beginning of a line, last to first.
         var starts: [String.Index] = []
         var idx = head.startIndex
         var atLineStart = true
@@ -247,26 +247,26 @@ enum DicoClient {
         try decode(type, from: raw(args))
     }
 
-    // MARK: Les cinq modes + la sauvegarde
+    // MARK: The five modes + saving
 
     static func lookup(_ word: String) throws -> Lookup { try call(Lookup.self, ["--json", word]) }
 
     static func conjugate(_ verb: String) throws -> Conjugation {
         let env = try call(ConjEnvelope.self, ["--json", "-c", verb])
-        guard let c = env.conjugation else { throw DicoError.cli("Pas de conjugaison pour « \(verb) »") }
+        guard let c = env.conjugation else { throw DicoError.cli("No conjugation for \u{201c}\(verb)\u{201d}") }
         if let e = c.error, !e.isEmpty { throw DicoError.cli(e) }
         return c
     }
 
     static func grammar(_ sentence: String) throws -> Grammar {
         let env = try call(GrammarEnvelope.self, ["--json", "-g", sentence])
-        guard let g = env.grammar else { throw DicoError.cli("Pas d'analyse grammaticale") }
+        guard let g = env.grammar else { throw DicoError.cli("No grammar analysis") }
         return g
     }
 
     static func xray(_ sentence: String) throws -> [XrayToken] {
         let env = try call(XrayEnvelope.self, ["--json", "-x", sentence])
-        guard let x = env.xray, !x.isEmpty else { throw DicoError.cli("Rien à disséquer") }
+        guard let x = env.xray, !x.isEmpty else { throw DicoError.cli("Nothing to dissect") }
         return x
     }
 

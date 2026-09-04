@@ -1,17 +1,17 @@
 import SwiftUI
 
-/// Les cinq modes du panneau.
+/// The five modes of the panel.
 enum Mode: String, CaseIterable, Identifiable {
     case mot, conjuguer, grammaire, rayonsX, demander
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .mot: return "Mot"
-        case .conjuguer: return "Conjuguer"
-        case .grammaire: return "Grammaire"
-        case .rayonsX: return "Rayons X"
-        case .demander: return "Demander ?"
+        case .mot: return "Word"
+        case .conjuguer: return "Conjugate"
+        case .grammaire: return "Grammar"
+        case .rayonsX: return "X-ray"
+        case .demander: return "Ask"
         }
     }
     var icon: String {
@@ -25,22 +25,22 @@ enum Mode: String, CaseIterable, Identifiable {
     }
     var placeholder: String {
         switch self {
-        case .mot: return "un mot… (cook, кошка, maison)"
-        case .conjuguer: return "un verbe… (aller)"
-        case .grammaire: return "une phrase à corriger…"
-        case .rayonsX: return "une phrase à disséquer…"
-        case .demander: return "une question au tuteur…"
+        case .mot: return "a word… (cook, кошка, maison)"
+        case .conjuguer: return "a verb… (aller)"
+        case .grammaire: return "a sentence to correct…"
+        case .rayonsX: return "a sentence to dissect…"
+        case .demander: return "a question for the tutor…"
         }
     }
 }
 
-/// Ce que le panneau affiche à l'instant t.
+/// What the panel is showing right now.
 enum Outcome {
     case vide
     case chargement
     case mot(Lookup)
     case conjugaison(Conjugation)
-    case grammaire(Grammar, String)     // + la phrase interrogée (pour les offsets)
+    case grammaire(Grammar, String)     // + the queried sentence (for the offsets)
     case rayonsX([XrayToken])
     case reponse(Answer)
     case erreur(String)
@@ -53,19 +53,19 @@ final class DicoModel: ObservableObject {
     @Published var outcome: Outcome = .vide
     @Published var busy: Bool = false
     @Published var toast: String? = nil
-    @Published var shown: Bool = false          // pilote l'animation d'apparition
+    @Published var shown: Bool = false          // drives the appearance animation
 
-    /// Dernier mot / phrase consulté — sert de `--context` au tuteur.
+    /// Last word / sentence looked up — used as `--context` for the tutor.
     private(set) var lastContext: String = ""
-    /// Mot source de la fiche courante (pour `--sens` à la sauvegarde).
+    /// Source word of the current card (for `--sens` when saving).
     private(set) var currentSource: String = ""
 
     private var generation = 0
     private var toastTask: Task<Void, Never>?
 
-    // MARK: Saisie
+    // MARK: Input
 
-    /// `-c`, `-g`, `-x` ou `?` en tête bascule le mode et se retire du champ.
+    /// A leading `-c`, `-g`, `-x` or `?` switches mode and is removed from the field.
     func normalizeInput() {
         let t = query
         let prefixes: [(String, Mode)] = [("-c ", .conjuguer), ("-g ", .grammaire),
@@ -82,7 +82,7 @@ final class DicoModel: ObservableObject {
         outcome = .vide
     }
 
-    // MARK: Requête
+    // MARK: Query
 
     func submit() {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -122,9 +122,9 @@ final class DicoModel: ObservableObject {
         }
     }
 
-    // MARK: Sauvegarde d'une acception
+    // MARK: Saving a sense
 
-    /// Sauve la n-ième acception de la fiche courante (1-indexé), pour ⌘1…⌘9.
+    /// Save the n-th sense of the current card (1-indexed), for ⌘1…⌘9.
     func saveSense(number n: Int) {
         guard case .mot(let lookup) = outcome else { return }
         if let senses = lookup.senses, n >= 1, n <= senses.count {
@@ -133,7 +133,7 @@ final class DicoModel: ObservableObject {
     }
 
     func save(sense: Sense, lookup: Lookup) {
-        // Pour une fiche française, l'entrée à sauver est la tête ("une maison").
+        // For a French card, the entry to save is the head ("une maison").
         let term = sense.saveTerm ?? lookup.head ?? lookup.query ?? ""
         guard !term.isEmpty else { return }
         let sens = currentSource.isEmpty ? (lookup.query ?? term) : currentSource
@@ -142,10 +142,10 @@ final class DicoModel: ObservableObject {
             let msg: String
             do {
                 let r = try DicoClient.save(term: term, sens: sens)
-                let status = r.status ?? "ajouté"
-                msg = "✓ « \(r.saved ?? shown) » \(status)"
+                let status = r.status ?? "added"
+                msg = "✓ \u{201c}\(r.saved ?? shown)\u{201d} \(status)"
             } catch {
-                msg = "⚠︎ pas sauvé — \((error as? LocalizedError)?.errorDescription ?? "erreur")"
+                msg = "⚠︎ not saved — \((error as? LocalizedError)?.errorDescription ?? "error")"
             }
             await MainActor.run { [weak self] in self?.flash(msg) }
         }

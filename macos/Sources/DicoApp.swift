@@ -2,18 +2,18 @@ import SwiftUI
 import AppKit
 import Carbon.HIToolbox
 
-// MARK: - Le panneau flottant
+// MARK: - The floating panel
 
-/// NSPanel non activant mais capable de devenir « key » — il faut bien taper dedans.
+/// A non-activating NSPanel that can still become key — you have to type in it.
 final class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
-    override func cancelOperation(_ sender: Any?) {   // Échap
+    override func cancelOperation(_ sender: Any?) {   // Esc
         (NSApp.delegate as? AppDelegate)?.hidePanel()
     }
 }
 
-// MARK: - Délégué d'application
+// MARK: - Application delegate
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -31,18 +31,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installKeyMonitors()
     }
 
-    // MARK: Barre de menus
+    // MARK: Menu bar
 
     private func buildStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "📖"
         let menu = NSMenu()
-        let open = NSMenuItem(title: "Ouvrir", action: #selector(togglePanel), keyEquivalent: "d")
+        let open = NSMenuItem(title: "Open", action: #selector(togglePanel), keyEquivalent: "d")
         open.keyEquivalentModifierMask = [.option]
         open.target = self
         menu.addItem(open)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quitter", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
@@ -50,10 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() { NSApp.terminate(nil) }
 
-    // MARK: Fenêtre
+    // MARK: Window
 
     private func buildPanel() {
-        // 520×420 de contenu + 12 pt de marge tout autour pour l'ombre.
+        // 520×420 of content + 12 pt of margin all around for the shadow.
         let rect = NSRect(x: 0, y: 0, width: 544, height: 444)
         panel = FloatingPanel(contentRect: rect,
                               styleMask: [.nonactivatingPanel, .borderless],
@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.level = .floating
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true                  // ombre native, épouse les coins arrondis (fenêtre non opaque)
+        panel.hasShadow = true                  // native shadow, follows the rounded corners (non-opaque window)
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         DispatchQueue.main.async { [weak self] in self?.panel.invalidateShadow() }
-        model.shown = true                       // déclenche l'animation élastique
+        model.shown = true                       // triggers the springy animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
             NotificationCenter.default.post(name: .dicoFocusField, object: nil)
         }
@@ -100,13 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func hidePanel() {
         model.shown = false
         stopClickAwayMonitor()
-        // On laisse l'animation de repli se jouer avant de retirer la fenêtre.
+        // Let the collapse animation play before removing the window.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
             self?.panel.orderOut(nil)
         }
     }
 
-    // MARK: Raccourci global ⌥D (Carbon — pas besoin d'Accessibilité)
+    // MARK: Global ⌥D hotkey (Carbon — no Accessibility permission needed)
 
     private func registerHotKey() {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
@@ -123,12 +123,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             id, GetApplicationEventTarget(), 0, &hotKeyRef)
     }
 
-    // MARK: Clavier local (Échap, ⌘K, ⌘1…⌘9) et clic à l'extérieur
+    // MARK: Local keyboard (Esc, ⌘K, ⌘1…⌘9) and click-away
 
     private func installKeyMonitors() {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.panel.isVisible else { return event }
-            if event.keyCode == 53 { self.hidePanel(); return nil }        // Échap
+            if event.keyCode == 53 { self.hidePanel(); return nil }        // Esc
             if event.modifierFlags.contains(.command) {
                 let chars = event.charactersIgnoringModifiers ?? ""
                 if chars == "k" { self.model.clear(); return nil }
@@ -155,21 +155,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// MARK: - Autotest (`--selftest`) : pas d'interface, on éprouve la chaîne CLI→Swift
+// MARK: - Self-test (`--selftest`): no UI, it exercises the CLI→Swift chain
 
 @MainActor
 func runSelfTest() {
-    _ = NSApplication.shared   // AppKit doit exister pour poser une vue hors écran
+    _ = NSApplication.shared   // AppKit must exist to lay out an off-screen view
 
-    /// Force la mise en page de la vue correspondante, hors écran :
-    /// c'est ce qui éprouve réellement le rendu (FlowLayout, Grid, markdown…).
+    /// Force the layout of the matching view, off screen: this is what really
+    /// exercises the rendering (FlowLayout, Grid, markdown…).
     func render(_ outcome: Outcome) -> String {
         let model = DicoModel()
         model.outcome = outcome
         let host = NSHostingView(rootView: PanelView(model: model))
         host.frame = NSRect(x: 0, y: 0, width: 544, height: 444)
         host.layoutSubtreeIfNeeded()
-        return "vue \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height))"
+        return "view \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height))"
     }
 
     func line(_ label: String, _ body: () throws -> String) {
@@ -182,32 +182,32 @@ func runSelfTest() {
         }
     }
 
-    line("mot cook") {
+    line("word cook") {
         let l = try DicoClient.lookup("cook")
         let senses = (l.senses ?? []).prefix(3).map { $0.display }.joined(separator: ", ")
-        return "direction=\(l.direction ?? "?") trad=\(l.translation ?? "?") | \(senses) | \(render(.mot(l)))"
+        return "direction=\(l.direction ?? "?") transl=\(l.translation ?? "?") | \(senses) | \(render(.mot(l)))"
     }
     line("conj aller") {
         let c = try DicoClient.conjugate("aller")
         let p = (c.tenses?["présent"] ?? []).joined(separator: ", ")
-        return "\(c.infinitive ?? "?") — \(c.orderedTenses.count) temps — présent: \(p) | \(render(.conjugaison(c)))"
+        return "\(c.infinitive ?? "?") — \(c.orderedTenses.count) tenses — présent: \(p) | \(render(.conjugaison(c)))"
     }
     line("gram elle est parti") {
         let g = try DicoClient.grammar("elle est parti")
         let n = (g.errors?.count ?? 0) + (g.spelling?.count ?? 0)
-        return "\(n) faute(s) → « \(g.corrected ?? "?") » | \(render(.grammaire(g, "elle est parti")))"
+        return "\(n) mistake(s) → \u{201c}\(g.corrected ?? "?")\u{201d} | \(render(.grammaire(g, "elle est parti")))"
     }
-    line("rayons X je vais au marché") {
+    line("x-ray je vais au marché") {
         let t = try DicoClient.xray("je vais au marché demain")
-        return "\(t.count) mots — \(t.map { $0.lemma ?? "?" }.joined(separator: "/")) | \(render(.rayonsX(t)))"
+        return "\(t.count) words — \(t.map { $0.lemma ?? "?" }.joined(separator: "/")) | \(render(.rayonsX(t)))"
     }
-    line("tuteur tu ou vous") {
+    line("tutor tu ou vous") {
         let a = try DicoClient.ask("tu ou vous ?", context: "cook")
         return "[\(a.model ?? "?")] \(render(.reponse(a))) — \(a.answer ?? "")"
     }
 }
 
-// MARK: - Point d'entrée
+// MARK: - Entry point
 
 @main
 struct DicoMain {
@@ -220,7 +220,7 @@ struct DicoMain {
         let delegate = AppDelegate()
         DicoMain.retainedDelegate = delegate
         app.delegate = delegate
-        app.setActivationPolicy(.accessory)   // LSUIElement : aucun Dock
+        app.setActivationPolicy(.accessory)   // LSUIElement: no Dock icon
         app.run()
     }
     @MainActor static var retainedDelegate: AppDelegate?

@@ -5,8 +5,8 @@
 #   "fr-core-news-md @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_md-3.8.0/fr_core_news_md-3.8.0-py3-none-any.whl",
 # ]
 # ///
-"""Sidecar spaCy : analyse morpho-syntaxique d'une phrase française → JSON.
-Lancé par dico via `uv run` (dépendances mises en cache après le 1er appel)."""
+"""spaCy sidecar: morphosyntactic analysis of a French sentence → JSON.
+Launched by dico through `uv run` (dependencies cached after the 1st call)."""
 import json, sys
 import spacy
 

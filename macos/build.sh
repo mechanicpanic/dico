@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compile Dico.app — pas de projet Xcode, juste swiftc.
+# Build Dico.app — no Xcode project, just swiftc.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -10,7 +10,7 @@ RES="$APP/Contents/Resources"
 rm -rf "$APP"
 mkdir -p "$MACOS" "$RES"
 
-echo "→ compilation…"
+echo "→ compiling…"
 xcrun swiftc -O -parse-as-library \
   -target arm64-apple-macos14 \
   -framework SwiftUI -framework AppKit -framework Carbon \
@@ -36,11 +36,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Signature ad-hoc : le raccourci global et l'accès trousseau aiment une identité stable.
+# Ad-hoc signature: the global hotkey and keychain access like a stable identity.
 codesign --force --sign - "$APP" 2>/dev/null || true
 
 echo "✓ $APP"
 echo
-echo "  autotest :  ./build/Dico.app/Contents/MacOS/Dico --selftest"
-echo "  lancer   :  open build/Dico.app     (puis ⌥D n'importe où)"
-echo "  installer:  ./install.sh"
+echo "  self-test:  ./build/Dico.app/Contents/MacOS/Dico --selftest"
+echo "  run      :  open build/Dico.app     (then ⌥D anywhere)"
+echo "  install  :  ./install.sh"

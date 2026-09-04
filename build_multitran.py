@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Construit data/multitran.db à partir des Tabfiles convertis par pyglossary.
+"""Build data/multitran.db from the Tabfiles converted by pyglossary.
 
-Étapes en amont (faites une fois, hors de ce script) :
+Upstream steps (done once, outside this script):
     uv run --with pyglossary --with lxml --with biplist -- pyglossary \\
         ~/Library/Dictionaries/multitran_rufr.dictionary data/multitran_rufr.txt \\
         --read-format=AppleDictBin --write-format=Tabfile
 
-Ce script lit ces .txt et fabrique une base SQLite interrogeable hors-ligne,
-sans aucune dépendance externe (sqlite3 fait partie de la bibliothèque standard).
+This script reads those .txt files and builds a SQLite database that can be
+queried offline, with no external dependency (sqlite3 ships with Python).
 """
 import os
 import sqlite3
@@ -20,8 +20,8 @@ SOURCES = {"rufr": "multitran_rufr.txt", "frru": "multitran_frru.txt"}
 
 
 def iter_entries(path):
-    """Lit un Tabfile pyglossary : 'mot<TAB>corps'. Recolle les rares lignes
-    de continuation (corps contenant un vrai retour à la ligne)."""
+    """Read a pyglossary Tabfile: 'word<TAB>body'. Re-joins the rare
+    continuation lines (a body containing a real newline)."""
     hw, body = None, None
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -37,7 +37,7 @@ def iter_entries(path):
 
 
 def _deaccent(s):
-    """Sans accents ni majuscules — pour la colonne nkey (recherche tolérante)."""
+    """No accents, no uppercase — for the nkey column (lenient lookup)."""
     nfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn").lower()
 
@@ -53,14 +53,14 @@ def main():
     for direction, fname in SOURCES.items():
         path = os.path.join(DATA, fname)
         if not os.path.exists(path):
-            print(f"⚠ manquant : {fname} (conversion pyglossary non faite ?)")
+            print(f"⚠ missing: {fname} (pyglossary conversion not done?)")
             continue
         n, batch = 0, []
         for hw, body in iter_entries(path):
             headword = hw.strip()
-            # Une entrée a souvent plusieurs clés jointes par « | », entre
-            # guillemets/espaces (« " zéro "|" zero " ») → on les sépare toutes
-            # pour les rendre cherchables (sinon 55% du frru est inatteignable).
+            # An entry often has several keys joined by "|", inside
+            # quotes/spaces (" zéro "|" zero ") → split them all so they become
+            # searchable (otherwise 55% of frru is unreachable).
             keys = {k for part in headword.split("|")
                     if (k := part.strip().strip('"').strip().lower())}
             for key in keys:
@@ -72,15 +72,15 @@ def main():
         if batch:
             con.executemany("INSERT INTO entries VALUES (?,?,?,?,?)", batch)
             n += len(batch)
-        print(f"  {direction} : {n:>7} entrées")
+        print(f"  {direction}: {n:>7} entries")
         total += n
-    print("  index…")
+    print("  indexing…")
     con.execute("CREATE INDEX idx_key_dir ON entries (key, dir)")
     con.execute("CREATE INDEX idx_nkey_dir ON entries (nkey, dir)")
     con.commit()
     con.close()
     size = os.path.getsize(DB) / 1e6
-    print(f"✓ {total} entrées → {DB}  ({size:.0f} Mo)")
+    print(f"✓ {total} entries → {DB}  ({size:.0f} MB)")
 
 
 if __name__ == "__main__":

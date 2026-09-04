@@ -1,7 +1,7 @@
-# 🔎 Mots du dico
+# 🔎 dico words
 
-*1 mots — généré automatiquement depuis `dico_vocab.json` (la source de vérité). **Ne pas éditer à la main** : régénéré à chaque recherche. Tout ce que tu cherches atterrit ici. Pour en retirer un : `dico --forget <mot>`.*
+*1 words — generated automatically from `dico_vocab.json` (the source of truth). **Do not edit by hand**: it is regenerated on every lookup. Everything you look up lands here. To drop one: `dico --forget <word>`.*
 
-| Mot | Sens | Exemple | Vu |
-|-----|------|---------|----|
+| Word | Meaning | Example | Seen |
+|------|---------|---------|------|
 | un chat | chat |  |  |
