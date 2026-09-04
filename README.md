@@ -25,6 +25,25 @@ pensé pour un apprenant russophone/anglophone. Cœur **zéro dépendance**
 Cumulables : `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap mot`…
 Mode interactif : tape `dico`, puis `!m` `!c` `!f` `!d` `!a` `!p` `!s` devant un mot.
 
+### La carte de dictionnaire (par défaut)
+
+Une recherche affiche une **vraie entrée** : les sens **groupés par nature** et
+**numérotés**, l'article/genre de chaque nom (Lexique), la fréquence (★), les
+rétro-traductions du sens principal, et une phrase d'exemple réelle (Tatoeba) :
+
+```
+» cook
+     verbe      1 cuisiner ★★  2 cuire ★  3 faire la cuisine   ← bake
+     nom        4 un cuisinier ★  5 une cuisine ★★             ← chef
+     « Il aime cuisiner le week-end. » — He likes to cook on weekends.
+» !s 4                      ← sauve « un cuisinier » (le nom, pas le verbe)
+```
+
+Le sens 1 est celui que l'auto-save garde ; **`!s N`** sauve le sens N — fini de
+se battre avec les drapeaux quand Google a choisi la mauvaise nature. Un mot
+**déjà français** (`maison`, `doit`) donne sa carte : nature · genre · article ·
+fréquence, puis ses sens anglais. `:examples off` coupe les phrases Tatoeba.
+
 **Pas besoin de taper les accents** : `etre` trouve *être*, `creche` trouve *crèche*.
 **Préfixes tolérants** (mode interactif) : `!c manger`, `! c manger`, `manger !c`, `-c manger`,
 `--conj manger`, `!cf mot`, `!C MANGER` — tous équivalents. Préfixe inconnu → message clair.
@@ -59,8 +78,12 @@ Backend, dans l'ordre : **1)** un endpoint **compatible OpenAI** (LM Studio sur
 `http://localhost:1234/v1` par défaut — ou un DGX Spark / Ollama / Mistral / Groq via
 `DICO_LLM_URL`, `DICO_LLM_MODEL`, `DICO_LLM_KEY`, ou `:llm <url> [modèle]` dans le REPL) ;
 **2)** l'API Anthropic (`ANTHROPIC_API_KEY`) ; **3)** la commande `claude`.
-Modèle recommandé sur Mac : un modèle **MLX** (pas GGUF — 2× plus rapide sur Apple
-Silicon) ; sur DGX Spark : Mistral Small 4. `*` local = sans internet.
+Modèle recommandé (bake-off sur 5 questions de grammaire, M4 Pro) :
+**Gemma 4 12B it — MLX 4-bit** (`lmstudio-community/gemma-4-12B-it-MLX-4bit`,
+≈ 2 s par réponse, 5/5 réponses justes). Ministral 3 8B est plus rapide (≈ 1,5 s)
+mais s'est trompé sur la règle *de/des*. Toujours préférer les poids **MLX** aux
+GGUF sur Apple Silicon (≈ 2× plus rapide). Sur le DGX Spark : Mistral Small 4.
+`*` local = sans internet.
 
 ### Lexique 3.83 — savoir, hors-ligne (badge sur chaque recherche)
 
@@ -88,7 +111,7 @@ lit le store directement. La curation est **soustractive** : on sauve tout, tu
 | `dico --forget mot` | retire un mot (curation soustractive) |
 | `dico --render` | régénère le markdown depuis le store JSON |
 
-En mode interactif : `:save on|off` · `:forget <mot>` · `:render` · `:spacy on|off` · `:llm`.
+En mode interactif : `:save on|off` · `:forget <mot>` · `:render` · `:spacy on|off` · `:llm` · `:examples on|off`.
 Chaque sauvegarde enrichit le mot avec le **genre** (→ *un/une*), le lemme accentué,
 la nature et la langue source ; les répétitions incrémentent un compteur `×N`.
 

@@ -96,12 +96,12 @@ def _get(url):
 # --------------------------------------------------------------------------- #
 #  Niveau 1 : traduction rapide                                               #
 # --------------------------------------------------------------------------- #
-def translate_google(word, tl="fr"):
-    """Endpoint gratuit de Google (auto-détection de la langue source).
+def _google_query(word, tl="fr", sl="auto"):
+    """Endpoint gratuit de Google (auto-détection de la langue source), JSON brut.
     Réessaie une fois en cas de 429 (limite de débit)."""
     q = urllib.parse.quote(word)
     url = ("https://translate.googleapis.com/translate_a/single"
-           f"?client=gtx&sl=auto&tl={tl}&dt=t&dt=bd&q={q}")
+           f"?client=gtx&sl={sl}&tl={tl}&dt=t&dt=bd&q={q}")
     try:
         raw = _get(url)
     except urllib.error.HTTPError as e:
@@ -109,7 +109,40 @@ def translate_google(word, tl="fr"):
             raise
         time.sleep(1.5)
         raw = _get(url)
-    data = json.loads(raw)
+    return json.loads(raw)
+
+
+_POS_FR = {"noun": "nom", "verb": "verbe", "adjective": "adjectif", "adverb": "adverbe",
+           "preposition": "préposition", "pronoun": "pronom", "conjunction": "conjonction",
+           "interjection": "interjection", "abbreviation": "abréviation",
+           "article": "article", "phrase": "expression", "suffix": "suffixe",
+           "auxiliary verb": "auxiliaire", "modal verb": "modal", "prefix": "préfixe"}
+
+
+def translate_rich(word, tl="fr", sl="auto"):
+    """(traduction, langue détectée, sens groupés par nature) —
+    sens = [(nature, [(terme, [rétro-traductions]), …]), …]. C'est la structure
+    d'un vrai dictionnaire, que « aussi : … » aplatissait."""
+    data = _google_query(word, tl, sl)
+    translation = "".join(seg[0] for seg in data[0] if seg and seg[0]).strip()
+    detected = data[2] if len(data) > 2 and isinstance(data[2], str) else None
+    groups = []
+    for entry in (data[1] or []) if len(data) > 1 else []:
+        pos = _POS_FR.get(str(entry[0]).lower(), str(entry[0]).lower())
+        terms = []
+        for t in (entry[2] if len(entry) > 2 and entry[2] else []):
+            if t and t[0]:
+                terms.append((t[0], [b for b in (t[1] if len(t) > 1 else []) if b][:4]))
+        if not terms and len(entry) > 1:
+            terms = [(x, []) for x in entry[1] if x]
+        if terms:
+            groups.append((pos, terms))
+    return translation, detected, groups
+
+
+def translate_google(word, tl="fr"):
+    """Compatibilité : (traduction, langue détectée, alternatives plates)."""
+    data = _google_query(word, tl)
     translation = "".join(seg[0] for seg in data[0] if seg and seg[0]).strip()
     detected = data[2] if len(data) > 2 and isinstance(data[2], str) else None
     alts = []
@@ -121,10 +154,10 @@ def translate_google(word, tl="fr"):
     return translation, detected, alts[:6]
 
 
-def translate_mymemory(word, src):
+def translate_mymemory(word, src, tl="fr"):
     """Secours : API gratuite MyMemory."""
     q = urllib.parse.quote(word)
-    url = f"https://api.mymemory.translated.net/get?q={q}&langpair={src}|fr"
+    url = f"https://api.mymemory.translated.net/get?q={q}&langpair={src}|{tl}"
     data = json.loads(_get(url))
     translation = data["responseData"]["translatedText"].strip()
     alts = []
@@ -144,6 +177,137 @@ def translate(word, tl="fr"):
         if tl != "fr":
             raise
         return translate_mymemory(word, src_guess)
+
+
+def _tatoeba(fr_word, to="eng", limit=1):
+    """Phrases d'exemple réelles (Tatoeba, CC-BY) : [(phrase FR, traduction)]."""
+    try:
+        url = ("https://tatoeba.org/en/api_v0/search?from=fra&to=" + to
+               + "&query=" + urllib.parse.quote(f'"{fr_word}"')
+               + "&sort=relevance&limit=8&word_count_min=4&word_count_max=12")
+        data = json.loads(_get(url))
+    except Exception:
+        return []
+    out = []
+    for r in data.get("results", []):
+        fr = r.get("text", "")
+        trs = [t for grp in r.get("translations", []) for t in grp]
+        if not fr or not trs or fr_word.lower() not in fr.lower():
+            continue
+        out.append((fr, trs[0].get("text", "")))
+        if len(out) >= limit:
+            break
+    return out
+
+
+_BAND_STARS = {"très courant": "★★★", "courant": "★★", "moyen": "★"}
+
+
+def _lex_gender_row(word):
+    """Pour un nom : la ligne Lexique AVEC genre (« maison » : la ligne la plus
+    fréquente peut être l'adjectif « fait maison », sans genre)."""
+    if not os.path.exists(LEXIQUE_DB):
+        return None
+    try:
+        con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
+        row = con.execute("SELECT genre FROM lexique WHERE (ortho=? OR northo=?) AND "
+                          "cgram LIKE 'NOM%' AND genre IN ('m','f') ORDER BY freqfilms DESC "
+                          "LIMIT 1", (word.lower(), _deaccent(word.lower()))).fetchone()
+        con.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _fr_head(term):
+    """Terme français → (recto avec article si nom, entrée Lexique)."""
+    lex = lexique_lookup(term)
+    if lex and " " not in term.strip() and lex["cgram"].startswith(("NOM", "ADJ")) \
+            and not lex["genre"]:
+        g = _lex_gender_row(term)                 # nom sans genre → chercher la ligne genrée
+        if g:
+            lex = dict(lex, genre=g, article={"m": "un", "f": "une"}[g], pos="nom")
+    if lex and lex["article"] and " " not in term.strip():
+        return f"{lex['article']} {lex['ortho']}", lex
+    return term, lex
+
+
+def _render_card_to_fr(word, src, translation, groups, examples=True):
+    """Carte RU/EN → FR : sens numérotés, groupés par nature (« !s N » = sauver le N)."""
+    print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}")
+    # La traduction principale (celle que l'auto-save garde) doit être le sens 1.
+    tmain = (translation or "").strip().lower()
+    groups = [(p, list(t)) for p, t in groups]
+    hit = next((i for i, (_, t) in enumerate(groups) if any(x.lower() == tmain for x, _ in t)), None)
+    if hit is None and translation:
+        lx = lexique_lookup(translation)
+        groups.insert(0, (lx["pos"] if lx else "", [(translation, [])]))
+    elif hit is not None:
+        pos, terms = groups.pop(hit)
+        terms.sort(key=lambda x: x[0].lower() != tmain)
+        groups.insert(0, (pos, terms))
+    senses, n = [], 0
+    for pos, terms in groups[:4]:
+        cells = []
+        for term, back in terms[:4]:
+            n += 1
+            front, lex = _fr_head(term)
+            senses.append(front)
+            stars = _BAND_STARS.get(lex["band"], "") if lex else ""
+            cells.append(f"{DIM}{n}{RESET} {GREEN if n == 1 else ''}{front}{RESET}"
+                         + (f" {DIM}{stars}{RESET}" if stars else ""))
+        back = [b for b in terms[0][1] if b.lower() != word.lower()][:2]
+        tail = f"   {DIM}← {', '.join(back)}{RESET}" if back else ""
+        print(f"     {DIM}{pos:10}{RESET} " + "  ".join(cells) + tail)
+    _LAST["senses"] = senses
+    if examples and translation:
+        for fr, tr in _tatoeba(translation.split()[-1] if " " in translation else translation, "eng"):
+            print(f"     {DIM}« {fr} » — {tr}{RESET}")
+    _LAST["hints"] = _LAST.get("hints", 0) + 1
+    if _LAST["hints"] <= 2:
+        print(f"     {DIM}!s N sauve le sens N (défaut : 1){RESET}")
+
+
+def _render_card_fr(word, lex, examples=True):
+    """Carte d'un mot FRANÇAIS : nature · genre/article · fréquence, puis sens EN."""
+    head, lex2 = _fr_head(word)
+    lex = lex2 or lex
+    if lex and lex["cgram"].startswith("NOM") and not lex["genre"]:
+        try:                                   # Lexique muet sur le genre (« maison ») → Wiktionnaire
+            w = wiktionary(word)
+            art = ARTICLE_FOR.get((w or {}).get("gender") or "")
+            if art:
+                g = "m" if art == "un" else "f"
+                lex = dict(lex, genre=g, article=art)
+                head = f"{art} {lex['ortho']}"
+        except Exception:
+            pass
+    bits = []
+    if lex:
+        bits.append(lex["pos"] + (" " + ("m." if lex["genre"] == "m" else "f.") if lex["genre"] else ""))
+        if head != word:
+            bits.append(head)
+        bits.append(lex["band"])
+    print(f"  🇫🇷 {BOLD}{word}{RESET}" + (f"   {DIM}{' · '.join(bits)}{RESET}" if bits else ""))
+    try:
+        _, _, groups = translate_rich(word, tl="en", sl="fr")   # sl explicite → sens groupés
+    except Exception:
+        groups = []
+        try:                                   # secours : MyMemory fr→en (1 sens)
+            t, _, _ = translate_mymemory(word, "fr", tl="en")
+            if t and t.lower() != word.lower():
+                groups = [("", [(t, [])])]
+        except Exception:
+            pass
+    senses = []
+    for pos, terms in groups[:3]:
+        line = " · ".join(t for t, _ in terms[:6])
+        print(f"     {DIM}{pos:10}{RESET} {line}")
+        senses.extend(t for t, _ in terms[:6])
+    _LAST["senses"] = [head]
+    if examples:
+        for fr, tr in _tatoeba(word, "eng"):
+            print(f"     {DIM}« {fr} » — {tr}{RESET}")
 
 
 # --------------------------------------------------------------------------- #
@@ -515,7 +679,7 @@ _TUTOR_SYS = ("Tu es un professeur de français pour un adulte débutant (A1→A
               "simple, TRÈS court (2 à 5 lignes), avec un exemple. Mets la traduction "
               "anglaise entre parenthèses pour les mots difficiles. Pas d'introduction, "
               "pas de tableau ; **gras** et listes « - » bienvenus.")
-_LAST = {"word": "", "fr": "", "sentence": ""}    # contexte pour « ? question »
+_LAST = {"word": "", "fr": "", "sentence": "", "senses": []}   # contexte « ? » / « !s N »
 
 
 def ai_explain(word, deep=False):
@@ -1529,19 +1693,28 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     multi_fr = want_multi and detect_lang(word) == "en"
     input_is_french = want_fr or direct_fr_verb or multi_fr
 
-    translation, detected, alts = None, None, []
+    translation, detected, alts, groups = None, None, [], []
     if input_is_french:
         translation = conj_inf if direct_fr_verb else word.strip().lower()
         detected = "fr"
     else:
+        groups = []
         try:
-            translation, detected, alts = translate(word)
+            translation, detected, groups = translate_rich(word)      # Google
+            alts = [t for _, terms in groups for t, _ in terms][:6]
         except Exception as e:
-            if not offline_ok:
+            try:
+                translation, detected, alts = translate_mymemory(word, src_guess)
+            except Exception:
+                translation = None
+            if translation:
+                pass
+            elif not offline_ok:
                 print(f"{RED}✗ Erreur / pas de connexion :{RESET} {e}")
                 print(f"{DIM}  (le dico a besoin d'internet){RESET}")
                 return
-            print(f"  {DIM}(hors-ligne : pas de traduction rapide){RESET}")
+            else:
+                print(f"  {DIM}(hors-ligne : pas de traduction rapide){RESET}")
     src = detected or src_guess
     _LAST.update(word=word, fr=translation or "")
 
@@ -1558,14 +1731,18 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
             else:
                 cognate = c                   # sinon : simple alerte « aussi français »
 
-    if translation and not input_is_french:
-        print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}  {DIM}→{RESET}  "
-              f"🇫🇷 {BOLD}{GREEN}{translation}{RESET}")
-        if alts:
-            print(f"  {DIM}aussi :{RESET} {', '.join(alts)}")
-    elif not translation and not offline_ok:
+    lex_fr = lexique_lookup(translation) if translation else None
+    if not translation and not offline_ok:
         print(f"{YELLOW}Aucune traduction trouvée pour « {word} ».{RESET}")
         return
+    if translation:
+        ex_on = config_load().get("examples", True)
+        is_fr = input_is_french or _deaccent(translation.lower()) == _deaccent(word.strip().lower())
+        if is_fr:
+            _render_card_fr(translation, lex_fr, examples=ex_on and not want_conj)
+        else:
+            _render_card_to_fr(word, src, translation, groups if not input_is_french else [],
+                               examples=ex_on)
 
     if cognate:                               # faux-ami potentiel : on le signale
         art = (cognate["article"] + " ") if cognate["article"] else ""
@@ -1574,15 +1751,6 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
         print(f"  {YELLOW}↔ « {word} » est aussi un mot français{RESET} : "
               f"{BOLD}{art}{cognate['lemma']}{RESET} {DIM}({cognate['pos']}{g}, "
               f"{cognate['band']}) — « !f {word} » pour le sens{RESET}")
-
-    # Badge fréquence + nature (Lexique 3.83, hors-ligne) : sait si le mot vaut
-    # la peine d'être mémorisé, et fournit le genre pour l'auto-save.
-    lex_fr = lexique_lookup(translation) if translation else None
-    if lex_fr:
-        bits = [lex_fr["band"], lex_fr["pos"]]
-        if lex_fr["genre"]:
-            bits.append("masc." if lex_fr["genre"] == "m" else "fém.")
-        print(f"  {DIM}📊 {' · '.join(bits)}{RESET}")
 
     if want_multi:
         lines, direction, err = multitran_lookup(word)
@@ -1768,6 +1936,10 @@ def _repl_command(line):
         etat = "OK" if _llm_reachable() else "injoignable"
         print(f"  tuteur : {url}  ·  modèle : {model or '(premier chargé)'}  ·  {etat}"
               f"   {DIM}(:llm <url> [modèle] · :llm <modèle>){RESET}")
+    elif cmd in ("examples", "exemples"):
+        if arg.lower() in ("on", "off"):
+            config_set("examples", arg.lower() == "on")
+        print(f"  exemples Tatoeba : {'ON' if config_load().get('examples', True) else 'off'}")
     elif cmd == "spacy":
         if arg.lower() in ("on", "off"):
             config_set("xray_spacy", arg.lower() == "on")
@@ -1786,6 +1958,18 @@ def _load_history():
     except OSError:
         pass
     readline.set_history_length(1000)
+
+
+def _save_term(french, sens, src_lang="en", tier="google"):
+    """Sauve un terme français (recto avec article si nom) avec « sens » au dos."""
+    front, lex = _fr_head(french)
+    lemma = (lex["lemma"] if lex else french)
+    rec = {"key": store_key(lemma), "front": front, "lemma": lemma, "sens": sens,
+           "pos": (lex["pos"] if lex else ""), "gender": (lex["genre"] if lex else "") or "",
+           "example": "", "src_word": sens, "src_lang": src_lang, "tier": tier}
+    status, cnt = store_upsert(rec)
+    tag = f"  {DIM}×{cnt}{RESET}" if cnt > 1 else ""
+    print(f"  {GREEN}💾 « {front} » → {status}{RESET}{tag}")
 
 
 def _save_history():
@@ -1858,6 +2042,15 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 break
             if line.startswith(":"):           # réglage, pas une recherche
                 _repl_command(line)
+                continue
+            ms = re.match(r"^[!-]\s*s\s*(\d+)$", line, re.I)   # « !s 2 » : sauver le sens 2
+            if ms:
+                n = int(ms.group(1)); senses = _LAST.get("senses") or []
+                if 1 <= n <= len(senses):
+                    _save_term(senses[n - 1], _LAST.get("word", ""),
+                               detect_lang(_LAST.get("word", "")))
+                else:
+                    print(f"  {DIM}sens {n} inconnu — la dernière carte en a {len(senses)}{RESET}")
                 continue
             if line.startswith("?"):           # question libre au tuteur (contexte = dernier mot)
                 deep = line.startswith("??")
