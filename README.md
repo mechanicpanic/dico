@@ -39,7 +39,7 @@ back-translations of the main sense, and a real example sentence (Tatoeba):
 » !s 4                      ← saves « un cuisinier » (the noun, not the verb)
 ```
 
-Sense 1 is the one autosave keeps; **`!s N`** saves sense N — no more fighting
+Sense 1 is the one autosave keeps; **`save N`** saves sense N — no more fighting
 with flags when Google picked the wrong part of speech. A word that is **already
 French** (`maison`, `doit`) gets its own card: part of speech · gender · article ·
 frequency, then its English senses. `:examples off` turns the Tatoeba sentences off.
