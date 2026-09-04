@@ -141,6 +141,22 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 export DICO_VOCAB="$HOME/notes/francais/mots-cherches.md"
 ```
 
+### Popup macOS : Raycast
+
+Pour les allergiques au terminal (ou juste pour aller vite) : `tools/raycast/dico.sh`
+est une *Script Command* Raycast. Dans Raycast → **Settings → Extensions → Script
+Commands → Add Directories** → choisis le dossier `tools/raycast` du clone (ou de
+`~/.local/share/uv/tools/dico/…` si installé comme outil). Ensuite :
+
+```
+⌥ Space  →  dico кошка
+            dico -c aller present
+            dico -g elle est parti
+```
+
+La carte s'affiche dans le panneau Raycast. Le script trouve `dico` dans le PATH
+(`uv tool install`) ou, à défaut, `~/Projects/vibes/dico/dico.py`.
+
 ### Sources & licences
 
 - Code : **MIT**. Tout le reste est téléchargé chez son auteur par `dico --setup`, jamais redistribué ici.
