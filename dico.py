@@ -443,17 +443,97 @@ def _ai_via_cli(prompt, model):
     return text, None
 
 
-def ai_explain(word, deep=False):
-    """Préfère l'API directe (si ANTHROPIC_API_KEY) ; sinon la commande `claude`.
-    deep=True → modèle Opus + prompt riche. Claude traduit le mot lui-même."""
-    if deep:
-        model, prompt, max_tokens = AI_MODEL_DEEP, _ai_prompt_deep(word), 1100
-    else:
-        model, prompt, max_tokens = AI_MODEL, _ai_prompt(word), 400
+# --- Modèle local / compatible OpenAI (LM Studio, DGX Spark, Ollama, Mistral…) ---
+# Réglages : DICO_LLM_URL (défaut http://localhost:1234/v1), DICO_LLM_MODEL,
+# DICO_LLM_KEY — ou dans ~/.dico_config.json (llm_url / llm_model / llm_key).
+def _llm_cfg():
+    cfg = config_load()
+    return (os.environ.get("DICO_LLM_URL") or cfg.get("llm_url") or "http://localhost:1234/v1",
+            os.environ.get("DICO_LLM_MODEL") or cfg.get("llm_model") or "",
+            os.environ.get("DICO_LLM_KEY") or cfg.get("llm_key") or "")
+
+
+def _llm_models(url, key):
+    """Modèles servis par l'endpoint (LM Studio : ceux chargés en premier)."""
+    req = urllib.request.Request(url.rstrip("/") + "/models",
+                                 headers={"Authorization": f"Bearer {key}"} if key else {})
+    with urllib.request.urlopen(req, timeout=3) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    return [m.get("id") for m in data.get("data", []) if m.get("id")]
+
+
+def _llm_openai(system, user, max_tokens):
+    """POST /chat/completions (compatible OpenAI). Renvoie (texte, erreur)."""
+    url, model, key = _llm_cfg()
+    try:
+        if not model:
+            ids = _llm_models(url, key)
+            if not ids:
+                return None, "aucun modèle chargé (LM Studio : charge un modèle)"
+            model = ids[0]
+        body = json.dumps({"model": model, "temperature": 0.3, "max_tokens": max_tokens,
+                           "messages": [{"role": "system", "content": system},
+                                        {"role": "user", "content": user}]}).encode()
+        hdr = {"Content-Type": "application/json"}
+        if key:
+            hdr["Authorization"] = f"Bearer {key}"
+        req = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=body,
+                                     headers=hdr, method="POST")
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        text = (data["choices"][0]["message"].get("content") or "").strip()
+        text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.S)   # modèles « pensants »
+        return (text, None) if text else (None, "réponse vide")
+    except urllib.error.URLError as e:
+        return None, f"endpoint injoignable ({url}) — {getattr(e, 'reason', e)}"
+    except Exception as e:
+        return None, str(e)
+
+
+def _llm_reachable():
+    url, _, key = _llm_cfg()
+    try:
+        return bool(_llm_models(url, key))
+    except Exception:
+        return False
+
+
+def llm_complete(system, user, max_tokens=400, deep=False):
+    """1) endpoint local/compatible OpenAI s'il répond, 2) API Anthropic, 3) `claude`."""
+    if os.environ.get("DICO_LLM_URL") or config_load().get("llm_url") or _llm_reachable():
+        return _llm_openai(system, user, max_tokens)
+    model = AI_MODEL_DEEP if deep else AI_MODEL
+    prompt = system + "\n\n" + user
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
         return _ai_via_api(prompt, api_key, model, max_tokens)
     return _ai_via_cli(prompt, model)
+
+
+_TUTOR_SYS = ("Tu es un professeur de français pour un adulte débutant (A1→A2) dont la "
+              "langue maternelle est le russe et qui parle anglais. Réponds en français "
+              "simple, TRÈS court (2 à 5 lignes), avec un exemple. Mets la traduction "
+              "anglaise entre parenthèses pour les mots difficiles. Pas d'introduction, "
+              "pas de tableau ; **gras** et listes « - » bienvenus.")
+_LAST = {"word": "", "fr": "", "sentence": ""}    # contexte pour « ? question »
+
+
+def ai_explain(word, deep=False):
+    """Fiche d'un mot (« !a mot » / « -a mot »)."""
+    prompt = _ai_prompt_deep(word) if deep else _ai_prompt(word)
+    return llm_complete(_TUTOR_SYS, prompt, 1100 if deep else 400, deep=deep)
+
+
+def ai_ask(question, deep=False):
+    """Question libre au tuteur, avec le contexte du dernier mot / de la dernière phrase."""
+    ctx = []
+    if _LAST["sentence"]:
+        ctx.append(f"La dernière phrase analysée : « {_LAST['sentence']} ».")
+    if _LAST["word"]:
+        ctx.append(f"Le dernier mot cherché : « {_LAST['word']} »"
+                   + (f" (→ « {_LAST['fr']} »)" if _LAST["fr"] else "") + ".")
+    user = ("Contexte : " + " ".join(ctx) + "\n\n" if ctx else "") + "Question : " + question
+    return llm_complete(_TUTOR_SYS, user, 700 if deep else 350, deep=deep)
 
 
 def _render_md(text):
@@ -485,11 +565,25 @@ def _render_md(text):
     return lines
 
 
-def _show_ai(word, deep):
-    icon, label = ("🧠", "Claude approfondi") if deep else ("🤖", "Claude")
+def _llm_label():
+    url, model, _ = _llm_cfg()
+    if os.environ.get("DICO_LLM_URL") or config_load().get("llm_url") or _llm_reachable():
+        try:
+            model = model or (_llm_models(url, _llm_cfg()[2]) or ["modèle local"])[0]
+        except Exception:
+            model = model or "modèle local"
+        return model.split("/")[-1][:28]
+    return "Claude"
+
+
+def _show_ai(word, deep, question=None):
+    icon = "🧠" if deep else "🤖"
+    label = _llm_label()
     pad = " " * 12
-    print(f"  {CYAN}{icon} {label} réfléchit…{RESET}", end="\r")
-    text, err = ai_explain(word, deep=deep)
+    print(f"  {CYAN}{icon} {label} réfléchit…{RESET}", end="\r", flush=True)
+    t0 = time.time()
+    text, err = (ai_ask(question, deep) if question else ai_explain(word, deep=deep))
+    label += f"  {DIM}{time.time() - t0:.1f}s{RESET}{CYAN}"
     if text:
         print(f"  {CYAN}{icon} {label} :{RESET}{pad}")
         for line in _render_md(text):
@@ -1404,7 +1498,12 @@ def _show_grammar(sentence):
 def show(word, want_dict=False, want_ai=False, want_save=False,
          want_multi=False, want_conj=False, want_deep=False, want_fr=False,
          want_save_main=False, want_gram=False, want_xray=False):
+    if (want_ai or want_deep) and len(word.split()) > 1 and not (
+            want_dict or want_fr or want_multi or want_conj):
+        _show_ai(word, deep=bool(want_deep), question=word)   # question libre
+        return
     if want_gram or want_xray:                # outils « phrase » : pipeline à part
+        _LAST["sentence"] = word.strip()
         if want_xray:
             _show_xray(word)
         if want_gram:
@@ -1444,6 +1543,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
                 return
             print(f"  {DIM}(hors-ligne : pas de traduction rapide){RESET}")
     src = detected or src_guess
+    _LAST.update(word=word, fr=translation or "")
 
     # Cognat / faux-ami : le mot TAPÉ est-il lui-même un mot français courant ?
     # (« table » EN → Google dit « tableau », mais « table » EST français.)
@@ -1522,10 +1622,9 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
     if want_dict and translation:             # Wiktionnaire de la traduction
         wikt_entry = _show_wikt(translation)
 
-    if want_ai:
-        _show_ai(word, deep=False)
-    if want_deep:
-        _show_ai(word, deep=True)
+    if want_ai or want_deep:
+        q = word if len(word.split()) > 1 else None   # plusieurs mots = question libre
+        _show_ai(word, deep=bool(want_deep), question=q)
 
     auto = autosave_on()
     if (auto or want_save or want_save_main) and translation:
@@ -1658,6 +1757,17 @@ def _repl_command(line):
     elif cmd == "render":
         store_render()
         print(f"  {GREEN}✓ markdown régénéré{RESET}")
+    elif cmd == "llm":
+        url, model, _ = _llm_cfg()
+        if arg:
+            parts = arg.split()
+            config_set("llm_url", parts[0]) if "://" in parts[0] else config_set("llm_model", parts[0])
+            if len(parts) > 1:
+                config_set("llm_model", parts[1])
+            url, model, _ = _llm_cfg()
+        etat = "OK" if _llm_reachable() else "injoignable"
+        print(f"  tuteur : {url}  ·  modèle : {model or '(premier chargé)'}  ·  {etat}"
+              f"   {DIM}(:llm <url> [modèle] · :llm <modèle>){RESET}")
     elif cmd == "spacy":
         if arg.lower() in ("on", "off"):
             config_set("xray_spacy", arg.lower() == "on")
@@ -1665,7 +1775,7 @@ def _repl_command(line):
         print(f"  spaCy pour « !x » : {etat}   {DIM}(:spacy on | :spacy off — off = "
               f"instantané, Lexique seul){RESET}")
     else:
-        print(f"  {DIM}commandes : :save on|off · :forget <mot> · :render · :spacy on|off{RESET}")
+        print(f"  {DIM}commandes : :save on|off · :forget <mot> · :render · :spacy on|off · :llm{RESET}")
 
 
 def _load_history():
@@ -1723,6 +1833,7 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
           f"   ·   FR→russe : !m   ·   sens d'un mot FR : !f / !a / !p{RESET}")
     print(f"{DIM}💾 auto-save{RESET} {etat} {DIM}·  :save on|off · :forget <mot> · "
           f":render{RESET}")
+    print(f"{DIM}❓ « ? ta question » = tuteur IA ({_llm_label()}) avec le contexte du dernier mot{RESET}")
     print(f"{DIM}↑ précédent   ·   « q » / Ctrl-D : quitter{RESET}\n")
     try:
         while True:
@@ -1747,6 +1858,15 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 break
             if line.startswith(":"):           # réglage, pas une recherche
                 _repl_command(line)
+                continue
+            if line.startswith("?"):           # question libre au tuteur (contexte = dernier mot)
+                deep = line.startswith("??")
+                q = line.lstrip("?").strip()
+                if q:
+                    _show_ai(None, deep, question=q)
+                else:
+                    print(f"  {DIM}« ? ta question » — ex : ? cuisiner vs cuire · "
+                          f"? pourquoi « de » ici · ?? (réponse détaillée){RESET}")
                 continue
             word, fl, perr = _parse_line(line)
             if perr:

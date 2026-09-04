@@ -14,8 +14,9 @@ pensé pour un apprenant russophone/anglophone. Cœur **zéro dépendance**
 | `dico -c doit` | **Forme conjuguée** → infinitif (*doit → devoir*) | **non** 🔌 |
 | `dico -f manger` | **Wiktionnaire** — mot déjà français | oui |
 | `dico -d house` | **Wiktionnaire** — après traduction | oui |
-| `dico -a house` | **Claude Haiku** — fiche rapide | oui |
-| `dico -p house` | **Claude Opus** — fiche d'étude | oui |
+| `dico -a house` | **Tuteur IA** — fiche rapide (modèle local via LM Studio, ou Claude) | non* |
+| `dico -a "tu ou vous ?"` | **Question libre** au tuteur (plusieurs mots = question) | non* |
+| `dico -p …` | idem, réponse détaillée | non* |
 | `dico -s house` | enregistre ce mot (store de vocabulaire) | oui |
 | `dico --mots-outils` | **noyau grammatical** (Lexique) : articles, prépositions, pronoms… | **non** 🔌 |
 | `dico -g "Elle est parti"` | **Grammaire** — corrige une phrase, nomme la règle (Grammalecte) | **non** 🔌 |
@@ -40,6 +41,26 @@ Mode interactif : tape `dico`, puis `!m` `!c` `!f` `!d` `!a` `!p` `!s` devant un
   (`tools/xray_spacy.py`, lancé par `uv run` — modèle téléchargé au 1ᵉʳ appel, ≈ 3 s
   ensuite). Sans spaCy ou avec `:spacy off`, tout le reste marche instantanément,
   hors-ligne. *La ligne de traduction anglaise de la phrase demande internet.*
+
+### Tuteur IA : `?` dans le REPL, modèle local d'abord
+
+Le tuteur n'est plus un « tier » qu'on active : c'est une **question qu'on pose**.
+En mode interactif, `? ta question` (ou `?? …` pour une réponse détaillée) — le
+tuteur connaît **le dernier mot cherché / la dernière phrase analysée** :
+
+```
+» cuisiner
+» ? et cuire, c'est pareil ?
+» -x j'en veux deux
+» ? explique « en » ici
+```
+
+Backend, dans l'ordre : **1)** un endpoint **compatible OpenAI** (LM Studio sur
+`http://localhost:1234/v1` par défaut — ou un DGX Spark / Ollama / Mistral / Groq via
+`DICO_LLM_URL`, `DICO_LLM_MODEL`, `DICO_LLM_KEY`, ou `:llm <url> [modèle]` dans le REPL) ;
+**2)** l'API Anthropic (`ANTHROPIC_API_KEY`) ; **3)** la commande `claude`.
+Modèle recommandé sur Mac : un modèle **MLX** (pas GGUF — 2× plus rapide sur Apple
+Silicon) ; sur DGX Spark : Mistral Small 4. `*` local = sans internet.
 
 ### Lexique 3.83 — savoir, hors-ligne (badge sur chaque recherche)
 
@@ -67,7 +88,7 @@ lit le store directement. La curation est **soustractive** : on sauve tout, tu
 | `dico --forget mot` | retire un mot (curation soustractive) |
 | `dico --render` | régénère le markdown depuis le store JSON |
 
-En mode interactif : `:save on|off` · `:forget <mot>` · `:render` · `:spacy on|off`.
+En mode interactif : `:save on|off` · `:forget <mot>` · `:render` · `:spacy on|off` · `:llm`.
 Chaque sauvegarde enrichit le mot avec le **genre** (→ *un/une*), le lemme accentué,
 la nature et la langue source ; les répétitions incrémentent un compteur `×N`.
 
