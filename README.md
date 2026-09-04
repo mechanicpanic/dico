@@ -23,7 +23,7 @@ standard library); several levels, two of which work **offline**.
 | `dico -x "j'habitais à Lyon"` | **X-ray** — every word: lemma, tense, gender, role, meaning | no* 🔌 |
 
 They combine: `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap word`…
-Interactive mode: type `dico`, then `!m` `!c` `!f` `!d` `!a` `!p` `!s` in front of a word.
+Interactive mode: type `dico`, then just type — words, never flags (see Getting started).
 
 ### The dictionary card (the default)
 
@@ -45,14 +45,9 @@ French** (`maison`, `doit`) gets its own card: part of speech · gender · artic
 frequency, then its English senses. `:examples off` turns the Tatoeba sentences off.
 
 **No need to type accents**: `etre` finds *être*, `creche` finds *crèche*.
-**With no prefix, dico guesses**: a RU/EN word → its card; a French word → its card
-(a verb: + its présent); a **French sentence** → a grammar correction; `? …` → the
-tutor. Prefixes only force a particular view (`!c` the full grid, `!x` the x-ray,
-`!m` Multitran, `!f`/`!d` Wiktionary).
-
-**Forgiving prefixes** (interactive mode): `!c manger`, `! c manger`, `manger !c`,
-`-c manger`, `--conj manger`, `!cf word`, `!C MANGER` — all equivalent. An unknown
-prefix gives a clear message.
+**dico guesses what you mean**: a RU/EN word → its card; a French word → its card
+(a verb also shows its présent); a French sentence → grammar check; `? …` → the
+tutor. Everything else is a plain word: `conj`, `def`, `ru`, `ex`, `grammar`, `x`, `save N`.
 
 ### Sentences: `-g` (grammar) and `-x` (x-ray)
 
@@ -140,13 +135,16 @@ plain words:
 ```
 » cook                → card (1 cuisiner  2 cuire … 5 un cuisinier)
 » save 5              → saves « un cuisinier » (the noun, not the verb)
-» conj                → full conjugation grid
-» def                 → dictionary definitions (Wiktionary)
-» ru                  → Russian (Multitran, offline)
-» ex                  → example sentences (EN + RU)
+» conj                → full conjugation grid        (or: conj manger)
+» def                 → dictionary definitions       (or: def maison)
+» ru                  → Russian, Multitran, offline  (or: ru chat)
+» ex                  → example sentences EN + RU    (or: ex partir)
+» grammar · x         → grammar check · x-ray, on the last sentence or one you give
 » ? is it formal      → ask the tutor about what you're looking at
 » help                → the cheat-sheet
 ```
+In interactive mode there are no flags at all. From the shell, the usual switches
+exist for one-shot calls: `dico -c manger`, `dico -g "…"`, `dico -x "…"`, `dico -f mot`.
 
 **Tutor without a local model?** Run `dico --llm` and bring your own key — Anthropic,
 OpenAI, Mistral, Groq, Gemini or any OpenAI-compatible URL. It's tested once and

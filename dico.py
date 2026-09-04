@@ -1905,94 +1905,59 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 # --------------------------------------------------------------------------- #
 #  Interactive mode                                                           #
 # --------------------------------------------------------------------------- #
-_FLAG_SET = set("damscpfgx")
-_FLAG_LONG = {
-    "conj": "c", "conjugaison": "c", "dico": "d", "wikt": "d",
-    "francais": "f", "fr": "f", "multitran": "m", "multi": "m",
-    "ai": "a", "ia": "a", "profond": "p", "deep": "p",
-    "save": "s", "sauve": "s", "sauver": "s",
-    "gram": "g", "grammaire": "g", "grammar": "g",
-    "xray": "x", "analyse": "x", "rayons": "x",
-}
-_FLAG_HELP = ("d=Wiktionary+transl.  f=Wiktionary(FR)  m=Multitran  c=conjugation  "
-              "a=AI  p=deep AI  s=save  g=grammar  x=x-ray")
-_FLAG_TOKEN = re.compile(r"(?:(?<=\s)|^)(--?|!)\s*([A-Za-z]+)(?=\s|$)")
-
-
-def _parse_line(line):
-    """Command prefixes ANYWHERE in the line, forgiving:
-       "!c manger" · "! c manger" · "manger !c" · "-c manger" ·
-       "--conj manger" · "!cf word" · "!c !f word". Case-insensitive.
-       Returns (word, flags:set, error|None)."""
-    flags, err = set(), None
-
-    def take(m):
-        nonlocal err
-        pre, letters = m.group(1), m.group(2)
-        low = letters.lower()
-        if low in _FLAG_LONG:                       # --conj / -conj / !conj
-            flags.add(_FLAG_LONG[low])
-            return " "
-        if pre == "--":
-            err = f"unknown option \u00ab {pre}{letters} \u00bb"
-            return " "
-        if any(ch not in _FLAG_SET for ch in low):
-            if pre == "!":                          # "!" = a clear intent
-                err = f"unknown prefix \u00ab !{letters} \u00bb — {_FLAG_HELP}"
-                return " "
-            return m.group(0)                       # "-er": part of the word
-        flags.update(low)                           # S is s (same store)
-        return " "
-
-    rest = _FLAG_TOKEN.sub(take, line)
-    word = " ".join(rest.split())
-    return word, flags, err
-
-
 _FOLLOW_HINT = "↳  save N · conj · def · ru · ex · ? question"
 
 
 def _follow_up(line):
-    """Plain-word actions on the last card — no flags to remember. True if handled."""
-    low = line.strip().lower()
-    fr = _LAST.get("fr") or ""
-    m = re.match(r"^(?:save|s)\s+(\d+)$", low)
+    """Plain-word commands. « conj », « def », « ru », « ex », « x », « grammar » act on
+    the last card, or on the word/sentence you give: « conj manger ». True if handled."""
+    low = line.strip()
+    m = re.match(r"^(?:save|s)\s+(\d+)$", low, re.I)
     if m:
         n = int(m.group(1)); senses = _LAST.get("senses") or []
         if 1 <= n <= len(senses):
             _save_term(senses[n - 1], _LAST.get("word", ""), detect_lang(_LAST.get("word", "")))
         else:
-            print(f"  {DIM}sense {n}? the last card has {len(senses)}{RESET}")
+            print(f"  {DIM}no sense {n} — the last card has {len(senses)}{RESET}")
         return True
-    if low in ("help", "h", ":help", "?help"):
+    if low.lower() in ("help", "h", ":help", "?help"):
         _print_cheatsheet()
         return True
-    if low not in ("conj", "conjugate", "def", "definition", "define", "ru", "multitran",
-                   "ex", "examples", "x", "xray", "x-ray"):
+    m = re.match(r"^(conj|conjugate|def|definition|define|ru|multitran|ex|examples|x|xray|x-ray"
+                 r"|grammar|check|xray)(?:\s+(.+))?$", low, re.I)
+    if not m:
         return False
-    if not fr and not _LAST.get("sentence"):
-        print(f"  {DIM}look something up first — then « {low} » acts on it{RESET}")
+    cmd, arg = m.group(1).lower(), (m.group(2) or "").strip()
+    fr = arg or _LAST.get("fr") or ""
+    sentence = arg or _LAST.get("sentence") or fr
+    if not fr and not sentence:
+        print(f"  {DIM}look something up first, or give a word: « {cmd} manger »{RESET}")
         return True
-    if low in ("conj", "conjugate"):
-        global _NO_AUTOSAVE
-        prev, _NO_AUTOSAVE = _NO_AUTOSAVE, True
-        try:
+    global _NO_AUTOSAVE
+    prev, _NO_AUTOSAVE = _NO_AUTOSAVE, True     # a follow-up never re-saves
+    try:
+        if cmd in ("conj", "conjugate"):
             show(fr, want_conj=True)
-        finally:
-            _NO_AUTOSAVE = prev
-    elif low in ("def", "definition", "define"):
-        _show_wikt(fr)
-    elif low in ("ru", "multitran"):
-        _show_multitran(fr)
-    elif low in ("ex", "examples"):
-        exs = _tatoeba(fr, "eng", limit=3) + _tatoeba(fr, "rus", limit=1)
-        if exs:
+        elif cmd in ("def", "definition", "define"):
+            _show_wikt(fr)
+        elif cmd in ("ru", "multitran"):
+            _show_multitran(fr)
+        elif cmd in ("ex", "examples"):
+            exs = _tatoeba(fr, "eng", limit=3) + _tatoeba(fr, "rus", limit=1)
             for s, t in exs:
                 print(f"     {DIM}« {s} » — {t}{RESET}")
+            if not exs:
+                print(f"  {DIM}no example sentences found for « {fr} »{RESET}")
+        elif cmd in ("grammar", "check"):
+            _show_grammar(sentence)
         else:
-            print(f"  {DIM}no example sentences found for « {fr} »{RESET}")
-    else:
-        _show_xray(_LAST.get("sentence") or fr)
+            _show_xray(sentence)
+    finally:
+        _NO_AUTOSAVE = prev
+    if arg:
+        _LAST["fr"] = arg if cmd not in ("grammar", "check", "x", "xray", "x-ray") else _LAST.get("fr", "")
+        if cmd in ("grammar", "check", "x", "xray", "x-ray"):
+            _LAST["sentence"] = arg
     return True
 
 
@@ -2074,12 +2039,7 @@ def _save_history():
             pass
 
 
-def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
-                base_c=False, base_p=False, base_f=False, base_S=False,
-                base_g=False, base_x=False):
-    base_flags = {k for k, v in (("d", base_d), ("a", base_a), ("s", base_s or base_S),
-                                 ("m", base_m), ("c", base_c), ("p", base_p),
-                                 ("f", base_f), ("g", base_g), ("x", base_x)) if v}
+def interactive():
     if not _data_ready():
         print(f"\n{BOLD}👋 Welcome to dico.{RESET} The offline data (conjugations, Lexique, "
               f"Grammalecte — ~50 MB, 2 min) isn't built yet.")
@@ -2103,8 +2063,7 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
     print(f"\n{BOLD}📖 dico{RESET}  —  Russian / English → French"
           f"        {DIM}autosave{RESET} {state}   {DIM}tutor {_llm_label()}{RESET}\n")
     _print_cheatsheet()
-    print(f"\n   {DIM}prefixes still work for power users (!c !x !f !m — before or after the word)  ·  "
-          f"↑ history  ·  « help » shows this again{RESET}\n")
+    print(f"\n   {DIM}↑ history  ·  « help » shows this again{RESET}\n")
     try:
         while True:
             try:
@@ -2131,15 +2090,6 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                 continue
             if _follow_up(line):                  # "save 2", "conj", "def", "ru", "ex", "x", "help"
                 continue
-            ms = re.match(r"^[!-]\s*s\s*(\d+)$", line, re.I)   # "!s 2": save sense 2
-            if ms:
-                n = int(ms.group(1)); senses = _LAST.get("senses") or []
-                if 1 <= n <= len(senses):
-                    _save_term(senses[n - 1], _LAST.get("word", ""),
-                               detect_lang(_LAST.get("word", "")))
-                else:
-                    print(f"  {DIM}no sense {n} — the last card has {len(senses)}{RESET}")
-                continue
             if line.startswith("?"):           # free question to the tutor (context = last word)
                 deep = line.startswith("??")
                 q = line.lstrip("?").strip()
@@ -2149,17 +2099,11 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
                     print(f"  {DIM}\u00ab ? your question \u00bb — e.g. ? cuisiner vs cuire · "
                           f"? pourquoi \u00ab de \u00bb ici · ?? (detailed answer){RESET}")
                 continue
-            word, fl, perr = _parse_line(line)
-            if perr:
-                print(f"  {YELLOW}✗ {perr}{RESET}")
+            if line[:1] in "!-":               # old prefix habit → point at the words
+                print(f"  {DIM}no prefixes anymore — say it in words: conj · def · ru · ex · "
+                      f"grammar · x · save N · ? question   (e.g. « def {line.split()[-1]} »){RESET}")
                 continue
-            fl |= base_flags
-            if not word:
-                print(f"  {DIM}the word is missing: \u00ab !{''.join(sorted(fl)) or 'c'} <word> \u00bb"
-                      f"   ({_FLAG_HELP}){RESET}")
-                continue
-            show(word, "d" in fl, "a" in fl, "s" in fl, "m" in fl, "c" in fl,
-                 "p" in fl, "f" in fl, False, "g" in fl, "x" in fl)
+            show(line)                         # a word, a French word, or a sentence
     finally:
         _save_history()
 
@@ -2251,7 +2195,8 @@ def _print_cheatsheet():
             ("a French word", "its card (+ présent if it's a verb)"),
             ("a French sentence", "grammar check + the rule"),
             ("save N", "save sense N of the last card"),
-            ("conj · def · ru · ex", "conjugation · dictionary definitions · Russian (Multitran) · examples"),
+            ("conj · def · ru · ex", "on the last card — or give a word: « conj manger », « def maison »"),
+            ("grammar · x [sentence]", "grammar check · x-ray, on the last sentence or the one you give"),
             ("? question", "ask the tutor, in context (?? = detailed)"),
             (":save on|off", "auto-save every lookup (also :forget word, :render, :llm, :spacy)"),
             ("q", "quit")]
@@ -2537,9 +2482,7 @@ def main():
              args.multitran, args.conj, args.profond, args.francais, args.save_main,
              args.grammaire, args.xray)
     else:
-        interactive(args.dico, args.ai, args.save, args.multitran,
-                    args.conj, args.profond, args.francais, args.save_main,
-                    args.grammaire, args.xray)
+        interactive()
 
 
 if __name__ == "__main__":
