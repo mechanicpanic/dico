@@ -11,3 +11,5 @@ __pycache__/
 # macOS
 .DS_Store
 data/*.tsv
+data/grammalecte/
+data/*.zip

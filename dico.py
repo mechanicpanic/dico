@@ -14,6 +14,8 @@ Niveaux (cumulables) :
     dico --autosave on    enregistre AUTOMATIQUEMENT chaque recherche (persistant)
     dico --forget <mot>   retire un mot (curation soustractive)
     dico --render         régénère le markdown depuis le store
+    dico -g "<phrase>"    corrige une PHRASE (Grammalecte hors-ligne) et nomme la règle
+    dico -x "<phrase>"    rayons X : chaque mot → lemme, temps, genre, rôle, sens
     dico --mots-outils    noyau grammatical glosé (articles, prépositions, pronoms…)
     dico --mots-outils -s en faire des cartes (front = mot, dos = sens anglais)
     dico -mda <mot>       tout en même temps
@@ -44,6 +46,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -93,12 +96,20 @@ def _get(url):
 # --------------------------------------------------------------------------- #
 #  Niveau 1 : traduction rapide                                               #
 # --------------------------------------------------------------------------- #
-def translate_google(word):
-    """Endpoint gratuit de Google (auto-détection de la langue source)."""
+def translate_google(word, tl="fr"):
+    """Endpoint gratuit de Google (auto-détection de la langue source).
+    Réessaie une fois en cas de 429 (limite de débit)."""
     q = urllib.parse.quote(word)
     url = ("https://translate.googleapis.com/translate_a/single"
-           f"?client=gtx&sl=auto&tl=fr&dt=t&dt=bd&q={q}")
-    data = json.loads(_get(url))
+           f"?client=gtx&sl=auto&tl={tl}&dt=t&dt=bd&q={q}")
+    try:
+        raw = _get(url)
+    except urllib.error.HTTPError as e:
+        if e.code != 429:
+            raise
+        time.sleep(1.5)
+        raw = _get(url)
+    data = json.loads(raw)
     translation = "".join(seg[0] for seg in data[0] if seg and seg[0]).strip()
     detected = data[2] if len(data) > 2 and isinstance(data[2], str) else None
     alts = []
@@ -124,12 +135,14 @@ def translate_mymemory(word, src):
     return translation, src, alts[:6]
 
 
-def translate(word):
-    """Essaie Google, puis MyMemory en secours."""
+def translate(word, tl="fr"):
+    """Essaie Google, puis MyMemory en secours (MyMemory : vers le français seulement)."""
     src_guess = detect_lang(word)
     try:
-        return translate_google(word)
+        return translate_google(word, tl)
     except Exception:
+        if tl != "fr":
+            raise
         return translate_mymemory(word, src_guess)
 
 
@@ -828,12 +841,15 @@ def _norm_tense(s):
 
 
 def _split_tense(word):
-    """« manger present » → (« manger », « présent »). Sinon (word, None)."""
+    """« manger present » ou « present manger » → (« manger », « présent »)."""
     parts = word.split()
     if len(parts) >= 2:
         t = _norm_tense(parts[-1])
         if t:
             return " ".join(parts[:-1]), t
+        t = _norm_tense(parts[0])
+        if t:
+            return " ".join(parts[1:]), t
     return word, None
 
 
@@ -984,6 +1000,7 @@ MOTS_OUTILS_GLOSS = {
     "même": "same / even", "autre": "other",
     # prépositions
     "de": "of / from", "d'": "of / from (+ voyelle)", "à": "to / at / in",
+    "au": "to the / at the (à + le)", "aux": "to the (à + les, pl.)",
     "pour": "for / (in order) to", "dans": "in / inside", "sur": "on / about",
     "sous": "under", "avec": "with", "sans": "without", "par": "by / through / per",
     "chez": "at (someone's) place", "vers": "towards / around (heure)",
@@ -1083,12 +1100,311 @@ def show_mots_outils(limit=120, save=False):
               f"ajouter à tes cartes.{RESET}")
 
 
+
+
+# --------------------------------------------------------------------------- #
+#  Rayons X : analyse d'une phrase (Lexique + conjugaisons, spaCy en option)   #
+# --------------------------------------------------------------------------- #
+XRAY_SPACY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "tools", "xray_spacy.py")
+_PERSON_LABEL = ["je", "tu", "il/elle", "nous", "vous", "ils/elles"]
+_DEP_FR = {
+    "nsubj": "sujet", "nsubj:pass": "sujet", "obj": "COD", "iobj": "COI",
+    "obl": "complément", "obl:arg": "complément", "obl:mod": "complément",
+    "ROOT": "verbe principal", "root": "verbe principal", "det": "déterminant",
+    "case": "préposition", "amod": "adjectif", "advmod": "adverbe", "cc": "coord.",
+    "conj": "coordonné", "mark": "subordonnant", "aux": "auxiliaire",
+    "aux:tense": "auxiliaire", "aux:pass": "auxiliaire", "cop": "copule",
+    "nmod": "compl. du nom", "xcomp": "compl. verbal", "ccomp": "compl. verbal",
+    "expl": "explétif", "expl:subj": "sujet", "fixed": "locution", "flat": "nom propre",
+    "flat:name": "nom propre", "appos": "apposition", "acl": "relative",
+    "acl:relcl": "relative", "punct": "", "dep": "",
+}
+_SPACY_POS_FR = {
+    "PRON": "pronom", "PROPN": "nom propre", "VERB": "verbe", "NOUN": "nom",
+    "ADJ": "adjectif", "ADV": "adverbe", "ADP": "préposition", "DET": "déterminant",
+    "CCONJ": "conjonction", "SCONJ": "conjonction", "AUX": "auxiliaire",
+    "NUM": "nombre", "INTJ": "interjection", "PART": "particule", "SYM": "symbole",
+}
+_ELISION_GLOSS = {"j'": "je (+ voyelle) = I", "qu'": "que (+ voyelle)",
+                  "n'": "ne (+ voyelle) : ne… pas", "ne": "not (ne… pas, 1re partie)",
+                  "pas": "not (ne… pas, 2e partie)"}
+
+
+_CLITICS = r"(moi|toi|nous|vous|le|la|les|lui|leur|y|en|ce|il|elle|ils|elles|on|je|tu)"
+
+
+def _xray_tokens(sentence):
+    """Découpe simple : sépare les élisions (j'habite → j' + habite) et les
+    pronoms accrochés (tiens-moi → tiens + moi), sans casser Saint-Pétersbourg."""
+    s = re.sub(r"(?i)\b(j|l|d|m|n|t|s|c|qu)['’]", lambda m: m.group(1) + "' ", sentence)
+    s = re.sub(r"(?i)(\w)-" + _CLITICS + r"\b", r"\1 \2", s)
+    toks = []
+    for raw in s.split():
+        w = raw.strip(".,;:!?…«»\"()[]")
+        if w:
+            toks.append(w)
+    return toks
+
+
+def _conj_tense_of(inf, form):
+    """À quel(s) temps / personne(s) « form » appartient-elle pour « inf » ?
+    → texte compact (« présent · je/tu · impératif · tu ») ou None. Compare
+    d'abord à l'exact (mangé ≠ mange) ; sans accents seulement si tu n'en as
+    pas tapé. Participe passé tolérant à l'accord (partie/partis → parti)."""
+    _, data, _ = _conj_query(inf)
+    if not data:
+        return None
+    f = form.lower()
+    typed_plain = _deaccent(f) == f            # tapé sans accents → tolérance
+    hits = {}                                  # temps → [personnes]
+    for tense, forms in data.items():
+        for i, full in enumerate(forms):
+            bare = _bare_form(full).lower()
+            if tense == "passé composé":
+                pp = bare.split()[-1]
+                if f.rstrip("s").rstrip("e") == pp or (
+                        typed_plain and _deaccent(f).rstrip("s").rstrip("e") == _deaccent(pp)):
+                    hits.setdefault("participe passé", [])
+                break
+            same = bare == f or (typed_plain and _deaccent(bare) == f)
+            if same:
+                pi = _CONJ_IMP.get(i, i) if tense == "impératif" else i
+                if pi < 6:
+                    hits.setdefault(tense, []).append(_PERSON_LABEL[pi])
+    if not hits:
+        return None
+    parts = []
+    for tense, who in hits.items():
+        parts.append(tense + (" · " + "/".join(who) if who else ""))
+    return " ; ".join(parts)
+
+
+def _spacy_tokens(sentence):
+    """Analyse spaCy via le sidecar (uv). None si indisponible / désactivé."""
+    if not config_load().get("xray_spacy", True):
+        return None
+    if not (shutil.which("uv") and os.path.exists(XRAY_SPACY)):
+        return None
+    try:
+        r = subprocess.run(["uv", "run", "--quiet", XRAY_SPACY, sentence],
+                           capture_output=True, text=True, timeout=120)
+        out = r.stdout
+        i = out.find("[")
+        return json.loads(out[i:]) if i >= 0 else None
+    except Exception:
+        return None
+
+
+def _gloss_for(lemma, token):
+    for k in (token.lower(), lemma.lower()):
+        if k in _ELISION_GLOSS:
+            return _ELISION_GLOSS[k]
+        if k in MOTS_OUTILS_GLOSS:
+            return MOTS_OUTILS_GLOSS[k]
+    key = store_key(lemma)
+    for e in store_load()["entries"]:
+        if e.get("key") == key and e.get("sens"):
+            sens = e["sens"]
+            lx = lexique_lookup(sens) if " " not in sens.strip() else None
+            if lx and _deaccent(lx["lemma"].lower()) == _deaccent(lemma.lower()):
+                continue                       # « doit » n'explique pas « devoir »
+            return sens[:40]
+    return ""
+
+
+def _show_xray(sentence):
+    """Chaque mot : lemme · nature · temps/personne · genre · fréquence · rôle · sens."""
+    sentence = sentence.strip()
+    print(f"  {BOLD}🩻 {sentence}{RESET}")
+    try:                                       # traduction de la phrase entière (1 appel)
+        tr, _, _ = translate(sentence, tl="en")
+        if tr and _deaccent(tr.lower()) != _deaccent(sentence.lower()):
+            print(f"  {DIM}→{RESET} {tr}")
+    except Exception:
+        pass
+    spacy_on = config_load().get("xray_spacy", True)
+    sp = _spacy_tokens(sentence) if spacy_on else None
+    if sp:
+        toks = [(t["text"], t["lemma"], t["pos"], _DEP_FR.get(t["dep"], t["dep"]))
+                for t in sp if t["pos"] != "PUNCT" and t["text"].strip()]
+        src_tag = "spaCy + Lexique + conjugaisons"
+    else:
+        toks = [(w, None, None, "") for w in _xray_tokens(sentence)]
+        src_tag = ("Lexique + conjugaisons — spaCy désactivé (« :spacy on » pour les rôles)"
+                   if not spacy_on else
+                   "Lexique + conjugaisons — spaCy indisponible (uv ?)" if not shutil.which("uv")
+                   else "Lexique + conjugaisons — spaCy : échec")
+    rows = []
+    for text, lemma, pos, role in toks:
+        text = text.strip("-–")                # spaCy laisse « -moi »
+        if not text:
+            continue
+        lex = lexique_lookup(text)
+        lem = (lex["lemma"] if lex else None) or lemma or text
+        nature = (lex["pos"] if lex else "") or _SPACY_POS_FR.get(pos or "", (pos or "").lower())
+        if not nature and text[:1].isupper() and rows:
+            nature = "nom propre"
+        detail, genre, band = "", "", ""
+        # Verbe ? La base de conjugaison a le dernier mot (« tiens » : Lexique dit
+        # interjection, spaCy dit verbe, la base dit tenir → verbe).
+        inf = _form_to_infinitive(text)
+        is_verb = bool(inf) and (
+            pos in ("VERB", "AUX") or lex is None
+            or lex["cgram"].startswith(("VER", "AUX", "ONO")))
+        if not inf and (pos in ("VERB", "AUX") or (lex and lex["cgram"].startswith(("VER", "AUX")))):
+            for cand in (lemma, lem):          # lemme spaCy (partie → partir) puis Lexique
+                if cand and _conj_query(cand)[1]:
+                    inf = _conj_query(cand)[0]
+                    break
+            is_verb = bool(inf)
+        if is_verb:
+            nature = "verbe"
+            if inf:
+                lem = inf
+                if _deaccent(text.lower()) == _deaccent(inf.lower()):
+                    detail = "infinitif"
+                else:
+                    detail = _conj_tense_of(inf, text) or ""
+        if lex:
+            if lex["genre"] and (lex["cgram"].startswith("NOM") or lex["cgram"] == "ADJ"):
+                genre = "m." if lex["genre"] == "m" else "f."
+            band = lex["band"]
+        rows.append((text, lem if lem.lower() != text.lower() else "", nature,
+                     detail, " ".join(x for x in (genre, band) if x), role,
+                     _gloss_for(lem, text)))
+    content = {"nom", "verbe", "adjectif", "adverbe"}
+    todo = [i for i, r in enumerate(rows) if not r[6] and r[2] in content]
+    if todo:
+        try:                                   # 1 seul appel pour tous les mots manquants
+            lem = [rows[i][1] or rows[i][0] for i in todo]
+            tr, _, _ = translate_google("\n".join(lem), tl="en")
+            parts = [p.strip() for p in tr.split("\n")]
+            if len(parts) == len(todo):
+                for i, g in zip(todo, parts):
+                    r = rows[i]
+                    rows[i] = r[:6] + (g.lower() if g.lower() != (r[1] or r[0]).lower() else "",)
+        except Exception:
+            pass
+    heads = ("mot", "lemme", "nature", "temps", "genre·fréq", "rôle", "sens")
+    widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(heads)]
+    print("  " + DIM + "  ".join(h.ljust(widths[i]) for i, h in enumerate(heads)).rstrip() + RESET)
+    for r in rows:
+        cells = []
+        for i, c in enumerate(r):
+            c = c.ljust(widths[i])
+            if i == 0:
+                c = f"{BOLD}{c}{RESET}"
+            elif i == 3 and r[3]:
+                c = f"{GREEN}{c}{RESET}"
+            elif i in (5, 6) and r[i]:
+                c = f"{DIM}{c}{RESET}"
+            cells.append(c)
+        print("  " + "  ".join(cells).rstrip())
+    print(f"  {DIM}({src_tag}){RESET}")
+
+
+# --------------------------------------------------------------------------- #
+#  Grammaire : Grammalecte hors-ligne (data/grammalecte, via build_grammalecte.py)
+# --------------------------------------------------------------------------- #
+GRAMMALECTE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "data", "grammalecte")
+_GC = None
+_GRAM_TYPE = {
+    "ppas": "participe passé", "gn": "accord (groupe nominal)", "conj": "conjugaison",
+    "gv": "groupe verbal", "vmode": "mode du verbe", "infi": "infinitif",
+    "imp": "impératif", "inte": "interrogation", "sgpl": "singulier / pluriel",
+    "conf": "confusion", "bs": "barbarisme", "eleu": "élision", "elis": "élision",
+    "typo": "typographie", "esp": "espaces", "nbsp": "espace insécable",
+    "maj": "majuscule", "apos": "apostrophe", "tu": "tournure", "redon": "redondance",
+    "pleo": "pléonasme", "date": "date", "num": "nombre", "poncfin": "ponctuation",
+    "virg": "virgule", "mc": "mot composé", "ocr": "OCR",
+}
+
+
+def _grammalecte():
+    """Charge (une fois) le correcteur vendu dans data/grammalecte. None si absent."""
+    global _GC
+    if _GC is not None:
+        return _GC or None
+    if not os.path.isdir(os.path.join(GRAMMALECTE_DIR, "grammalecte")):
+        _GC = False
+        return None
+    try:
+        if GRAMMALECTE_DIR not in sys.path:
+            sys.path.insert(0, GRAMMALECTE_DIR)
+        import grammalecte as _g
+        _GC = _g.GrammarChecker("fr")
+    except Exception:
+        _GC = False
+    return _GC or None
+
+
+def _show_grammar(sentence):
+    """Phrase surlignée → chaque faute (quoi, pourquoi, suggestion) → version corrigée."""
+    gc = _grammalecte()
+    if gc is None:
+        print(f"  {YELLOW}✗ Grammalecte absent — lance : python3 build_grammalecte.py "
+              f"(ou ./setup.sh){RESET}")
+        return
+    text = sentence.strip()
+    try:
+        gram, spell = gc.getParagraphErrors(text, bSpellSugg=True)
+    except Exception as e:
+        print(f"  {YELLOW}✗ Grammalecte : {e}{RESET}")
+        return
+    errs = sorted(gram, key=lambda e: e["nStart"])
+    sp = sorted(spell, key=lambda e: e["nStart"])
+    spans = sorted([(e["nStart"], e["nEnd"], RED) for e in errs]
+                   + [(e["nStart"], e["nEnd"], YELLOW) for e in sp])
+    out, pos = "", 0
+    for a, b, col in spans:                    # la phrase, fautes surlignées
+        if a < pos:
+            continue
+        out += text[pos:a] + f"{col}{BOLD}{text[a:b]}{RESET}"
+        pos = b
+    out += text[pos:]
+    print(f"  📝 {out}")
+    if not errs and not sp:
+        print(f"  {GREEN}✓ Rien à signaler — c'est correct !{RESET}")
+        return
+    n = 0
+    for e in errs:                             # chaque faute : quoi, pourquoi, → suggestion
+        n += 1
+        msg = (e.get("sMessage") or "").replace("\xa0", " ").strip()
+        typ = _GRAM_TYPE.get(e.get("sType", ""), e.get("sType", ""))
+        print(f"  {RED}{n}.{RESET} « {BOLD}{text[e['nStart']:e['nEnd']]}{RESET} » — {msg}"
+              + (f"  {DIM}[{typ}]{RESET}" if typ else ""))
+        sug = e.get("aSuggestions") or []
+        if sug:
+            print(f"     {GREEN}→ {' / '.join(sug[:4])}{RESET}")
+    for e in sp:
+        n += 1
+        sug = [s for s in (e.get("aSuggestions") or [])
+               if s.lower() != e["sValue"].lower()][:4]
+        print(f"  {YELLOW}{n}.{RESET} « {BOLD}{e['sValue']}{RESET} » — mot inconnu "
+              f"(orthographe ? accent ?)" + (f"  {DIM}→ {' / '.join(sug)}{RESET}" if sug else ""))
+    fixed, changed = text, False              # version corrigée (1re suggestion)
+    for e in sorted(errs, key=lambda e: -e["nStart"]):
+        sug = e.get("aSuggestions") or []
+        if sug:
+            fixed = fixed[:e["nStart"]] + sug[0] + fixed[e["nEnd"]:]
+            changed = True
+    if changed:
+        print(f"  {GREEN}✓ {fixed}{RESET}")
+
 # --------------------------------------------------------------------------- #
 #  Affichage                                                                  #
 # --------------------------------------------------------------------------- #
 def show(word, want_dict=False, want_ai=False, want_save=False,
          want_multi=False, want_conj=False, want_deep=False, want_fr=False,
-         want_save_main=False):
+         want_save_main=False, want_gram=False, want_xray=False):
+    if want_gram or want_xray:                # outils « phrase » : pipeline à part
+        if want_xray:
+            _show_xray(word)
+        if want_gram:
+            _show_grammar(word)
+        return
     src_guess = detect_lang(word)
     offline_ok = want_multi or want_conj      # sections qui marchent hors-ligne
 
@@ -1273,15 +1589,48 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 # --------------------------------------------------------------------------- #
 #  Mode interactif                                                            #
 # --------------------------------------------------------------------------- #
-def _parse_inline(line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S):
-    """Préfixe : '!f' '!d' '!m' '!c' '!a' '!p' '!s' (journal) '!S' (vocab propre)…
-    Tolère une espace après le « ! » (« ! c mot » == « !c mot »)."""
-    m = re.match(r"^!\s*([damscpfS]+)\s+(.*)$", line)
-    if m:
-        flags = m.group(1)
-        return (m.group(2).strip(), "d" in flags, "a" in flags, "s" in flags,
-                "m" in flags, "c" in flags, "p" in flags, "f" in flags, "S" in flags)
-    return line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S
+_FLAG_SET = set("damscpfgx")
+_FLAG_LONG = {
+    "conj": "c", "conjugaison": "c", "dico": "d", "wikt": "d",
+    "francais": "f", "fr": "f", "multitran": "m", "multi": "m",
+    "ai": "a", "ia": "a", "profond": "p", "deep": "p",
+    "save": "s", "sauve": "s", "sauver": "s",
+    "gram": "g", "grammaire": "g", "grammar": "g",
+    "xray": "x", "analyse": "x", "rayons": "x",
+}
+_FLAG_HELP = ("d=Wiktionnaire+trad  f=Wiktionnaire(FR)  m=Multitran  c=conjugaison  "
+              "a=IA  p=IA profonde  s=sauver  g=grammaire  x=analyse")
+_FLAG_TOKEN = re.compile(r"(?:(?<=\s)|^)(--?|!)\s*([A-Za-z]+)(?=\s|$)")
+
+
+def _parse_line(line):
+    """Préfixes de commande N'IMPORTE OÙ dans la ligne, tolérants :
+       « !c manger » · « ! c manger » · « manger !c » · « -c manger » ·
+       « --conj manger » · « !cf mot » · « !c !f mot ». Insensible à la casse.
+       Renvoie (mot, flags:set, erreur|None)."""
+    flags, err = set(), None
+
+    def take(m):
+        nonlocal err
+        pre, letters = m.group(1), m.group(2)
+        low = letters.lower()
+        if low in _FLAG_LONG:                       # --conj / -conj / !conj
+            flags.add(_FLAG_LONG[low])
+            return " "
+        if pre == "--":
+            err = f"option inconnue « {pre}{letters} »"
+            return " "
+        if any(ch not in _FLAG_SET for ch in low):
+            if pre == "!":                          # « ! » = intention claire
+                err = f"préfixe inconnu « !{letters} » — {_FLAG_HELP}"
+                return " "
+            return m.group(0)                       # « -er » : fait partie du mot
+        flags.update(low)                           # S ≡ s (même store)
+        return " "
+
+    rest = _FLAG_TOKEN.sub(take, line)
+    word = " ".join(rest.split())
+    return word, flags, err
 
 
 def _repl_command(line):
@@ -1304,8 +1653,14 @@ def _repl_command(line):
     elif cmd == "render":
         store_render()
         print(f"  {GREEN}✓ markdown régénéré{RESET}")
+    elif cmd == "spacy":
+        if arg.lower() in ("on", "off"):
+            config_set("xray_spacy", arg.lower() == "on")
+        etat = "ON" if config_load().get("xray_spacy", True) else "off"
+        print(f"  spaCy pour « !x » : {etat}   {DIM}(:spacy on | :spacy off — off = "
+              f"instantané, Lexique seul){RESET}")
     else:
-        print(f"  {DIM}commandes : :save on|off · :forget <mot> · :render{RESET}")
+        print(f"  {DIM}commandes : :save on|off · :forget <mot> · :render · :spacy on|off{RESET}")
 
 
 def _load_history():
@@ -1327,7 +1682,11 @@ def _save_history():
 
 
 def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
-                base_c=False, base_p=False, base_f=False, base_S=False):
+                base_c=False, base_p=False, base_f=False, base_S=False,
+                base_g=False, base_x=False):
+    base_flags = {k for k, v in (("d", base_d), ("a", base_a), ("s", base_s or base_S),
+                                 ("m", base_m), ("c", base_c), ("p", base_p),
+                                 ("f", base_f), ("g", base_g), ("x", base_x)) if v}
     _load_history()                            # ↑ rappelle les mots précédents
     try:                                       # pour détecter un REPL devenu obsolète
         src_mtime = os.path.getmtime(os.path.abspath(__file__))
@@ -1341,12 +1700,13 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
     else:
         prompt = f"{BLUE}»{RESET} "
     print(f"\n{BOLD}📖 dico{RESET}  —  russe / anglais → français")
-    print(f"{DIM}Tape un mot, ou un préfixe :{RESET}\n")
+    print(f"{DIM}Tape un mot, ou un préfixe (avant ou après le mot ; « -c » marche aussi) :{RESET}\n")
     rows = [
         ("!f", "Wiktionnaire (mot déjà FR)", "!a", "IA rapide (Haiku)"),
         ("!d", "Wiktionnaire + traduction",  "!p", "IA profonde (Opus)"),
         ("!m", "Multitran (ru↔fr, offline)", "!s", "sauver ce mot"),
-        ("!c", "conjugaison",                "",   ""),
+        ("!c", "conjugaison",                "!g", "corriger une PHRASE (grammaire)"),
+        ("!x", "rayons X d'une PHRASE",      "",   ""),
     ]
     w = max(len(r[1]) for r in rows)
     for lf, ld, rf, rd in rows:
@@ -1383,10 +1743,17 @@ def interactive(base_d=False, base_a=False, base_s=False, base_m=False,
             if line.startswith(":"):           # réglage, pas une recherche
                 _repl_command(line)
                 continue
-            word, d, a, s, m, c, pf, f, sv = _parse_inline(
-                line, base_d, base_a, base_s, base_m, base_c, base_p, base_f, base_S)
-            if word:
-                show(word, d, a, s, m, c, pf, f, sv)
+            word, fl, perr = _parse_line(line)
+            if perr:
+                print(f"  {YELLOW}✗ {perr}{RESET}")
+                continue
+            fl |= base_flags
+            if not word:
+                print(f"  {DIM}il manque le mot : « !{''.join(sorted(fl)) or 'c'} <mot> »"
+                      f"   ({_FLAG_HELP}){RESET}")
+                continue
+            show(word, "d" in fl, "a" in fl, "s" in fl, "m" in fl, "c" in fl,
+                 "p" in fl, "f" in fl, False, "g" in fl, "x" in fl)
     finally:
         _save_history()
 
@@ -1418,6 +1785,10 @@ def main():
                    help="enregistre CE mot maintenant (dans le store de vocabulaire)")
     p.add_argument("-S", "--save-main", action="store_true",
                    help="alias de -s (même store unique ; gardé par habitude)")
+    p.add_argument("-g", "--grammaire", action="store_true",
+                   help="corrige une PHRASE française (Grammalecte, hors-ligne) et nomme la règle")
+    p.add_argument("-x", "--xray", action="store_true",
+                   help="passe une PHRASE aux rayons X : chaque mot → lemme, nature, genre, fréquence")
     p.add_argument("--autosave", nargs="?", const="status",
                    choices=["on", "off", "status"], metavar="on|off",
                    help="enregistre AUTOMATIQUEMENT chaque recherche (réglage persistant)")
@@ -1452,10 +1823,12 @@ def main():
 
     if args.mots:
         show(" ".join(args.mots), args.dico, args.ai, args.save,
-             args.multitran, args.conj, args.profond, args.francais, args.save_main)
+             args.multitran, args.conj, args.profond, args.francais, args.save_main,
+             args.grammaire, args.xray)
     else:
         interactive(args.dico, args.ai, args.save, args.multitran,
-                    args.conj, args.profond, args.francais, args.save_main)
+                    args.conj, args.profond, args.francais, args.save_main,
+                    args.grammaire, args.xray)
 
 
 if __name__ == "__main__":

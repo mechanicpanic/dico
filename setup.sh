@@ -14,6 +14,9 @@ python3 build_conj_forms.py
 echo "==> Lexique 3.83 (fréquence, lemmes, genres, mots-outils)…"
 python3 build_lexique.py
 
+echo "==> Grammalecte (correcteur grammatical hors-ligne, pour dico -g)…"
+python3 build_grammalecte.py
+
 BUNDLES="$HOME/Library/Dictionaries"
 if [ -d "$BUNDLES/multitran_rufr.dictionary" ] && [ -d "$BUNDLES/multitran_frru.dictionary" ]; then
   for dir in rufr frru; do

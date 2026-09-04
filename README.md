@@ -18,11 +18,28 @@ pensé pour un apprenant russophone/anglophone. Cœur **zéro dépendance**
 | `dico -p house` | **Claude Opus** — fiche d'étude | oui |
 | `dico -s house` | enregistre ce mot (store de vocabulaire) | oui |
 | `dico --mots-outils` | **noyau grammatical** (Lexique) : articles, prépositions, pronoms… | **non** 🔌 |
+| `dico -g "Elle est parti"` | **Grammaire** — corrige une phrase, nomme la règle (Grammalecte) | **non** 🔌 |
+| `dico -x "j'habitais à Lyon"` | **Rayons X** — chaque mot : lemme, temps, genre, rôle, sens | non* 🔌 |
 
 Cumulables : `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap mot`…
 Mode interactif : tape `dico`, puis `!m` `!c` `!f` `!d` `!a` `!p` `!s` devant un mot.
 
 **Pas besoin de taper les accents** : `etre` trouve *être*, `creche` trouve *crèche*.
+**Préfixes tolérants** (mode interactif) : `!c manger`, `! c manger`, `manger !c`, `-c manger`,
+`--conj manger`, `!cf mot`, `!C MANGER` — tous équivalents. Préfixe inconnu → message clair.
+
+### Phrases : `-g` (grammaire) et `-x` (rayons X)
+
+- **`dico -g "<phrase>"`** — correcteur **Grammalecte** (GPL, pur Python, installé par
+  `build_grammalecte.py` dans `data/grammalecte/`) : phrase avec les fautes surlignées,
+  puis chaque faute *(quoi · pourquoi · → suggestion)*, puis la **version corrigée**.
+  Idéal pour écrire tes propres phrases et apprendre la règle qui te manque.
+- **`dico -x "<phrase>"`** — analyse mot à mot : lemme, nature, **temps + personne**
+  (via la base de conjugaison — plus fiable que spaCy pour l'imparfait), genre, fréquence,
+  **rôle** (sujet / COD / verbe principal…) et sens. Les rôles viennent de **spaCy**
+  (`tools/xray_spacy.py`, lancé par `uv run` — modèle téléchargé au 1ᵉʳ appel, ≈ 3 s
+  ensuite). Sans spaCy ou avec `:spacy off`, tout le reste marche instantanément,
+  hors-ligne. *La ligne de traduction anglaise de la phrase demande internet.*
 
 ### Lexique 3.83 — savoir, hors-ligne (badge sur chaque recherche)
 
@@ -50,7 +67,7 @@ lit le store directement. La curation est **soustractive** : on sauve tout, tu
 | `dico --forget mot` | retire un mot (curation soustractive) |
 | `dico --render` | régénère le markdown depuis le store JSON |
 
-En mode interactif : `:save on|off` · `:forget <mot>` · `:render`.
+En mode interactif : `:save on|off` · `:forget <mot>` · `:render` · `:spacy on|off`.
 Chaque sauvegarde enrichit le mot avec le **genre** (→ *un/une*), le lemme accentué,
 la nature et la langue source ; les répétitions incrémentent un compteur `×N`.
 
