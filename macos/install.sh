@@ -10,4 +10,4 @@ rm -rf /Applications/Dico.app
 cp -R build/Dico.app /Applications/Dico.app
 echo "✓ /Applications/Dico.app"
 echo "  open /Applications/Dico.app  — then ⌥D"
-echo "  (Settings → General → Login Items to launch it at login.)"
+echo "  (⚙︎ Settings ▸ General ▸ Launch at login, once it is in /Applications.)"

@@ -1,122 +1,8 @@
 # dico 🇫🇷
 
-A command-line pocket dictionary: **Russian / English → French**, built for a
-Russian/English-speaking learner. **Zero dependencies** at its core (the Python 3
-standard library); several levels, two of which work **offline**.
-
-## Levels (can be combined)
-
-| Command | Source | Internet? |
-|---|---|---|
-| `dico кошка` | Google (fast) | yes |
-| `dico -m кошка` | **Multitran** (rich, ru↔fr) | **no** 🔌 |
-| `dico -c manger` | **Conjugation** (~7000 verbs, 7 tenses) | **no** 🔌 |
-| `dico -c doit` | **Conjugated form** → infinitive (*doit → devoir*) | **no** 🔌 |
-| `dico -f manger` | **Wiktionary** — the word is already French | yes |
-| `dico -d house` | **Wiktionary** — after translation | yes |
-| `dico -a house` | **AI tutor** — quick card (local model through LM Studio, or Claude) | no* |
-| `dico -a "tu ou vous ?"` | **Free question** to the tutor (several words = a question) | no* |
-| `dico -p …` | same, detailed answer | no* |
-| `dico -s house` | save this word (vocabulary store) | yes |
-| `dico --mots-outils` | **grammatical core** (Lexique): articles, prepositions, pronouns… | **no** 🔌 |
-| `dico -g "Elle est parti"` | **Grammar** — fixes a sentence, names the rule (Grammalecte) | **no** 🔌 |
-| `dico -x "j'habitais à Lyon"` | **X-ray** — every word: lemma, tense, gender, role, meaning | no* 🔌 |
-
-They combine: `dico -mc хотеть`, `dico -fc manger`, `dico -mcdap word`…
-Interactive mode: type `dico`, then just type — words, never flags (see Getting started).
-
-### The dictionary card (the default)
-
-A lookup shows a **real entry**: senses **grouped by part of speech** and
-**numbered**, the article/gender of every noun (Lexique), the frequency (★), the
-back-translations of the main sense, and a real example sentence (Tatoeba):
-
-```
-» cook
-     verbe      1 cuisiner ★★  2 cuire ★  3 faire la cuisine   ← bake
-     nom        4 un cuisinier ★  5 une cuisine ★★             ← chef
-     « Il aime cuisiner le week-end. » — He likes to cook on weekends.
-» !s 4                      ← saves « un cuisinier » (the noun, not the verb)
-```
-
-Sense 1 is the one autosave keeps; **`save N`** saves sense N — no more fighting
-with flags when Google picked the wrong part of speech. A word that is **already
-French** (`maison`, `doit`) gets its own card: part of speech · gender · article ·
-frequency, then its English senses. `:examples off` turns the Tatoeba sentences off.
-
-**No need to type accents**: `etre` finds *être*, `creche` finds *crèche*.
-**dico guesses what you mean**: a RU/EN word → its card; a French word → its card
-(a verb also shows its présent); a French sentence → grammar check; `? …` → the
-tutor. Everything else is a plain word: `conj`, `def`, `ru`, `ex`, `grammar`, `x`, `save N`.
-
-### Sentences: `-g` (grammar) and `-x` (x-ray)
-
-- **`dico -g "<sentence>"`** — the **Grammalecte** checker (GPL, pure Python,
-  installed into `data/grammalecte/` by `build_grammalecte.py`): the sentence with
-  its mistakes highlighted, then each mistake *(what · why · → suggestion)*, then
-  the **corrected version**. Ideal for writing your own sentences and learning the
-  rule you were missing.
-- **`dico -x "<sentence>"`** — a word-by-word analysis: lemma, part of speech,
-  **tense + person** (from the conjugation database — more reliable than spaCy for
-  the imparfait), gender, frequency, **role** (sujet / COD / verbe principal…) and
-  meaning. The roles come from **spaCy** (`tools/xray_spacy.py`, launched through
-  `uv run` — the model is downloaded on the 1st call, ~3 s afterwards). Without
-  spaCy, or with `:spacy off`, everything else still works instantly and offline.
-  *The English translation line for the sentence needs internet.*
-
-### AI tutor: `?` in the REPL, local model first
-
-The tutor is no longer a "tier" you switch on: it is a **question you ask**. In
-interactive mode, `? your question` (or `?? …` for a detailed answer) — the tutor
-knows **the last word you looked up / the last sentence you analysed**:
-
-```
-» cuisiner
-» ? et cuire, c'est pareil ?
-» -x j'en veux deux
-» ? explique « en » ici
-```
-
-Backends, in order: **1)** an **OpenAI-compatible** endpoint (LM Studio on
-`http://localhost:1234/v1` by default — or a DGX Spark / Ollama / Mistral / Groq
-through `DICO_LLM_URL`, `DICO_LLM_MODEL`, `DICO_LLM_KEY`, or `:llm <url> [model]`
-in the REPL); **2)** the Anthropic API (`ANTHROPIC_API_KEY`); **3)** the `claude`
-command. Recommended model (bake-off on 5 grammar questions, M4 Pro):
-**Gemma 4 12B it — MLX 4-bit** (`lmstudio-community/gemma-4-12B-it-MLX-4bit`,
-~2 s per answer, 5/5 correct). Ministral 3 8B is faster (~1.5 s) but got the
-*de/des* rule wrong. Always prefer **MLX** weights over GGUF on Apple Silicon
-(~2× faster). On the DGX Spark: Mistral Small 4.
-`*` local = no internet needed.
-
-### Lexique 3.83 — knowledge, offline (a badge on every lookup)
-
-Every French word gets a **badge** `📊 frequency · part of speech · gender`
-(*très courant → rare*, from [Lexique](http://www.lexique.org)), so you can tell
-whether it is worth memorising. Lexique is also used to enrich autosave (lemma +
-gender **with no network**), and to **detect cognates/false friends** — `table`
-(EN) stays `table` (FR), but `pain` (EN→*douleur*) is flagged *"also a French
-word: un pain"*. And `dico --mots-outils` prints the grammatical scaffolding you
-cannot guess (le, de, à, que, être, avoir…) **with their English meanings**; add
-`-s` to turn them into Anki cards (`dico --mots-outils -s`).
-
-## Vocabulary: autosave + JSON store
-
-Everything you look up can be **saved automatically**. The **source of truth** is
-`dico_vocab.json` (next to the markdown); the `.md` is only a **regenerated
-view** — you never edit the markdown by hand again, and `push_anki.py` reads the
-store directly. Curation is **subtractive**: everything is saved, you *remove*
-the junk.
-
-| Command | Effect |
-|---|---|
-| `dico --autosave on` / `off` | turn automatic saving on/off (persistent) |
-| `dico -s word` | save this word now (even when autosave is off) |
-| `dico --forget word` | drop a word (subtractive curation) |
-| `dico --render` | regenerate the markdown from the JSON store |
-
-In interactive mode: `:save on|off` · `:forget <word>` · `:render` · `:spacy on|off` · `:llm` · `:examples on|off`.
-Every save enriches the word with its **gender** (→ *un/une*), the accented lemma,
-the part of speech and the source language; repeats bump an `×N` counter.
+A pocket dictionary for a **Russian / English speaker learning French**: a
+zero-dependency Python CLI (`dico`) and a native **macOS popup** (`macos/`,
+**⌥D** from any app) that drives it. Several sources, most of them **offline**.
 
 ## Getting started
 
@@ -127,102 +13,203 @@ dico --tour      # a 2-minute guided walkthrough
 dico             # the interactive mode — just type
 ```
 
-**No flags to learn.** dico guesses what you mean: an English/Russian word → a card
-with numbered senses; a French word → its card (verbs show their présent); a French
-sentence → grammar check with the rule; `? …` → the tutor. Then act on the card in
-plain words:
+Requirements: **Python 3.10+** and [`uv`](https://docs.astral.sh/uv/) (used for
+the install, the conjugation build and spaCy). The core has **no dependencies**.
+Data and settings live in `~/.dico/` and `~/.dico_config.json`; `DICO_HOME`,
+`DICO_DATA`, `DICO_VOCAB`, `DICO_STORE` move them elsewhere.
+
+Working from a clone instead (development):
+
+```sh
+git clone https://github.com/mechanicpanic/dico && cd dico && ./setup.sh
+alias dico="python3 $PWD/dico.py"
+```
+
+**Tutor without a local model?** Run `dico --llm` and bring your own key —
+Anthropic, OpenAI, Mistral, Groq, Gemini or any OpenAI-compatible URL. It is
+tested once and stored in `~/.dico_config.json` (chmod 600). With LM Studio or
+Ollama running, dico finds the loaded model by itself.
+
+## Interactive mode: no flags
+
+**dico guesses what you mean**: an English/Russian word → a card with numbered
+senses; a French word → its card (verbs show their présent); a French sentence →
+grammar check with the rule; `? …` → the tutor. Then act on the card in plain
+words:
 
 ```
-» cook                → card (1 cuisiner  2 cuire … 5 un cuisinier)
-» save 5              → saves « un cuisinier » (the noun, not the verb)
+» cook
+     verbe      1 cuisiner ★★  2 cuire ★  3 faire la cuisine   ← bake
+     nom        4 un cuisinier ★  5 une cuisine ★★             ← chef
+     « Il aime cuisiner le week-end. » — He likes to cook on weekends.
+» save 4              → saves « un cuisinier » (the noun, not the verb)
 » conj                → full conjugation grid        (or: conj manger)
 » def                 → dictionary definitions       (or: def maison)
 » ru                  → Russian, Multitran, offline  (or: ru chat)
 » ex                  → example sentences EN + RU    (or: ex partir)
 » grammar · x         → grammar check · x-ray, on the last sentence or one you give
-» ? is it formal      → ask the tutor about what you're looking at
+» ? is it formal      → ask the tutor about what you're looking at (?? = detailed)
 » help                → the cheat-sheet
 ```
-In interactive mode there are no flags at all. From the shell, the usual switches
-exist for one-shot calls: `dico -c manger`, `dico -g "…"`, `dico -x "…"`, `dico -f mot`.
 
-**Tutor without a local model?** Run `dico --llm` and bring your own key — Anthropic,
-OpenAI, Mistral, Groq, Gemini or any OpenAI-compatible URL. It's tested once and
-stored in `~/.dico_config.json` (chmod 600). Or point LM Studio / Ollama at a model
-and dico finds it by itself.
+Sense 1 is the one autosave keeps; `save N` saves sense N — no more fighting
+with a translator that picked the wrong part of speech. **No need to type
+accents**: `etre` finds *être*, `creche` finds *crèche*.
 
-## Installation
+Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>` ·
+`:render` · `:examples on|off` · `:spacy on|off` · `:llm <url> [model]`.
+
+## One-shot switches (from the shell)
+
+| Command | Source | Internet? |
+|---|---|---|
+| `dico кошка` | the card (Google senses + Lexique + Tatoeba) | yes |
+| `dico -m кошка` | **Multitran** (rich, ru↔fr) | **no** 🔌 |
+| `dico -c manger` | **Conjugation** (~7000 verbs, 7 tenses) | **no** 🔌 |
+| `dico -c doit` | **Conjugated form** → infinitive (*doit → devoir*) | **no** 🔌 |
+| `dico -f manger` | **Wiktionary** — the word is already French | yes |
+| `dico -d house` | **Wiktionary** — after translation | yes |
+| `dico -g "Elle est parti"` | **Grammar** — fixes a sentence, names the rule (Grammalecte) | **no** 🔌 |
+| `dico -x "j'habitais à Lyon"` | **X-ray** — every word: lemma, tense, gender, role, meaning | no* 🔌 |
+| `dico -a "tu ou vous ?"` | **Tutor** — a question (`-p` for a detailed answer) | no* |
+| `dico -s house` | save this word now | yes |
+| `dico --mots-outils` | **grammatical core** (Lexique): articles, prepositions, pronouns… | **no** 🔌 |
+
+They combine: `dico -mc хотеть`, `dico -fc manger`. `*` local = no internet needed.
+`dico --json …` returns the same things as JSON (what the popup and Raycast use).
+
+## What is behind the card
+
+### The dictionary card
+
+A lookup is a **real entry**: senses **grouped by part of speech** and numbered,
+the article/gender of every noun (Lexique), the frequency (★), the
+back-translations of the main sense, and a real example sentence (Tatoeba). A
+word that is **already French** (`maison`, `doit`) gets its own card: part of
+speech · gender · article · frequency, then its English senses. Definitions
+(`def`) come from the French Wiktionary and stay in French — with the etymology.
+
+### Sentences: grammar and x-ray
+
+- **Grammar** — the **Grammalecte** checker (GPL, pure Python, installed into
+  `data/grammalecte/` by `build_grammalecte.py`): the sentence with its mistakes
+  highlighted, each mistake *(what · why · → suggestion)*, then the corrected
+  version. In the REPL any French sentence triggers it.
+- **X-ray** — word by word: lemma, part of speech, **tense + person** (from the
+  conjugation database — more reliable than spaCy for the imparfait), gender,
+  frequency, **role** (sujet / COD / verbe principal…) and meaning. Roles come
+  from **spaCy** (`tools/xray_spacy.py`, run through `uv run`; the model is
+  downloaded on the first call, ~3 s afterwards). Without spaCy, or with
+  `:spacy off`, everything else still works instantly and offline.
+
+### The tutor
+
+The tutor is a **question you ask**, not a tier you switch on. In the REPL,
+`? your question` (`?? …` for a detailed answer) — it knows the last word you
+looked up and the last sentence you analysed:
+
+```
+» cuisiner
+» ? et cuire, c'est pareil ?
+» x j'en veux deux
+» ? explique « en » ici
+```
+
+Backends, in order: **1)** an **OpenAI-compatible** endpoint (LM Studio on
+`http://localhost:1234/v1` or Ollama on `:11434`, auto-detected — or a DGX Spark /
+Mistral / Groq through `DICO_LLM_URL`, `DICO_LLM_MODEL`, `DICO_LLM_KEY`, or
+`dico --llm`); **2)** the Anthropic API (`ANTHROPIC_API_KEY`); **3)** the
+`claude` command. Recommended local model (bake-off on 5 grammar questions,
+M4 Pro): **Gemma 4 12B it — MLX 4-bit** (`lmstudio-community/gemma-4-12B-it-MLX-4bit`,
+~2 s per answer, 5/5 correct). Ministral 3 8B is faster (~1.5 s) but got the
+*de/des* rule wrong. Prefer **MLX** weights over GGUF on Apple Silicon (~2× faster).
+
+### Lexique 3.83 — knowledge, offline
+
+Every French word gets a badge `📊 frequency · part of speech · gender`
+(*très courant → rare*, from [Lexique](http://www.lexique.org)), so you can tell
+whether it is worth memorising. Lexique also enriches autosave (lemma + gender
+**with no network**) and **detects cognates/false friends** — `table` (EN) stays
+`table` (FR), but `pain` (EN → *douleur*) is flagged *"also a French word: un
+pain"*. `dico --mots-outils` prints the grammatical scaffolding you cannot guess
+(le, de, à, que, être, avoir…) with their English meanings; add `-s` to turn
+them into cards.
+
+## Vocabulary: autosave + JSON store
+
+Everything you look up can be **saved automatically**. The **source of truth** is
+`dico_vocab.json`; the markdown next to it is a **regenerated view** you never
+edit by hand, and `push_anki.py` reads the store directly. Curation is
+**subtractive**: everything is saved, you *remove* the junk.
+
+| Command | Effect |
+|---|---|
+| `dico --autosave on` / `off` | turn automatic saving on/off (persistent) |
+| `dico -s word` | save this word now (even when autosave is off) |
+| `dico --forget word` | drop a word (subtractive curation) |
+| `dico --render` | regenerate the markdown from the JSON store |
+
+Every save enriches the word with its **gender** (→ *un/une*), the accented
+lemma, the part of speech and the source language; repeats bump an `×N` counter.
+Where the files live: `vocab_path` / `store_path` in `~/.dico_config.json`
+(the popup's Settings ▸ Vocabulary sets them), or `DICO_VOCAB` / `DICO_STORE`,
+which win over the config.
+
+## macOS popup
+
+`macos/` is a native menu-bar app: **⌥D** anywhere opens a floating panel with
+the same card, a conjugation grid, grammar, x-ray and the tutor — all by click,
+no flags — plus a ⚙︎ Settings window that edits the same `~/.dico_config.json`
+the CLI uses (tutor / BYOK, autosave and store paths, hotkey, launch at login,
+rebuild offline data). It only needs `dico` installed as above.
 
 ```sh
-# standalone tool (recommended) — a "dico" command on your PATH
-uv tool install git+https://github.com/mechanicpanic/dico
-dico --setup            # downloads / builds the offline databases (~2 min)
-
-# or, from a clone (development):
-git clone https://github.com/mechanicpanic/dico && cd dico && ./setup.sh
-alias dico="python3 $PWD/dico.py"
+cd macos && ./build.sh      # → build/Dico.app   (Xcode Command Line Tools, macOS 14+)
+./install.sh                # → /Applications/Dico.app, then ⌥D
 ```
 
-Requirements: **Python 3.10+** and [`uv`](https://docs.astral.sh/uv/) (for the
-conjugations, spaCy and the installation). The core has **no dependencies**.
-Data and settings live in `~/.dico/` (or in the clone's directory); `DICO_HOME`,
-`DICO_DATA`, `DICO_VOCAB`, `DICO_STORE` move them elsewhere.
+Everything about it — modes, the card's sections, every shortcut, the settings
+tabs, `--selftest` — is in [`macos/README.md`](macos/README.md).
 
-```sh
-# (optional) AI tutor: LM Studio on localhost:1234 works with no configuration;
-# otherwise any OpenAI-compatible endpoint, or the Anthropic API:
-export DICO_LLM_URL="http://spark.local:8000/v1"  DICO_LLM_MODEL="…"
-export ANTHROPIC_API_KEY="sk-ant-..."
-# (optional) where your cards live (an Obsidian vault, for instance)
-export DICO_VOCAB="$HOME/notes/francais/mots-cherches.md"
-```
-
-### macOS popup: Raycast
-
-For those allergic to the terminal (or just in a hurry): `tools/raycast/dico.sh`
-is a Raycast *Script Command*. In Raycast → **Settings → Extensions → Script
-Commands → Add Directories** → pick the `tools/raycast` folder of the clone (or of
-`~/.local/share/uv/tools/dico/…` if installed as a tool). Then:
-
-```
-⌥ Space  →  dico кошка
-            dico -c aller present
-            dico -g elle est parti
-```
-
-The card appears in the Raycast panel. The script finds `dico` on the PATH
-(`uv tool install`) or, failing that, `~/Projects/vibes/dico/dico.py`.
-
-### Sources & licences
-
-- Code: **MIT**. Everything else is downloaded from its own author by `dico --setup`, never redistributed here.
-- **Lexique 3.83** (New, Pallier et al.) — CC BY-SA · **Tatoeba** — CC BY 2.0 fr ·
-  **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugations · **spaCy** `fr_core_news_md` — MIT/CC BY-SA ·
-  **Wiktionary** — CC BY-SA · **Multitran**: proprietary Apple dictionaries, *bring your own* (the `-m` option).
-- The quick translation goes through an unofficial Google endpoint (rate-limited), with a MyMemory fallback.
+**Raycast** instead: `tools/raycast/dico.sh` is a Raycast *Script Command*
+(Raycast → Settings → Extensions → Script Commands → Add Directories → the
+`tools/raycast` folder). `⌥ Space → dico кошка` shows the card in the Raycast
+panel; `dico -c aller`, `dico -g elle est parti` work the same way.
 
 ## Offline data (`data/`)
 
-The SQLite databases are **not** versioned (~600 MB). Rebuild them with:
+The SQLite databases are **not** versioned (~600 MB). `dico --setup` (or
+`./setup.sh` in a clone) rebuilds them:
 
-```sh
-./setup.sh
-```
+| Builder | Produces | Needs |
+|---|---|---|
+| `build_conjugations.py` | `conjugations.db` (verbecc, ~7000 verbs) | `uv` |
+| `build_conj_forms.py` | the `forms` reverse index (*doit → devoir*) | — |
+| `build_lexique.py` | `lexique.db` (Lexique 3.83, downloaded from lexique.org) | — |
+| `build_grammalecte.py` | `data/grammalecte/` (the checker, from grammalecte.net) | — |
+| `build_multitran.py` | `multitran.db` — **optional**, from the Apple dictionaries `~/Library/Dictionaries/multitran_{rufr,frru}.dictionary` (converted with `pyglossary` by `setup.sh`) | `uv` |
 
-- **Conjugations** → `build_conjugations.py` (through `verbecc` + `uv`). Standalone.
-- **Multitran** → needs the Apple dictionaries
-  `~/Library/Dictionaries/multitran_{rufr,frru}.dictionary` (from the Multitran
-  `.zip` files). `setup.sh` converts them with `pyglossary`, then runs
-  `build_multitran.py`.
-
-Without those databases `dico` still works — only `-m` and `-c` are disabled.
+Without a database the matching feature is simply off (`-m` without Multitran,
+`-c` without conjugations…); the rest of `dico` keeps working.
 
 ## Files
 
-| File | Role |
+| Path | Role |
 |---|---|
 | `dico.py` | the tool (zero dependencies) |
-| `build_conjugations.py` | builds `data/conjugations.db` |
-| `build_multitran.py` | builds `data/multitran.db` (from the converted `.txt` files) |
-| `setup.sh` | rebuilds every database |
+| `build_*.py`, `setup.sh` | the offline data builders (above) |
+| `tools/xray_spacy.py` | spaCy sidecar for x-ray roles (PEP 723, run through `uv`) |
+| `tools/raycast/dico.sh` | Raycast script command |
+| `macos/` | the popup app (SwiftUI, no Xcode project) |
 | `data/` | SQLite databases **(not versioned)** |
+
+## Sources & licences
+
+- Code: **MIT**. Everything else is downloaded from its own author by
+  `dico --setup`, never redistributed here.
+- **Lexique 3.83** (New, Pallier et al.) — CC BY-SA · **Tatoeba** — CC BY 2.0 fr ·
+  **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugations · **spaCy**
+  `fr_core_news_md` — MIT/CC BY-SA · **Wiktionary** — CC BY-SA · **Multitran**:
+  proprietary Apple dictionaries, *bring your own*.
+- The quick translation goes through an unofficial Google endpoint
+  (rate-limited), with a MyMemory fallback.

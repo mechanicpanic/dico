@@ -240,7 +240,7 @@ def _fr_head(term):
 
 
 def _render_card_to_fr(word, src, translation, groups, examples=True):
-    """RU/EN → FR card: numbered senses grouped by part of speech ("!s N" saves sense N)."""
+    """RU/EN → FR card: numbered senses grouped by part of speech ("save N" saves sense N)."""
     print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}")
     # The main translation (the one autosave keeps) must be sense 1.
     tmain = (translation or "").strip().lower()
@@ -319,7 +319,7 @@ def _render_card_fr(word, lex, examples=True):
         inf, data, _ = _conj_query(lex["lemma"])
         if data and data.get("présent"):
             print(f"     {DIM}présent{RESET}    " + "  ·  ".join(data["présent"])
-                  + f"   {DIM}(!c for the full table){RESET}")
+                  + f"   {DIM}(« conj » for the full table){RESET}")
     if examples:
         for fr, tr in _tatoeba(word, "eng"):
             print(f"     {DIM}« {fr} » — {tr}{RESET}")
@@ -698,7 +698,7 @@ _TUTOR_SYS = ("You are a French teacher for an adult beginner (A1→A2) whose na
               "simple French, VERY short (2 to 5 lines), with an example. Put the "
               "English translation in parentheses for difficult words. No preamble, "
               "no tables; **bold** and \"- \" lists are welcome.")
-_LAST = {"word": "", "fr": "", "sentence": "", "senses": []}   # context for "?" / "!s N"
+_LAST = {"word": "", "fr": "", "sentence": "", "senses": []}   # context for "?" / "save N"
 
 
 def ai_explain(word, deep=False):
@@ -1195,7 +1195,7 @@ def conjugate_lookup(word):
     return None, None, None, False
 
 
-# Tense asked for after the verb: "dico -c manger present" / "!c manger futur".
+# Tense asked for after the verb: "dico -c manger present" / "conj manger futur".
 TENSE_ALIASES = {
     "present": "présent", "pres": "présent",
     "passe": "passé composé", "pc": "passé composé", "passecompose": "passé composé",
@@ -1890,7 +1890,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
             if cognate["genre"] else ""
         print(f"  {YELLOW}↔ \u00ab {word} \u00bb is also a French word{RESET}: "
               f"{BOLD}{art}{cognate['lemma']}{RESET} {DIM}({cognate['pos']}{g}, "
-              f"{cognate['band']}) — \u00ab !f {word} \u00bb for its meaning{RESET}")
+              f"{cognate['band']}) — \u00ab def {word} \u00bb for its meaning{RESET}")
 
     if want_multi:
         _show_multitran(word)
