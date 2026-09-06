@@ -361,6 +361,14 @@ struct GeneralTab: View {
     var onHotkeyChange: (HotkeyChoice) -> Void = { _ in }
     @State private var loginItem = false
     @State private var loginError: String? = nil
+    @State private var axTrusted = Selection.trusted
+
+    private var selectionCaption: String {
+        if !store.selection { return "Off: the hotkey only opens the panel." }
+        return axTrusted
+            ? "Reading the selection uses the Accessibility permission — granted. Right-click ▸ Services ▸ Look up in Dico works everywhere, with no permission."
+            : "Needs the Accessibility permission (System Settings ▸ Privacy & Security ▸ Accessibility ▸ Dico). Until then the hotkey only opens the panel; right-click ▸ Services ▸ Look up in Dico works without it."
+    }
 
     var body: some View {
         ScrollView {
@@ -409,6 +417,27 @@ struct GeneralTab: View {
                     }
                 }
 
+                SettingsCard(title: "Look up the selection",
+                             caption: selectionCaption) {
+                    Toggle(isOn: $store.selection) {
+                        Text("\(store.hotkey.display) with text selected looks it up").font(rounded(12, .medium))
+                    }
+                    .toggleStyle(.switch)
+                    .onChange(of: store.selection) { _, on in
+                        store.save()
+                        if on && !Selection.trusted { Selection.requestAccess() }
+                        axTrusted = Selection.trusted
+                    }
+                    if store.selection && !axTrusted {
+                        HStack(spacing: 8) {
+                            Button("Grant access…") { Selection.requestAccess() }
+                                .help("Opens System Settings ▸ Privacy & Security ▸ Accessibility")
+                            Button("Check again") { axTrusted = Selection.trusted }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
                 SettingsCard(title: "Launch at login",
                              caption: loginError ?? "macOS keeps Dico in the menu bar from the next login on.") {
                     Toggle(isOn: $loginItem) {
@@ -420,7 +449,10 @@ struct GeneralTab: View {
                 Spacer(minLength: 0)
             }
         }
-        .onAppear { loginItem = SMAppService.mainApp.status == .enabled }
+        .onAppear {
+            loginItem = SMAppService.mainApp.status == .enabled
+            axTrusted = Selection.trusted
+        }
     }
 
     private func setLogin(_ want: Bool) {

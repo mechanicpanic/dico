@@ -21,6 +21,8 @@ enum Shortcuts {
     @MainActor static func all() -> [Shortcut] {
         [
             .init(keys: globalHotkey, what: "Open / close the panel, from any app", group: "Panel"),
+            .init(keys: globalHotkey + " + selection", what: "Look up the text selected in the front app", group: "Panel"),
+            .init(keys: "⌘V · ⌘C · ⌘A", what: "Paste, copy, select all in the field", group: "Panel"),
             .init(keys: "Esc", what: "Clear the field and the results — again to close", group: "Panel"),
             .init(keys: "⌘K", what: "Clear the field", group: "Panel"),
             .init(keys: "⌘,", what: "Settings", group: "Panel"),

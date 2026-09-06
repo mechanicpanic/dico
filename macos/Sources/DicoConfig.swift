@@ -116,6 +116,7 @@ final class ConfigStore: ObservableObject {
     @Published var examples: Bool = true
     @Published var xraySpacy: Bool = true
     @Published var hotkey: HotkeyChoice = .fallback
+    @Published var selection: Bool = true
 
     init(path: String = ConfigPath.current) {
         self.path = path
@@ -137,6 +138,7 @@ final class ConfigStore: ObservableObject {
         examples = bool("examples") ?? true
         xraySpacy = bool("xray_spacy") ?? true
         hotkey = HotkeyChoice.from(string("popup_hotkey"))
+        selection = bool(Selection.configKey) ?? true
     }
 
     private func string(_ k: String) -> String? { raw[k] as? String }
@@ -179,6 +181,7 @@ final class ConfigStore: ObservableObject {
         put("examples", examples)
         put("xray_spacy", xraySpacy)
         put("popup_hotkey", hotkey.id)
+        put(Selection.configKey, selection)
         put("vocab_path", vocabPath.isEmpty ? nil : vocabPath)
         put("store_path", storePath.isEmpty ? nil : storePath)
 

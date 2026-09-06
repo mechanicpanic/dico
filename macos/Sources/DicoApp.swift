@@ -24,15 +24,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var localMonitor: Any?
     private var globalMonitor: Any?
 
+    private let services = DicoServices()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.mainMenu = AppDelegate.editingMenu()   // ⌘C ⌘V ⌘A ⌘Z reach the text field
         buildStatusItem()
         buildPanel()
         registerHotKey(nil)
         installKeyMonitors()
+        services.onText = { [weak self] text in self?.lookUp(selected: text) }
+        NSApp.servicesProvider = services
+        NSUpdateDynamicServices()
         NotificationCenter.default.addObserver(
             forName: .dicoOpenSettings, object: nil, queue: .main) { _ in
                 MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openSettings() }
             }
+    }
+
+    /// A menu-bar-only app has no main menu, so ⌘V has nowhere to go and the
+    /// field never receives it. An invisible Edit menu with the standard
+    /// selectors is all it takes.
+    static func editingMenu() -> NSMenu {
+        let main = NSMenu()
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Edit")
+        let items: [(String, Selector, String)] = [
+            ("Undo", Selector(("undo:")), "z"), ("Redo", Selector(("redo:")), "Z"),
+            ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"),
+            ("Paste", #selector(NSText.paste(_:)), "v"),
+            ("Select All", #selector(NSText.selectAll(_:)), "a"),
+        ]
+        for (title, sel, key) in items {
+            edit.addItem(NSMenuItem(title: title, action: sel, keyEquivalent: key))
+        }
+        editItem.submenu = edit
+        main.addItem(editItem)
+        return main
+    }
+
+    /// Text handed over by ⌥D-with-a-selection or the Services menu:
+    /// show the panel with it and run it in the right mode.
+    func lookUp(selected text: String) {
+        if !panel.isVisible { showPanel() }
+        model.run(text, mode: Selection.mode(for: text))
     }
 
     // MARK: Menu bar
@@ -119,6 +153,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isVisible ? hidePanel() : showPanel()
     }
 
+    /// The global hotkey. With the panel hidden and text selected in the
+    /// front app, the selection is looked up straight away.
+    @objc func hotkeyPressed() {
+        if panel.isVisible { hidePanel(); return }
+        let raw = ConfigStore.readRaw(at: ConfigPath.current)
+        if Selection.enabled(in: raw), let text = Selection.grab() {
+            lookUp(selected: text)
+        } else {
+            showPanel()
+        }
+    }
+
     func showPanel() {
         center()
         model.shown = false
@@ -152,7 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                           eventKind: UInt32(kEventHotKeyPressed))
             InstallEventHandler(GetApplicationEventTarget(), { _, _, _ -> OSStatus in
                 DispatchQueue.main.async {
-                    (NSApp.delegate as? AppDelegate)?.togglePanel()
+                    (NSApp.delegate as? AppDelegate)?.hotkeyPressed()
                 }
                 return noErr
             }, 1, &eventType, nil, nil)
@@ -693,7 +739,7 @@ func runSelfTest() -> Int32 {
     line("shortcuts catalogue + ⌘/ sheet") {
         let all = Shortcuts.all()
         let musts = ["⌘,", "⌘K", "Esc", "⌘1…⌘9", "⌘⇧1", "⌘⇧5", "⌘D", "⌘R", "⌘E",
-                     "⌘J", "⌘L", "⌘/", "⌘⇧C"]
+                     "⌘J", "⌘L", "⌘/", "⌘⇧C", "⌘V · ⌘C · ⌘A", Shortcuts.globalHotkey + " + selection"]
         for k in musts where !all.contains(where: { $0.keys == k }) {
             throw Failed(why: "\(k) is not in the catalogue")
         }
@@ -705,6 +751,67 @@ func runSelfTest() -> Int32 {
         let model = DicoModel(recentKey: testKey)
         model.showShortcuts = true
         return "\(all.count) shortcuts in \(Shortcuts.grouped().count) groups | sheet \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height)) | over the panel: \(render(model))"
+    }
+
+    // ------------------------------------------------------------------ //
+    // 6b. Paste + selection: the Edit menu, the service, the text shaping.
+    // ------------------------------------------------------------------ //
+    line("edit menu routes ⌘V/⌘C/⌘A") {
+        let menu = AppDelegate.editingMenu()
+        guard let edit = menu.items.first?.submenu else { throw Failed(why: "no Edit submenu") }
+        let want: [(String, String)] = [("paste:", "v"), ("copy:", "c"), ("cut:", "x"),
+                                        ("selectAll:", "a"), ("undo:", "z")]
+        for (sel, key) in want {
+            guard edit.items.contains(where: {
+                $0.action.map { NSStringFromSelector($0) } == sel && $0.keyEquivalent == key
+            }) else { throw Failed(why: "\(sel) (⌘\(key.uppercased())) missing from the Edit menu") }
+        }
+        return "\(edit.items.count) items: " + want.map { "⌘\($0.1.uppercased())→\($0.0)" }.joined(separator: " ")
+    }
+
+    line("selection → text shaping + mode") {
+        let cases: [(String?, String?)] = [
+            ("  bonjour\n", "bonjour"), ("« maison », ", "maison"), ("j'ai   dit\nseconde ligne", "j'ai dit"),
+            ("https://example.com/x", nil), ("", nil), (nil, nil), (String(repeating: "a", count: 250), nil),
+        ]
+        for (input, want) in cases where Selection.normalize(input) != want {
+            throw Failed(why: "normalize(\(input ?? "nil")) = \(Selection.normalize(input) ?? "nil"), wanted \(want ?? "nil")")
+        }
+        let modes: [(String, Mode)] = [
+            ("chat", .mot), ("un coup de main", .mot),
+            ("elle est parti hier et je mange", .grammaire), ("je ne sais pas où il est", .grammaire),
+            ("the cat is on the table", .mot), ("кошка сидит на столе тихо", .mot),
+        ]
+        for (t, m) in modes where Selection.mode(for: t) != m {
+            throw Failed(why: "mode(\(t)) = \(Selection.mode(for: t)), wanted \(m)")
+        }
+        guard DicoServices().responds(to: Selector(("lookUp:userData:error:"))) else {
+            throw Failed(why: "the services provider lacks lookUp:userData:error:")
+        }
+        var plist = "not in a bundle"
+        if let services = Bundle.main.infoDictionary?["NSServices"] as? [[String: Any]],
+           let first = services.first {
+            guard first["NSMessage"] as? String == "lookUp", first["NSPortName"] as? String == "Dico" else {
+                throw Failed(why: "NSServices entry does not point at lookUp / Dico")
+            }
+            plist = "Info.plist advertises « \((first["NSMenuItem"] as? [String: String])?["default"] ?? "?") »"
+        }
+        return "\(cases.count) shapes · \(modes.count) mode picks · service selector ✓ · \(plist) · AX trusted: \(Selection.trusted)"
+    }
+
+    line("config: popup_selection round-trips") {
+        let dir = NSTemporaryDirectory() + "dico-selftest-sel-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let path = dir + "/config.json"
+        _ = ConfigStore.writeRaw(["popup_selection": false, "autosave": true], to: path)
+        let store = ConfigStore(path: path)
+        guard store.selection == false else { throw Failed(why: "false not read back") }
+        store.selection = true
+        guard store.save(), Selection.enabled(in: ConfigStore.readRaw(at: path)) else {
+            throw Failed(why: "true not written") }
+        guard Selection.enabled(in: [:]) else { throw Failed(why: "must default to on") }
+        return "off → on → file, default on"
     }
 
     // ------------------------------------------------------------------ //

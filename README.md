@@ -159,7 +159,8 @@ which win over the config.
 
 `macos/` is a native menu-bar app: **⌥D** anywhere opens a floating panel with
 the same card, a conjugation grid, grammar, x-ray and the tutor — all by click,
-no flags — plus a ⚙︎ Settings window that edits the same `~/.dico_config.json`
+no flags. **Select a word in any app and press ⌥D** to look it up directly (or
+right-click ▸ Services ▸ *Look up in Dico*). Plus a ⚙︎ Settings window that edits the same `~/.dico_config.json`
 the CLI uses (tutor / BYOK, autosave and store paths, hotkey, launch at login,
 rebuild offline data). It only needs `dico` installed as above.
 

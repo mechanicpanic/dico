@@ -58,6 +58,8 @@ every button carries the same thing as a tooltip.
 | | |
 |---|---|
 | `⌥D` | open / close the panel (global, from any app — configurable) |
+| `⌥D` with text selected | looks the selection up (see below) |
+| `⌘V` `⌘C` `⌘A` | paste, copy, select all in the field |
 | `Esc` | clears the field and the results; again to close |
 | `⌘K` | clear the field |
 | `⌘,` | Settings |
@@ -79,7 +81,34 @@ the hotkey shown is the one actually configured.
 Erasing the field wipes the results too — nothing stale is ever left on screen.
 
 The global hotkey goes through Carbon `RegisterEventHotKey`: **no Accessibility
-permission is requested**.
+permission is requested** for it. (A menu-bar-only app has no Edit menu, so an
+invisible one is installed at launch — without it ⌘V never reaches the field.)
+
+## Look up the selection
+
+Two ways to send a word from another app, without typing it:
+
+- **Select it, press ⌥D.** With the panel hidden, the hotkey reads the selection
+  of the front app and runs it at once: a word or a short phrase (up to 4 words)
+  → the card; a longer French sentence → Grammar; a longer English/Russian
+  sentence → the card (it translates). Reading the selection needs the
+  **Accessibility** permission (System Settings ▸ Privacy & Security ▸
+  Accessibility ▸ Dico). Until it is granted — or when nothing is selected —
+  ⌥D simply opens the panel as before. The text comes from the Accessibility
+  API (the focused element's selected text: Safari, Chrome, Terminal, Preview,
+  native apps); when that gives nothing, a ⌘C is simulated and the clipboard is
+  put back afterwards. Toggle in **Settings ▸ General ▸ Look up the selection**
+  (config key `popup_selection`, on by default); the same card has a
+  *Grant access…* button.
+- **Right-click ▸ Services ▸ Look up in Dico.** A macOS text service declared
+  in `Info.plist` (`NSServices`), so it needs **no permission** and works in
+  every app with a text selection; it launches Dico if needed. System Settings
+  ▸ Keyboard ▸ Keyboard Shortcuts ▸ Services ▸ Text lets you give it its own key.
+  macOS picks services up from `/Applications` — run `./install.sh` (a build
+  in `build/` may not show in the menu until it has been launched once).
+
+Ad-hoc signed builds: the Accessibility grant is tied to the binary's hash, so
+after every `./build.sh` macOS may ask again. It is stable once installed.
 
 ## ⚙︎ Settings
 
@@ -92,7 +121,7 @@ hold an API key), and keys it does not know about are preserved.
 |---|---|---|
 | **Tutor** | local / bring-your-own-key / Anthropic / none. *local* shows what actually answered `GET /v1/models` on LM Studio `:1234` and Ollama `:11434`. *byok* has presets — OpenAI, Mistral, Groq, Gemini, Custom — plus base URL, model and a secure key field. A **Test** button runs `dico --json -a "Reply with the single word ok"` and shows the model that answered, or the error. | `llm`, `llm_url`, `llm_model`, `llm_key`, `anthropic_key` |
 | **Vocabulary** | auto-save every lookup; where the markdown view and the JSON store live (file pickers, empty = `~/.dico/…`). A caption warns when `DICO_VOCAB` / `DICO_STORE` are set in the environment — those still win over the config. | `autosave`, `vocab_path`, `store_path` |
-| **General** | the example sentence on the card; X-ray roles via spaCy (*off = instant, on = ~3 s, needs `uv`*); the **global hotkey** (⌥D, ⌥Space, ⌃⌥D, ⌘⇧D — re-registered with Carbon on the spot); **launch at login** via `SMAppService`. | `examples`, `xray_spacy`, `popup_hotkey` |
+| **General** | the example sentence on the card; X-ray roles via spaCy (*off = instant, on = ~3 s, needs `uv`*); the **global hotkey** (⌥D, ⌥Space, ⌃⌥D, ⌘⇧D — re-registered with Carbon on the spot); **look up the selection** on the hotkey, with the Accessibility status and a *Grant access…* button; **launch at login** via `SMAppService`. | `examples`, `xray_spacy`, `popup_hotkey`, `popup_selection` |
 | **Offline data** | **Build / refresh** runs `dico --setup --no-llm` in the background and streams its output into a log view with a spinner; **Take the tour** opens Terminal on `dico --tour`. | — |
 | **Shortcuts** | the same list as ⌘/. | — |
 
@@ -144,6 +173,11 @@ top of that it:
   fallback to ⌥D;
 - checks the shortcut catalogue covers every documented key and lays the ⌘/
   sheet out;
+- checks the invisible Edit menu routes ⌘V / ⌘C / ⌘X / ⌘A / ⌘Z to the standard
+  selectors, the selection shaping (trim, first line, quotes, URLs and walls of
+  text rejected) and the mode pick (phrase → card, French sentence → Grammar,
+  EN/RU sentence → card), the service selector and the `NSServices` entry in
+  the built `Info.plist`, and that `popup_selection` round-trips (default on);
 - runs the Settings ▸ Test call (`--json -a`) once.
 
 It prints one ✓ per line and exits non-zero on the first ✗.
@@ -173,6 +207,7 @@ Sources/DicoConfig.swift   ~/.dico_config.json, atomic + chmod 600; hotkey prese
 Sources/DicoModel.swift    modes, state, sections, recents, saving, toasts
 Sources/PanelView.swift    palette, material, field, mode chips, recents, errors
 Sources/ResultViews.swift  the five result views + the card sections
+Sources/Selection.swift    the front app's selection (AX API, ⌘C fallback); the Services provider
 Sources/Shortcuts.swift    the shortcut catalogue, the ⌘/ sheet, the list
 Sources/SettingsView.swift the ⚙︎ window: tutor, vocabulary, general, data, keys
 Sources/DicoApp.swift      @main, menu bar, panel, the hotkey, --selftest
