@@ -1156,6 +1156,13 @@ func renderShots(into dir: String) -> Int32 {
     }
     if let t = try? DicoClient.xray("le chat noir dort sur la table") {
         let m = model("le chat noir dort sur la table", mode: .rayonsX); m.outcome = .rayonsX(t); panel("40-xray", m)
+        // The detail block, with the second word selected.
+        let host = NSHostingView(rootView: XrayView(tokens: t, onSave: { _ in }, onLookup: { _ in })
+            .padding(18).background(Palette.panel))
+        host.frame = NSRect(x: 0, y: 0, width: PanelSize.content, height: 300)
+        host.appearance = NSAppearance(named: .darkAqua)
+        host.layoutSubtreeIfNeeded()
+        print("   x-ray tiles: \(t.map { XrayView.tag($0) }.joined(separator: " | "))")
     }
     do {
         let m = model("quand employer le subjonctif ?", mode: .demander)

@@ -1008,76 +1008,123 @@ struct GrammarView: View {
     }
 }
 
-// MARK: - 🔬 X-ray
+// MARK: - 🔬 X-ray — the sentence, interlinear
 
+/// The sentence as a row of tiles: the word in serif, its part of speech and
+/// gender in mono underneath, the gloss under that. Click a word for the
+/// rest (lemma, tense, role) and to look it up or save it.
 struct XrayView: View {
     let tokens: [XrayToken]
     var onSave: ((XrayToken) -> Void)? = nil
-    @State private var hoverRow: Int? = nil
+    var onLookup: ((String) -> Void)? = nil
+    @State private var selected: Int? = nil
 
-    /// Columns 1.1 / 1 / 1.1 / 0.9 / 0.8 / 1 fr of the content width.
-    static let fractions: [CGFloat] = [1.1, 1, 1.1, 0.9, 0.8, 1]
     static let width: CGFloat = PanelSize.content - 36
-    private func col(_ i: Int) -> CGFloat {
-        (XrayView.fractions[i] / XrayView.fractions.reduce(0, +) * XrayView.width).rounded(.down)
+
+    /// « nom », « verbe · présent », « adj. », « prép. »…
+    static func tag(_ t: XrayToken) -> String {
+        let pos = (t.pos ?? "").lowercased()
+        let short: String
+        switch true {
+        case pos.hasPrefix("nom"): short = "nom"
+        case pos.hasPrefix("verbe"): short = "verbe"
+        case pos.hasPrefix("adjectif"): short = "adj."
+        case pos.hasPrefix("adverbe"): short = "adv."
+        case pos.hasPrefix("préposition"): short = "prép."
+        case pos.hasPrefix("article"): short = "art."
+        case pos.hasPrefix("déterminant"): short = "dét."
+        case pos.hasPrefix("pronom"): short = "pron."
+        case pos.hasPrefix("conjonction"): short = "conj."
+        case pos.isEmpty: short = "?"
+        default: short = String(pos.prefix(6))
+        }
+        if short == "verbe", let tense = (t.tense ?? "").split(separator: ";").first, !tense.isEmpty {
+            return "verbe · \(tense.split(separator: "·").first?.trimmingCharacters(in: .whitespaces) ?? String(tense))"
+        }
+        return short
+    }
+
+    private func tint(_ t: XrayToken) -> Color {
+        if let g = t.gender, !g.isEmpty { return Palette.genderTint(g) }
+        return (t.pos ?? "").lowercased().hasPrefix("verbe") ? Palette.ink : Palette.ink(0.9)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 0) {
-                ForEach(Array(["word", "lemma", "pos", "tense", "role", "meaning"].enumerated()), id: \.offset) { i, h in
-                    Text(h.uppercased()).font(mono(8.5)).tracking(0.7).foregroundStyle(Palette.ink(0.30))
-                        .frame(width: col(i), alignment: .leading)
+        VStack(alignment: .leading, spacing: 16) {
+            FlowLayout(spacing: 4, lineSpacing: 6) {
+                ForEach(Array(tokens.enumerated()), id: \.offset) { i, t in
+                    tile(i, t)
                 }
             }
-            .padding(.bottom, 7)
-            Hairline(structural: true)
-            ForEach(Array(tokens.enumerated()), id: \.offset) { i, t in
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text(t.text ?? "").font(serif(16))
-                        .foregroundStyle((t.gender ?? "").isEmpty ? Palette.ink(0.9) : Palette.genderTint(t.gender))
-                        .frame(width: col(0), alignment: .leading).lineLimit(1)
-                    cell(t.lemma, col(1))
-                    (Text(t.pos ?? "—") + Text((t.gender ?? "").isEmpty ? "" : " \(t.gender ?? "")")
-                        .foregroundStyle(Palette.genderTint(t.gender)))
-                        .font(sans(11)).foregroundStyle(Palette.ink(0.5))
-                        .frame(width: col(2), alignment: .leading).lineLimit(1).truncationMode(.tail)
-                    let tense = (t.tense ?? "").split(separator: ";").first.map(String.init) ?? ""
-                    Text(tense.isEmpty ? "—" : tense).font(sans(11))
-                        .foregroundStyle(tense.hasPrefix("présent") ? Palette.bleuInk : Palette.ink(0.5))
-                        .frame(width: col(3), alignment: .leading).lineLimit(1).truncationMode(.tail)
-                    cell(t.role, col(4))
-                    if let onSave, hoverRow == i {
-                        HStack(spacing: 6) {
-                            cell(t.gloss, col(5) - 40)
-                            LinkButton(label: "save", tint: Palette.ink(0.4), size: 10,
-                                       help: "Make \u{ab} \(t.lemma ?? t.text ?? "") \u{bb} a card") { onSave(t) }
-                        }
-                        .frame(width: col(5), alignment: .leading)
-                    } else {
-                        cell(t.gloss, col(5))
-                    }
-                }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-                .onHover { hoverRow = $0 ? i : (hoverRow == i ? nil : hoverRow) }
-                .overlay(alignment: .bottom) { if i < tokens.count - 1 { Rectangle().fill(Palette.ink(0.05)).frame(height: 1) } }
+            if let i = selected, i < tokens.count {
+                detail(tokens[i])
+            } else {
+                (Text("Click a word. Gender colours it: ") + Text("masculin").foregroundStyle(Palette.bleuInk)
+                    + Text(" · ") + Text("féminin").foregroundStyle(Palette.roseInk)
+                    + Text(". Roles come from spaCy when it is switched on in Settings."))
+                    .font(sans(10.5)).foregroundStyle(Palette.ink(0.28))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            (Text("Gender colours the word: ") + Text("masculin").foregroundStyle(Palette.bleuInk)
-                + Text(" · ") + Text("féminin").foregroundStyle(Palette.roseInk)
-                + Text(". Roles come from spaCy when it is switched on in Settings."))
-                .font(sans(10.5)).foregroundStyle(Palette.ink(0.28))
-                .padding(.top, 12)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(width: XrayView.width, alignment: .leading)
     }
 
-    private func cell(_ s: String?, _ w: CGFloat) -> some View {
-        let t = (s ?? "").isEmpty ? "—" : (s ?? "")
-        return Text(t).font(sans(11)).foregroundStyle(Palette.ink(0.5))
-            .frame(width: w, alignment: .leading).lineLimit(1).truncationMode(.tail)
-            .help(t)
+    private func tile(_ i: Int, _ t: XrayToken) -> some View {
+        let on = selected == i
+        return Button { withAnimation(.easeOut(duration: 0.12)) { selected = on ? nil : i } } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(t.text ?? "").font(serif(22)).foregroundStyle(tint(t))
+                HStack(spacing: 4) {
+                    Text(XrayView.tag(t)).font(mono(9)).foregroundStyle(Palette.ink(0.35))
+                    if let g = t.gender, !g.isEmpty {
+                        Text(g).font(sans(9, .semibold)).foregroundStyle(Palette.genderTint(g))
+                    }
+                }
+                if let gl = t.gloss, !gl.isEmpty {
+                    Text(gl).font(sans(10.5)).foregroundStyle(Palette.ink(0.45)).lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(on ? Palette.bleu.opacity(0.12) : Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Palette.bleu.opacity(on ? 0.3 : 0), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(t.lemma ?? t.text ?? "")
+    }
+
+    private func detail(_ t: XrayToken) -> some View {
+        let rows: [(String, String)] = [
+            ("lemma", t.lemma ?? ""),
+            ("pos", [t.pos ?? "", (t.gender ?? "").isEmpty ? "" : (t.gender == "m" ? "masculin" : "féminin")]
+                .filter { !$0.isEmpty }.joined(separator: " · ")),
+            ("tense", (t.tense ?? "").replacingOccurrences(of: ";", with: " · ")),
+            ("role", t.role ?? ""),
+            ("meaning", t.gloss ?? ""),
+            ("frequency", t.band ?? ""),
+        ].filter { !$0.1.isEmpty }
+        return VStack(alignment: .leading, spacing: 8) {
+            Eyebrow(t.text ?? "", tint: (t.gender ?? "").isEmpty ? nil : Palette.genderTint(t.gender),
+                    trailing: AnyView(HStack(spacing: 14) {
+                        if let onLookup, let l = t.lemma ?? t.text, !l.isEmpty {
+                            LinkButton(label: "Look up", size: 10.5, help: "The Word card for \u{ab} \(l) \u{bb}") { onLookup(l) }
+                        }
+                        if let onSave {
+                            LinkButton(label: "save", tint: Palette.ink(0.4), size: 10.5,
+                                       help: "Make \u{ab} \(t.lemma ?? t.text ?? "") \u{bb} a card") { onSave(t) }
+                        }
+                    }))
+            ForEach(rows, id: \.0) { k, v in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(k.uppercased()).font(mono(9)).tracking(0.9).foregroundStyle(Palette.ink(0.30))
+                        .frame(width: 70, alignment: .leading)
+                    Text(v).font(k == "lemma" ? serif(15) : sans(12.5)).foregroundStyle(Palette.ink(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .transition(.opacity)
     }
 }
 

@@ -140,7 +140,9 @@ struct PanelView: View {
         case .grammaire(let g, let sentence):
             scroll(top: 16, side: 18) { GrammarView(grammar: g, sentence: sentence, model: model) }
         case .rayonsX(let toks):
-            scroll(top: 14, side: 18) { XrayView(tokens: toks) { model.saveToken($0) } }
+            scroll(top: 16, side: 18) {
+                XrayView(tokens: toks, onSave: { model.saveToken($0) }, onLookup: { model.run($0, mode: .mot) })
+            }
         case .reponse(let a):
             scroll(top: 16, side: 18) {
                 AnswerView(answer: a, context: model.askContext) { model.saveAnswer(a) }

@@ -38,8 +38,10 @@ and a macOS popup.
   for Russian and Ask); dark and light palettes.
 - The conjugation grid is ruled, the **endings in blue**, the auxiliary
   dimmed; ⌘1 saves the infinitive. Grammar notes carry a mono rule label
-  (ACCORD, ORTHO.…), the correction sits in a green card with ⌘⇧C. X-ray is a
-  six-column table. The ⌘/ sheet and the five Settings tabs got the same
+  (ACCORD, ORTHO.…), the correction sits in a green card with ⌘⇧C. X-ray lays
+  the sentence out interlinear — a tile per word with its part of speech,
+  gender and gloss underneath; click one for lemma, tense and role, « Look
+  up » and « save ». The ⌘/ sheet and the five Settings tabs got the same
   language.
 - `Dico --shots DIR` renders every screen, dark and light, to PNG — off
   screen, for design review.
