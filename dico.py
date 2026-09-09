@@ -104,7 +104,8 @@ def _get(url):
 #  Level 1: quick translation                                                 #
 # --------------------------------------------------------------------------- #
 class RateLimited(Exception):
-    """Google's free endpoint is throttling this IP — the caller falls back."""
+    """Google refused the query (its "Sorry… automated queries" page, served as
+    a 429) — the caller falls back to another source."""
 
 
 # A lookup you have already done must never cost a request again: the same word
@@ -161,8 +162,16 @@ def cache_flush():
     _TR_DIRTY = False
 
 
-_RL_KEY = "!google_rate_limited_until"
-_RL_COOLDOWN = 15 * 60          # once throttled, stop asking for a quarter of an hour
+# Google's endpoint takes a `client` parameter, and the two values behave very
+# differently: `gtx` is the one every scraping snippet uses, so it is the one
+# Google blocks ("Sorry… we can't process your request", HTTP 429, and it does
+# not clear by waiting). `dict-chrome-ex` is what Chrome's own dictionary uses:
+# same JSON shape, same dt=bd sense groups, and it answers. Try it first and
+# keep gtx as the spare in case that flips round one day.
+_GOOGLE_CLIENTS = ("dict-chrome-ex", "gtx")
+
+_RL_KEY = "!google_blocked_until"
+_RL_COOLDOWN = 15 * 60          # every client refused: stop asking for a while
 
 
 def _rate_limited_now():
@@ -170,7 +179,7 @@ def _rate_limited_now():
     return bool(row) and time.time() < row.get("v", 0)
 
 
-def _mark_rate_limited():
+def _mark_blocked():
     global _TR_DIRTY
     _cache_load()[_RL_KEY] = {"t": time.time(), "v": time.time() + _RL_COOLDOWN}
     _TR_DIRTY = True
@@ -187,26 +196,23 @@ def _google_query(word, tl="fr", sl="auto"):
     if hit is not None:
         return hit
     if _rate_limited_now():
-        raise RateLimited("Google is rate-limiting this address")
+        raise RateLimited("Google refused the query")
     q = urllib.parse.quote(word)
-    url = ("https://translate.googleapis.com/translate_a/single"
-           f"?client=gtx&sl={sl}&tl={tl}&dt=t&dt=bd&q={q}")
-    try:
-        raw = _get(url)
-    except urllib.error.HTTPError as e:
-        if e.code != 429:
-            raise
-        time.sleep(0.6)
+    refused = None
+    for client in _GOOGLE_CLIENTS:
+        url = ("https://translate.googleapis.com/translate_a/single"
+               f"?client={client}&sl={sl}&tl={tl}&dt=t&dt=bd&q={q}")
         try:
-            raw = _get(url)
-        except urllib.error.HTTPError as e2:
-            if e2.code == 429:
-                _mark_rate_limited()
-                raise RateLimited("Google is rate-limiting this address") from e2
-            raise
-    data = json.loads(raw)
-    _cache_put(ck, data)
-    return data
+            data = json.loads(_get(url))
+        except urllib.error.HTTPError as e:
+            if e.code != 429:
+                raise
+            refused = e
+            continue                       # this client is blocked: try the next
+        _cache_put(ck, data)
+        return data
+    _mark_blocked()
+    raise RateLimited("Google refused the query") from refused
 
 
 _FALLBACK_NOTE = ""      # set when a card came from the fallback, shown once
@@ -233,7 +239,7 @@ def translate_rich(word, tl="fr", sl="auto"):
             raise
         src = detect_lang(word)
         tr, _, alts = translate_mymemory(word, src)
-        _FALLBACK_NOTE = "Google is rate-limiting — translation via MyMemory (fewer senses)"
+        _FALLBACK_NOTE = "Google refused the query — translation via MyMemory (fewer senses)"
         lx = lexique_lookup(tr)
         # MyMemory gives no part of speech: only the main term can claim the one
         # Lexique knows; the alternatives stay in an unlabelled group.
@@ -1918,10 +1924,34 @@ def _show_grammar(sentence):
 # --------------------------------------------------------------------------- #
 #  Display                                                                    #
 # --------------------------------------------------------------------------- #
+# Lexique lists borrowings and single letters, so "put", "out", "the", "i", "go"
+# and "home" are all "known French words" — enough to send « put out the fire »
+# to the grammar checker instead of translating it. These are the words that
+# settle it the other way; French homographs (a, on, or, car, son, ton, pour,
+# sale, pain, coin, vie…) are deliberately NOT in the list.
+_EN_MARKERS = {
+    "the", "is", "are", "was", "were", "be", "been", "am", "does", "did", "doing",
+    "to", "of", "in", "at", "for", "with", "and", "but", "this", "that", "these",
+    "those", "it", "its", "you", "your", "i", "my", "me", "he", "him", "his",
+    "she", "her", "they", "them", "their", "we", "our", "out", "up", "off",
+    "put", "get", "got", "make", "made", "have", "has", "had", "can", "could",
+    "will", "would", "should", "what", "how", "why", "when", "where", "who",
+    "not", "there", "here", "from", "into", "about", "over", "under", "back",
+    "want", "need", "know", "think", "say", "said", "go", "going", "went",
+    "come", "like", "just", "very", "some", "any", "all", "more", "most",
+    "then", "than", "because", "if", "too", "also", "only", "still", "again",
+    "never", "always", "now", "today", "tomorrow", "yesterday", "home", "house",
+    "don't", "doesn't", "isn't", "can't", "won't", "i'm", "it's", "let's",
+}
+
+
 def _looks_french_sentence(text):
-    """>= 3 words, no Cyrillic, and most of the words known to Lexique."""
+    """>= 3 words, no Cyrillic, most of the words known to Lexique — and not
+    plainly English (Lexique knows too many English-looking strings)."""
     toks = [t for t in re.findall(r"[\w'’-]+", text) if not t.isdigit()]
     if len(toks) < 3 or re.search(r"[\u0400-\u04FF]", text):
+        return False
+    if sum(1 for t in toks if t.lower() in _EN_MARKERS) / len(toks) >= 0.34:
         return False
     hits = sum(1 for t in toks if lexique_lookup(t.strip("'’")) is not None)
     return hits / len(toks) >= 0.6
