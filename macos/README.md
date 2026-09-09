@@ -26,7 +26,9 @@ The card is the whole dictionary, not just the translation:
 - **header** — the query with **its own** flag (🇬🇧/🇷🇺 — from `src_lang`, or
   Cyrillic → 🇷🇺) and the French result with 🇫🇷: « 🇷🇺 сказать → 🇫🇷 dire ».
   A French card is 🇫🇷 throughout. Then the head with its article, the gender pill
-  (m blue, f rose) and the frequency in ★;
+  (m blue, f rose), the frequency in ★, the **CEFR pill** (`A1`…`C2` from FLELex —
+  green for A, blue for B, red for C: when a *learner* meets the word, as opposed
+  to how common it is for a native) and the **IPA**, both offline;
 - **senses** as numbered chips grouped by part of speech — **clicking one saves
   it** to the vocabulary (or **⌘1…⌘9**), and a toast confirms
   « un cuisinier » added;

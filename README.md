@@ -130,6 +130,19 @@ M4 Pro): **Gemma 4 12B it — MLX 4-bit** (`lmstudio-community/gemma-4-12B-it-ML
 ~2 s per answer, 5/5 correct). Ministral 3 8B is faster (~1.5 s) but got the
 *de/des* rule wrong. Prefer **MLX** weights over GGUF on Apple Silicon (~2× faster).
 
+### Levels, pronunciation and homophones — all offline
+
+A French word carries its **CEFR level** (`A1`…`C2`, from **FLELex**) next to
+the frequency band. They answer different questions: the band says how common a
+word is *for a native*, the level says **when a learner is expected to meet it**
+— `néanmoins` is *peu courant* but only **B1**. It also carries its
+**pronunciation in IPA** (`maison  /mɛzɔ̃/`), derived from Lexique's own
+phonetic column, so all 142 694 forms have one with no network.
+
+Grouping Lexique on that same phonetic column gives **exact homophones,
+offline and instantly** — `vert` → *vair · ver · verre · vers* (inflections of
+the word itself are dropped). `syn` merges them with the Wiktionnaire's list.
+
 ### Lexique 3.83 — knowledge, offline
 
 Every French word gets a badge `📊 frequency · part of speech · gender`
@@ -192,7 +205,8 @@ The SQLite databases are **not** versioned (~600 MB). `dico --setup` (or
 |---|---|---|
 | `build_conjugations.py` | `conjugations.db` (verbecc, ~7000 verbs) | `uv` |
 | `build_conj_forms.py` | the `forms` reverse index (*doit → devoir*) | — |
-| `build_lexique.py` | `lexique.db` (Lexique 3.83, downloaded from lexique.org) | — |
+| `build_lexique.py` | `lexique.db` (Lexique 3.83, from lexique.org) — spelling, lemma, gender, frequency, **phonetics, syllables, homophones** | — |
+| `build_flelex.py` | the `cefr` table (**FLELex**, CEFRLex/UCLouvain): an A1…C2 level for 14 236 lemmas | — |
 | `build_grammalecte.py` | `data/grammalecte/` (the checker, from grammalecte.net) | — |
 | `build_multitran.py` | `multitran.db` — **optional**, from the Apple dictionaries `~/Library/Dictionaries/multitran_{rufr,frru}.dictionary` (converted with `pyglossary` by `setup.sh`) | `uv` |
 
@@ -218,6 +232,7 @@ Without a database the matching feature is simply off (`-m` without Multitran,
   homophones, Russian translations *and* the spoken recordings (CC BY-SA).
   Multitran stays optional and bring-your-own; without it, `ru` answers from
   the Wiktionnaire (with transliteration and gender).
+- **FLELex** (François, Gala, Watrin & Fairon — CEFRLex, UCLouvain) — the CEFR levels.
 - **Lexique 3.83** (New, Pallier et al.) — CC BY-SA · **Tatoeba** — CC BY 2.0 fr ·
   **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugations · **spaCy**
   `fr_core_news_md` — MIT/CC BY-SA · **Wiktionary** — CC BY-SA · **Multitran**:
