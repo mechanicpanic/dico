@@ -61,6 +61,11 @@ and a macOS popup.
   cards (« 20 cards to review — 0 due · 3 learning · 331 new », Review),
   the words saved lately with their gloss, and the recent searches. The
   four « try one » examples only greet a first run.
+- **The cards live in git.** Keep the store in a repository with a remote
+  and `dico --backup` pulls what other sources wrote, renders
+  `vocabulaire.md`, commits and pushes; `dico --pull` only pulls. The app
+  pulls at launch and backs up 20 s after a save (a minute after a grade),
+  coalesced — Settings ▸ Vocabulary ▸ Backup switches that off.
 - **Anything can become a card.** ⌘S saves what is on screen: the phrase
   in the field, the corrected sentence in Grammar, the tutor's answer in
   Ask (front: the word it was about, back: the answer), sense 1 of a Word

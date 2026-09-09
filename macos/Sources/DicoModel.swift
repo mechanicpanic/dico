@@ -157,6 +157,33 @@ final class DicoModel: ObservableObject {
     @Published private(set) var lastOpened: Section? = nil
     /// The word the tutor is being asked about (set by the card's "Ask ?" button).
     @Published private(set) var askContext: String? = nil
+    /// Git backup of the cards: after a save, 20 s later, coalesced.
+    private var backupTask: Task<Void, Never>?
+    @Published private(set) var backupNote: String? = nil
+
+    /// Pull what other sources wrote (at launch), or push what we saved.
+    func backupCards(pullOnly: Bool = false, delay: TimeInterval = 0) {
+        backupTask?.cancel()
+        backupTask = Task.detached(priority: .utility) { [weak self] in
+            if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+            guard !Task.isCancelled else { return }
+            guard let paths = try? DicoClient.paths(), let repo = paths.cards_repo, !repo.isEmpty,
+                  paths.cards_autosync ?? false else { return }
+            let result = try? DicoClient.backup(pullOnly: pullOnly)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if let e = result?.error, !e.isEmpty {
+                    self.backupNote = "⚠︎ cards backup: \(e)"
+                    self.flash(self.backupNote ?? "")
+                } else {
+                    self.backupNote = nil
+                    if !pullOnly, let steps = result?.steps, steps.contains("push") { self.flash("✓ cards backed up") }
+                    if pullOnly, let steps = result?.steps, steps.contains("pull") { self.refreshHome(force: true) }
+                }
+            }
+        }
+    }
+
     /// The empty screen, once there is a history: what is due, what was saved lately.
     @Published private(set) var home: DicoClient.Deck? = nil
     private var homeFetchedAt: Date = .distantPast
@@ -518,7 +545,10 @@ final class DicoModel: ObservableObject {
             }
             await MainActor.run { [weak self] in
                 self?.flash(msg)
-                if msg.hasPrefix("✓") { self?.refreshHome(force: true) }
+                if msg.hasPrefix("✓") {
+                    self?.refreshHome(force: true)
+                    self?.backupCards(delay: 20)
+                }
             }
         }
     }
@@ -617,6 +647,7 @@ final class DicoModel: ObservableObject {
                 guard let self else { return }
                 if let failed { self.review.error = failed; return }
                 self.review.graded += 1
+                self.backupCards(delay: 60)          // grades count as changes, but batch them
                 if ease == 1 {                       // again: it comes back at the end
                     self.review.cards.append(card)
                 }

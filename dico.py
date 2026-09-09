@@ -1544,6 +1544,72 @@ def run_review():
     print(f"{GREEN}✓ {done} graded.{RESET}")
 
 
+# ---------------------------------------------------------------------------
+# Backup: the store's directory is a git repository with a remote.
+# ---------------------------------------------------------------------------
+
+def _git(args, cwd):
+    """Run git quietly. Returns (ok, output)."""
+    try:
+        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=60)
+        return r.returncode == 0, (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+
+
+def cards_repo():
+    """The directory holding the store, if it is a git repository — else None."""
+    d = os.path.dirname(os.path.abspath(STORE))
+    return d if os.path.isdir(os.path.join(d, ".git")) else None
+
+
+def cards_autosync():
+    """Back up after every save? On by default once the store lives in a repo."""
+    v = _early_cfg("cards_autosync")
+    return bool(cards_repo()) if v is None else bool(v)
+
+
+def run_backup(as_json=False, pull_only=False):
+    """dico --backup: pull what other sources wrote, render vocabulaire.md,
+    commit and push. Silent when nothing changed."""
+    repo = cards_repo()
+    if not repo:
+        msg = {"error": f"{os.path.dirname(os.path.abspath(STORE))} is not a git repository"}
+        return print(json.dumps(msg) if as_json else f"{YELLOW}✗ {msg['error']}{RESET}")
+    ok_remote, remote = _git(["remote", "get-url", "origin"], repo)
+    steps = []
+    if ok_remote:
+        ok, out = _git(["pull", "--rebase", "--autostash", "-q", "origin", "HEAD"], repo)
+        steps.append(("pull", ok, out))
+        if not ok:
+            _git(["rebase", "--abort"], repo)
+    if not pull_only:
+        try:
+            store_render(os.path.join(repo, "vocabulaire.md"))
+        except Exception as e:                  # the view is optional
+            steps.append(("render", False, str(e)))
+        n = len(store_load()["entries"])
+        _git(["add", "-A"], repo)
+        ok, out = _git(["diff", "--cached", "--quiet"], repo)
+        if not ok:                              # something to commit
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            ok, out = _git(["-c", "commit.gpgsign=false", "commit", "-q", "-m", f"cards: {n} words — {stamp}"], repo)
+            steps.append(("commit", ok, out))
+        if ok_remote:
+            ok, out = _git(["push", "-q", "origin", "HEAD"], repo)
+            steps.append(("push", ok, out))
+    failed = [(k, o) for k, ok, o in steps if not ok]
+    result = {"repo": repo, "remote": remote if ok_remote else "", "steps": [k for k, ok, _ in steps if ok],
+              "error": "; ".join(f"{k}: {o.splitlines()[-1] if o else '?'}" for k, o in failed) or None}
+    if as_json:
+        return print(json.dumps(result, ensure_ascii=False))
+    if failed:
+        print(f"{YELLOW}✗ backup: {result['error']}{RESET}")
+    else:
+        done = ", ".join(result["steps"]) or "nothing to do"
+        print(f"{GREEN}✓ cards backed up{RESET} {DIM}({done}) → {remote if ok_remote else repo}{RESET}")
+
+
 def store_forget(word):
     data = store_load()
     k = store_key(word)
@@ -3280,6 +3346,10 @@ def main():
     p.add_argument("--card", metavar="KEY", help="with --json: one card, filled in (gloss, example, IPA…) if it was bare")
     p.add_argument("--ease", type=int, default=3, choices=(1, 2, 3, 4),
                    help="1 again · 2 hard · 3 good · 4 easy (with --grade)")
+    p.add_argument("--backup", action="store_true",
+                   help="pull, commit and push the cards (the store's folder must be a git repo)")
+    p.add_argument("--pull", action="store_true",
+                   help="only pull what other sources wrote to the cards")
     p.add_argument("--paths", action="store_true",
                    help="where the config, the vocabulary, the store and the data live (JSON with --json)")
     p.add_argument("--say", action="store_true",
@@ -3331,9 +3401,12 @@ def main():
         if card is None:
             return print(json.dumps({"error": f"no card « {args.grade} »"}, ensure_ascii=False))
         return print(json.dumps({"card": card}, ensure_ascii=False))
+    if args.backup or args.pull:
+        return run_backup(as_json=args.json, pull_only=args.pull)
     if args.paths:
         paths = {"config": CONFIG_PATH, "vocab": VOCAB, "store": STORE, "data": DATA_DIR,
-                 "home": DICO_HOME}
+                 "home": DICO_HOME, "cards_repo": cards_repo() or "",
+                 "cards_autosync": cards_autosync()}
         if args.json:
             return print(json.dumps(paths, ensure_ascii=False))
         for k, v in paths.items():

@@ -356,6 +356,9 @@ struct TutorTab: View {
 
 struct VocabularyTab: View {
     @ObservedObject var store: ConfigStore
+    @State private var paths: DicoClient.Paths? = nil
+    @State private var backingUp = false
+    @State private var backupResult: String? = nil
 
     var body: some View {
         ScrollView {
@@ -383,6 +386,26 @@ struct VocabularyTab: View {
                     }
                 }
 
+                SettingsCard(title: "Backup",
+                             caption: (paths?.cards_repo ?? "").isEmpty
+                                ? "Put the store in a git repository with a remote and dico pulls, commits and pushes it — « dico --backup »."
+                                : "The cards live in a git repository; other machines and scripts can write to it. dico pulls at launch and pushes after saves.") {
+                    if let repo = paths?.cards_repo, !repo.isEmpty {
+                        HStack(spacing: 10) {
+                            Text(repo.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                                .font(mono(11)).foregroundStyle(Palette.ink(0.75)).lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 0)
+                            PillButton(label: backingUp ? "Backing up…" : "Back up now", busy: backingUp) { backupNow() }
+                        }
+                        SwitchRow(title: "Back up to git after every save", isOn: $store.cardsAutosync)
+                            .onChange(of: store.cardsAutosync) { _, _ in store.save() }
+                        if let r = backupResult {
+                            Text(r).font(sans(11.5)).foregroundStyle(r.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
                 SettingsCard(title: "Vocabulary location", caption: envCaption) {
                     pathRow("Markdown", text: $store.vocabPath,
                             placeholder: ConfigStore.defaultVocabPath,
@@ -395,6 +418,23 @@ struct VocabularyTab: View {
                 }
                 Spacer(minLength: 0)
             }
+        }
+        .onAppear { Task.detached { let p = try? DicoClient.paths(); await MainActor.run { paths = p } } }
+    }
+
+    private func backupNow() {
+        backingUp = true
+        Task.detached(priority: .userInitiated) {
+            let msg: String
+            do {
+                let b = try DicoClient.backup()
+                msg = (b.error ?? "").isEmpty ? "✓ \((b.steps ?? []).joined(separator: ", ").ifEmpty("nothing to do")) → \(b.remote ?? b.repo ?? "")"
+                                              : "✗ \(b.error ?? "")"
+            } catch {
+                msg = "✗ \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
+            }
+            let out = msg
+            await MainActor.run { backupResult = out; backingUp = false }
         }
     }
 
@@ -640,4 +680,9 @@ struct ShortcutsTab: View {
             }
         }
     }
+}
+
+
+private extension String {
+    func ifEmpty(_ other: String) -> String { isEmpty ? other : self }
 }

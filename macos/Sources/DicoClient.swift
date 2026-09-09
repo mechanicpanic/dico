@@ -388,7 +388,15 @@ enum DicoClient {
     }
 
     /// Where the CLI keeps things — the store is what the Anki push reads.
-    struct Paths: Decodable { var config: String; var vocab: String; var store: String; var data: String }
+    struct Paths: Decodable {
+        var config: String; var vocab: String; var store: String; var data: String
+        var cards_repo: String?; var cards_autosync: Bool?
+    }
+    /// `dico --backup`: pull, render, commit, push the cards. Slow-ish (git + network).
+    struct Backup: Decodable { var repo: String?; var remote: String?; var steps: [String]?; var error: String? }
+    static func backup(pullOnly: Bool = false) throws -> Backup {
+        try call(Backup.self, ["--json", pullOnly ? "--pull" : "--backup"], timeout: 90)
+    }
     static func paths() throws -> Paths { try call(Paths.self, ["--json", "--paths"]) }
 
     /// Runs the CLI and returns raw stdout. Blocking — call it off the main thread.
@@ -469,8 +477,8 @@ enum DicoClient {
         throw DicoError.badOutput(head)
     }
 
-    private static func call<T: Decodable>(_ type: T.Type, _ args: [String]) throws -> T {
-        try decode(type, from: raw(args))
+    private static func call<T: Decodable>(_ type: T.Type, _ args: [String], timeout: TimeInterval = 30) throws -> T {
+        try decode(type, from: raw(args, timeout: timeout))
     }
 
     // MARK: The five modes + saving

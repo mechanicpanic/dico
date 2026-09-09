@@ -122,6 +122,8 @@ final class ConfigStore: ObservableObject {
     /// The Anki deck the Cards mode reviews (AnkiConnect).
     @Published var ankiDeck: String = ""
     @Published var reviewSource: ReviewSource = .dico
+    /// Commit + push the cards after every save (the store's folder must be a git repo).
+    @Published var cardsAutosync: Bool = true
 
     init(path: String = ConfigPath.current) {
         self.path = path
@@ -147,6 +149,7 @@ final class ConfigStore: ObservableObject {
         appearance = string(Appearance.configKey) ?? "system"
         ankiDeck = string(AnkiClient.configKey) ?? ""
         reviewSource = ReviewSource(rawValue: string(ReviewSource.configKey) ?? "") ?? .dico
+        cardsAutosync = bool("cards_autosync") ?? true
     }
 
     private func string(_ k: String) -> String? { raw[k] as? String }
@@ -193,6 +196,7 @@ final class ConfigStore: ObservableObject {
         put(Appearance.configKey, appearance == "system" ? nil : appearance)
         put(AnkiClient.configKey, ankiDeck.trimmingCharacters(in: .whitespaces).isEmpty ? nil : ankiDeck)
         put(ReviewSource.configKey, reviewSource == .dico ? nil : reviewSource.rawValue)
+        put("cards_autosync", cardsAutosync)
         put("vocab_path", vocabPath.isEmpty ? nil : vocabPath)
         put("store_path", storePath.isEmpty ? nil : storePath)
 
