@@ -30,12 +30,8 @@ enum Shortcuts {
             .init(keys: "⌘/", what: "This list", group: "Panel"),
             .init(keys: "⌘W", what: "Close the panel", group: "Panel"),
 
-            .init(keys: "⌘⌥1", what: "📖 Word", group: "Modes"),
-            .init(keys: "⌘⌥2", what: "🔁 Conjugate", group: "Modes"),
-            .init(keys: "⌘⌥3", what: "✅ Grammar", group: "Modes"),
-            .init(keys: "⌘⌥4", what: "🔬 X-ray", group: "Modes"),
-            .init(keys: "⌘⌥5", what: "💬 Ask", group: "Modes"),
-            .init(keys: "⌘⌥6", what: "🎴 Cards", group: "Modes"),
+            .init(keys: "Tab · ⇧Tab", what: "Next · previous mode", group: "Modes"),
+            .init(keys: "⌃1…⌃6", what: "📖 Word · 🔁 Conjugate · ✅ Grammar · 🔬 X-ray · 💬 Ask · 🎴 Cards", group: "Modes"),
 
             .init(keys: "⌘1…⌘9", what: "Save sense N", group: "Word card"),
             .init(keys: "⌘D", what: "Definitions — Wiktionary", group: "Word card"),

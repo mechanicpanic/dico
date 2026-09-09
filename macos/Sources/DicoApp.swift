@@ -243,7 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Local keyboard (Esc, ⌘K, ⌘1…⌘9) and click-away
 
     /// The number keys, by key code — `charactersIgnoringModifiers` turns
-    /// ⌘⌥1 into "¡" on most layouts, so the digit has to come from the code.
+    /// ⌃1 gives odd characters on some layouts, so the digit has to come from the code.
     private static let digitCodes: [UInt16: Int] = [
         UInt16(kVK_ANSI_1): 1, UInt16(kVK_ANSI_2): 2, UInt16(kVK_ANSI_3): 3,
         UInt16(kVK_ANSI_4): 4, UInt16(kVK_ANSI_5): 5, UInt16(kVK_ANSI_6): 6,
@@ -276,21 +276,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            model.reviewKey(event.charactersIgnoringModifiers ?? "", keyCode: event.keyCode) {
             return nil
         }
+        let mods = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        // Tab / ⇧Tab walk the rail; ⌃1…⌃6 jump to a mode. One hand, and macOS
+        // keeps its hands off both (⌘⇧3/4/5 are screenshots).
+        if event.keyCode == 48, mods.isSubset(of: [.shift]) {
+            model.cycleMode(mods.contains(.shift) ? -1 : 1)
+            return nil
+        }
+        if mods == [.control], let n = AppDelegate.digitCodes[event.keyCode] {
+            if n <= Mode.allCases.count { model.setMode(Mode.allCases[n - 1]) }
+            return nil
+        }
         guard event.modifierFlags.contains(.command) else { return event }
         let chars = (event.charactersIgnoringModifiers ?? "").lowercased()
         let shift = event.modifierFlags.contains(.shift)
-        let option = event.modifierFlags.contains(.option)
 
         if chars == "/" { model.showShortcuts.toggle(); return nil }
         if chars == "w" { hidePanel(); return nil }
 
-        // ⌘⌥1…⌘⌥6 switch mode (⌘⇧3/4/5 belong to macOS: screenshots); ⌘1…⌘9 save a sense.
-        if let n = AppDelegate.digitCodes[event.keyCode] {
-            if option {
-                if n <= Mode.allCases.count { model.setMode(Mode.allCases[n - 1]) }
-            } else if !shift {
-                model.saveSense(number: n)
-            }
+        // ⌘1…⌘9 save a sense.
+        if let n = AppDelegate.digitCodes[event.keyCode], !shift {
+            model.saveSense(number: n)
             return nil
         }
 
@@ -796,7 +802,7 @@ func runSelfTest() -> Int32 {
     // ------------------------------------------------------------------ //
     line("shortcuts catalogue + ⌘/ sheet") {
         let all = Shortcuts.all()
-        let musts = ["⌘,", "⌘K", "Esc", "⌘1…⌘9", "⌘⌥1", "⌘⌥6", "⌘D", "⌘R", "⌘E",
+        let musts = ["⌘,", "⌘K", "Esc", "⌘1…⌘9", "Tab · ⇧Tab", "⌃1…⌃6", "⌘D", "⌘R", "⌘E",
                      "⌘J", "⌘L", "⌘/", "⌘⇧C", "⌘V · ⌘C · ⌘A", Shortcuts.globalHotkey + " + selection"]
         for k in musts where !all.contains(where: { $0.keys == k }) {
             throw Failed(why: "\(k) is not in the catalogue")

@@ -555,7 +555,14 @@ final class DicoModel: ObservableObject {
 
     // MARK: What the keyboard shortcuts drive
 
-    /// ⌘⌥1…⌘⌥6 — switch mode, and re-run the current query in it.
+    /// Tab / ⇧Tab — the next / previous mode on the rail.
+    func cycleMode(_ step: Int) {
+        let all = Mode.allCases
+        let i = all.firstIndex(of: mode) ?? 0
+        setMode(all[(i + step + all.count) % all.count])
+    }
+
+    /// ⌃1…⌃6 — switch mode, and re-run the current query in it.
     func setMode(_ m: Mode) {
         guard mode != m else { return }
         mode = m
