@@ -1,6 +1,6 @@
 [project]
 name = "dico"
-version = "0.9.0"
+dynamic = ["version"]
 description = "Command-line pocket dictionary: Russian / English -> French, with grammar, conjugation and a local AI tutor."
 readme = "README.md"
 license = "MIT"
@@ -15,6 +15,9 @@ dico = "dico:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "dico.py"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["dico.py", "build_conjugations.py", "build_conj_forms.py",

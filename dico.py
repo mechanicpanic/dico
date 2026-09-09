@@ -37,6 +37,8 @@ Translation and Wiktionary need internet; Multitran and the conjugations work
 offline (databases in data/). The -a option uses the Anthropic API if
 ANTHROPIC_API_KEY is set (fast, ~1-2 s), otherwise the `claude` command.
 """
+__version__ = "1.0.0"
+
 import argparse
 import html
 import json
@@ -2976,6 +2978,7 @@ def main():
                    help="set up the tutor: local model, your own API key, or none")
     p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
     p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
+    p.add_argument("--version", action="version", version=f"dico {__version__}")
     p.add_argument("--say", action="store_true",
                    help="play a native recording of the word (Wiktionary/Commons)")
     p.add_argument("--syn", action="store_true",

@@ -196,6 +196,26 @@ tabs, `--selftest` — is in [`macos/README.md`](macos/README.md).
 `tools/raycast` folder). `⌥ Space → dico кошка` shows the card in the Raycast
 panel; `dico -c aller`, `dico -g elle est parti` work the same way.
 
+## Releases
+
+Tagged releases carry the CLI and a **built `Dico.app`**:
+
+```sh
+uv tool install git+https://github.com/mechanicpanic/dico@v1.0.0   # a pinned version
+```
+
+For the app, download `Dico-<version>.zip` from the release, unzip it and drag
+it to `/Applications`. The build is **signed ad-hoc**, not notarised, so the
+first launch needs **right-click ▸ Open** (or
+`xattr -dr com.apple.quarantine /Applications/Dico.app`); after that it opens
+normally. `CHANGELOG.md` says what is in each one.
+
+Cutting one: `tools/release.sh` is a dry run — it refuses a dirty tree or a
+version with no changelog section, builds the app, runs its self-test and zips
+it — and `tools/release.sh --publish` tags and publishes. The version lives in
+`dico.py` (`__version__`) and nowhere else: the wheel and the app's Info.plist
+both read it from there, and `dico --version` prints it.
+
 ## Offline data (`data/`)
 
 The SQLite databases are **not** versioned (~600 MB). `dico --setup` (or

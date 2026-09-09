@@ -73,8 +73,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "📖"
+        statusItem.button?.image = AppDelegate.menuBarMark()
+        statusItem.button?.toolTip = "Dico"
         rebuildMenu()
+    }
+
+    /// The app's own mark, « é », drawn as a TEMPLATE image: the menu bar
+    /// recolours it itself, so it follows light/dark and the highlight state —
+    /// which an emoji never did.
+    static func menuBarMark() -> NSImage {
+        let side: CGFloat = 18
+        let image = NSImage(size: NSSize(width: side, height: side))
+        image.lockFocus()
+        let font = NSFont.systemFont(ofSize: 15, weight: .semibold)
+        let mark = NSAttributedString(string: "é", attributes: [
+            .font: font, .foregroundColor: NSColor.black,
+        ])
+        let s = mark.size()
+        mark.draw(at: NSPoint(x: (side - s.width) / 2, y: (side - s.height) / 2))
+        image.unlockFocus()
+        image.isTemplate = true          // black + alpha; AppKit tints it
+        return image
     }
 
     /// Rebuilt when the hotkey changes, so the menu shows the real one.
@@ -861,6 +880,26 @@ func runSelfTest() -> Int32 {
         let pill = NSHostingView(rootView: CEFRPill(level: "B2"))
         pill.layoutSubtreeIfNeeded()
         return seen.joined(separator: " | ") + " | pill \(Int(pill.fittingSize.width))×\(Int(pill.fittingSize.height))"
+    }
+
+    line("menu bar mark is a template image") {
+        let img = AppDelegate.menuBarMark()
+        guard img.isTemplate else { throw Failed(why: "not a template: it will not follow dark mode") }
+        guard img.size.width > 8, img.size.height > 8 else {
+            throw Failed(why: "degenerate size \(img.size)")
+        }
+        // It must actually have ink in it — an empty template is invisible.
+        guard let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else {
+            throw Failed(why: "no bitmap")
+        }
+        var inked = 0
+        for x in 0..<rep.pixelsWide {
+            for y in 0..<rep.pixelsHigh where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.2 {
+                inked += 1
+            }
+        }
+        guard inked > 20 else { throw Failed(why: "only \(inked) inked pixels") }
+        return "\(Int(img.size.width))×\(Int(img.size.height)) template, \(inked) inked px"
     }
 
     line("badges reach a translation card too") {

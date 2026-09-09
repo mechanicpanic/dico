@@ -1,19 +1,18 @@
+
+__pycache__/
+.DS_Store
+.venv/
+*.pyc
 # Bases de données locales — trop volumineuses, reconstructibles via ./setup.sh
+# macOS
+# Python
+data/*.csv
 data/*.db
+data/*.tsv
 data/*.txt
 data/*.txt_res/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-
-# macOS
-.DS_Store
-data/*.tsv
-data/grammalecte/
 data/*.zip
-dist/
-data/*.csv
 data/audio/
+data/grammalecte/
 data/translate_cache.json
+dist/
