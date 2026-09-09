@@ -33,12 +33,19 @@ python3 -c "import ast,sys; ast.parse(open('dico.py').read())"
 echo "==> app + self-test"
 ( cd macos && ./build.sh >/dev/null && ./build/Dico.app/Contents/MacOS/Dico --selftest )
 
-# 4. Package: the app, zipped the way macOS expects (keeps the signature).
+# 4. Package. The DMG is what a person gets: drag-to-Applications and a
+#    READ ME that explains the one-off Gatekeeper dance. The zip is for
+#    anyone who would rather not mount a disk image.
 mkdir -p dist
 ZIP="dist/Dico-$VERSION.zip"
 rm -f "$ZIP"
 ditto -c -k --keepParent macos/build/Dico.app "$ZIP"
 echo "✓ $ZIP  ($(du -h "$ZIP" | cut -f1))"
+
+( cd macos && ./package.sh )
+DMG="dist/Dico-$VERSION.dmg"
+mv "macos/build/Dico-$VERSION.dmg" "$DMG"
+echo "✓ $DMG  ($(du -h "$DMG" | cut -f1))"
 
 if [ -z "$PUBLISH" ]; then
   echo
@@ -52,7 +59,7 @@ git tag -a "$TAG" -m "dico $TAG"
 git push origin "$TAG"
 
 NOTES="$(awk -v v="## $VERSION " 'index($0,v)==1{f=1;next} f&&/^## /{exit} f' CHANGELOG.md)"
-gh release create "$TAG" "$ZIP" \
+gh release create "$TAG" "$DMG" "$ZIP" \
   --title "dico $VERSION" \
   --notes "$NOTES
 
@@ -64,7 +71,12 @@ uv tool install git+https://github.com/mechanicpanic/dico@$TAG
 dico --setup
 \`\`\`
 
-**macOS popup** — download \`Dico-$VERSION.zip\` below, unzip, drag to
-/Applications. The build is signed ad-hoc, so the first launch needs
-**right-click ▸ Open** (or \`xattr -dr com.apple.quarantine /Applications/Dico.app\`)."
+**macOS app — nothing to install.** Download \`Dico-$VERSION.dmg\`, drag Dico to
+Applications, press ⌥D. The dictionary, conjugations and grammar checker are
+inside the app; no Python, no uv, no setup, works offline.
+
+The first launch takes three extra clicks: the app is signed ad-hoc, so macOS
+blocks the first double-click. Open **System Settings ▸ Privacy & Security**,
+scroll to *Security*, and click **Open Anyway**. Once. (macOS 14 and older:
+right-click ▸ Open.)"
 echo "✓ published: $(gh release view "$TAG" --json url -q .url)"

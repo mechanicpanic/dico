@@ -903,6 +903,25 @@ func runSelfTest() -> Int32 {
         return seen.joined(separator: " | ") + " | pill \(Int(pill.fittingSize.width))×\(Int(pill.fittingSize.height))"
     }
 
+    line("first run offers something to press") {
+        let model = DicoModel(recentKey: "dico.recent.selftest.firstrun")
+        model.forgetRecent()
+        guard model.recent.isEmpty else { throw Failed(why: "recents were not cleared") }
+        let host = NSHostingView(rootView: EmptyStateView(model: model)
+            .frame(width: PanelSize.width - 32))
+        host.layoutSubtreeIfNeeded()
+        guard host.fittingSize.height > 120 else {
+            throw Failed(why: "the first-run state is \(Int(host.fittingSize.height))pt — the examples are missing")
+        }
+        // Every example must be something the app can actually run.
+        for ex in EmptyStateView.examples where ex.query.isEmpty {
+            throw Failed(why: "empty example")
+        }
+        return "\(EmptyStateView.examples.count) examples: "
+            + EmptyStateView.examples.map(\.query).joined(separator: " · ")
+            + " | \(Int(host.fittingSize.height))pt"
+    }
+
     line("menu bar mark is a template image") {
         let img = AppDelegate.menuBarMark()
         guard img.isTemplate else { throw Failed(why: "not a template: it will not follow dark mode") }

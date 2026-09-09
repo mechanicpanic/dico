@@ -277,16 +277,56 @@ struct PanelView: View {
 struct EmptyStateView: View {
     @ObservedObject var model: DicoModel
 
+    /// One example per thing dico can do, so the first click teaches the tool.
+    static let examples: [(query: String, what: String, mode: Mode)] = [
+        ("cook", "a word", .mot),
+        ("maison", "a French word", .mot),
+        ("elle est parti hier", "a sentence to correct", .mot),
+        ("aller", "a verb to conjugate", .conjuguer),
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(spacing: 8) {
-                Text("📖").font(.system(size: 34))
+                Text("é")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .foregroundStyle(LinearGradient(
+                        colors: [Palette.bleu, Palette.rose],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
                 Text("Type a word, a French sentence, or a question.")
                     .font(rounded(13, .medium)).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, model.recent.isEmpty ? 34 : 18)
+            .padding(.top, model.recent.isEmpty ? 26 : 18)
+
+            // Nothing looked up yet: someone who has just installed this needs
+            // something to press, not an empty box and a blinking cursor.
+            if model.recent.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("TRY ONE").font(rounded(9.5, .bold))
+                        .foregroundStyle(.tertiary).tracking(0.6)
+                    FlowLayout(spacing: 6) {
+                        ForEach(EmptyStateView.examples, id: \.query) { ex in
+                            Button { model.run(ex.query, mode: ex.mode) } label: {
+                                HStack(spacing: 5) {
+                                    Text(ex.query).font(rounded(12, .medium))
+                                    Text(ex.what).font(rounded(10, .regular))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.horizontal, 8).padding(.vertical, 5)
+                                .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .fill(Palette.bleu.opacity(0.09)))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Run \u{ab} \(ex.query) \u{bb}")
+                        }
+                    }
+                    Text("\(model.hotkeyLabel) opens this from any app · ⌘/ shows every shortcut")
+                        .font(rounded(10, .regular)).foregroundStyle(.quaternary)
+                        .padding(.top, 2)
+                }
+            }
 
             if !model.recent.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {

@@ -6,6 +6,21 @@ zero-dependency Python CLI (`dico`) and a native **macOS popup** (`macos/`,
 
 ## Getting started
 
+**The app — nothing to install.** Download `Dico-<version>.dmg` from the
+[releases](https://github.com/mechanicpanic/dico/releases), drag Dico to
+Applications, and press **⌥D** anywhere. The dictionary, the conjugations and
+the grammar checker are *inside the app*: no Python, no `uv`, no Terminal, no
+setup step, and it works offline.
+
+> **The first launch takes three extra clicks.** The app is signed ad-hoc
+> (notarising it needs a paid Apple account), so macOS refuses the first
+> double-click. Open **System Settings ▸ Privacy & Security**, scroll to
+> *Security* — it says Dico was blocked — and click **Open Anyway**. Once.
+> (On macOS 14 and older, right-click ▸ Open does the same job; Apple removed
+> that shortcut in macOS 15.) The DMG says all this too.
+
+**The command line**, if you want `dico` in a terminal as well:
+
 ```sh
 uv tool install git+https://github.com/mechanicpanic/dico
 dico --setup     # builds the offline data (~2 min), then asks about the tutor
@@ -13,8 +28,10 @@ dico --tour      # a 2-minute guided walkthrough
 dico             # the interactive mode — just type
 ```
 
-Requirements: **Python 3.10+** and [`uv`](https://docs.astral.sh/uv/) (used for
-the install, the conjugation build and spaCy). The core has **no dependencies**.
+Requirements for the **command line**: [`uv`](https://docs.astral.sh/uv/) (for
+the install, the conjugation build and spaCy). The core is pure standard
+library and runs on the Python macOS ships (3.9) — which is why the app needs
+nothing at all.
 Data and settings live in `~/.dico/` and `~/.dico_config.json`; `DICO_HOME`,
 `DICO_DATA`, `DICO_VOCAB`, `DICO_STORE` move them elsewhere.
 
