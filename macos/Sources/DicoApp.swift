@@ -124,6 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quit() { NSApp.terminate(nil) }
 
     @objc func openSettings() {
+        // The panel floats above everything; Settings is an ordinary window
+        // and would open behind it. The panel is transient — put it away.
+        if panel.isVisible { hidePanel() }
         SettingsWindowController.shared.onHotkeyChange = { [weak self] choice in
             self?.registerHotKey(choice)
             self?.rebuildMenu()
