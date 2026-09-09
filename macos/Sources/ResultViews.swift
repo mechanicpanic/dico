@@ -116,6 +116,11 @@ struct WordView: View {
                         withAnimation(.easeOut(duration: 0.15)) { model.toggle(s) }
                     }
                 }
+                ActionButton(icon: "speaker.wave.2", label: "Listen",
+                             active: false, busy: model.speaking,
+                             help: "Hear \u{ab} \(model.cardTerm) \u{bb} said by a native speaker (⌘P) — Wiktionary/Commons") {
+                    model.speak(model.cardTerm)
+                }
                 ActionButton(icon: "bubble.left.and.text.bubble.right", label: "Ask ?",
                              active: false, busy: false,
                              help: "Ask the tutor about \u{ab} \(model.cardTerm) \u{bb} (⌘L)") {
@@ -289,6 +294,64 @@ struct DefinitionBody: View {
                 Text(e).font(rounded(10.5, .regular)).italic().foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            WordNoteRow(icon: "≈", title: "synonymes", words: def.syn ?? [])
+            WordNoteRow(icon: "♪", title: "homophones", words: def.homo ?? [])
+        }
+    }
+}
+
+/// « ≈ synonymes  minet · greffier (familier) » — a label and its words, with
+/// the register tag dimmed after the word it belongs to.
+struct WordNoteRow: View {
+    let icon: String
+    let title: String
+    let words: [WordNote]
+
+    var body: some View {
+        if !words.isEmpty {
+            HStack(alignment: .top, spacing: 6) {
+                Text("\(icon) \(title)").font(rounded(10, .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 82, alignment: .leading)
+                FlowLayout(spacing: 5) {
+                    ForEach(words, id: \.self) { w in
+                        HStack(spacing: 3) {
+                            Text(w.word ?? "").font(rounded(11, .medium))
+                            if let n = w.note, !n.isEmpty {
+                                Text(n).font(rounded(9, .regular)).foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.05)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Russian straight from the Wiktionnaire — what you get when Multitran, which
+/// is proprietary and bring-your-own, is not installed.
+struct WiktionaryRuBody: View {
+    let terms: [RuTerm]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Wiktionnaire").font(rounded(9.5, .medium)).foregroundStyle(.quaternary)
+            ForEach(terms, id: \.self) { t in
+                HStack(spacing: 7) {
+                    Text(t.word ?? "").font(rounded(13, .semibold))
+                    if let tr = t.tr, !tr.isEmpty {
+                        Text("[\(tr)]").font(.system(size: 10.5, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                    if let g = t.gender, !g.isEmpty {
+                        Text(g).font(rounded(10, .bold)).foregroundStyle(Palette.genderTint(g))
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
         }
     }
 }
@@ -364,6 +427,8 @@ struct MultitranBody: View {
                 ForEach(Array(entry.usableGroups.enumerated()), id: \.offset) { _, g in
                     posGroup(g)
                 }
+            } else if !(entry.wiktionary_ru ?? []).isEmpty {
+                WiktionaryRuBody(terms: entry.wiktionary_ru ?? [])
             } else {
                 fallbackLines
             }

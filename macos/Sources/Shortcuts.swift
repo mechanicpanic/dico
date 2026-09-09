@@ -41,6 +41,7 @@ enum Shortcuts {
             .init(keys: "⌘E", what: "Examples (Tatoeba)", group: "Word card"),
             .init(keys: "⌘J", what: "Conjugate — on a verb card", group: "Word card"),
             .init(keys: "⌘L", what: "Ask the tutor about this word", group: "Word card"),
+            .init(keys: "⌘P", what: "Hear the word said by a native speaker", group: "Word card"),
 
             .init(keys: "⌘⇧C", what: "Copy the corrected sentence", group: "Grammar"),
         ]

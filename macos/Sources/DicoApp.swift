@@ -274,6 +274,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "e": return model.toggleSectionShortcut(.exemples) ? nil : event
         case "j": return model.toggleSectionShortcut(.conjugaison) ? nil : event
         case "l": return model.askAboutCurrentCard() ? nil : event
+        case "p":
+            guard !model.cardTerm.isEmpty else { return event }
+            model.speak(model.cardTerm)
+            return nil
         default: return event
         }
     }
@@ -812,6 +816,43 @@ func runSelfTest() -> Int32 {
             throw Failed(why: "true not written") }
         guard Selection.enabled(in: [:]) else { throw Failed(why: "must default to on") }
         return "off → on → file, default on"
+    }
+
+    // ------------------------------------------------------------------ //
+    // 6c. The Wiktionnaire's extra layers: audio, synonyms, homophones, Russian.
+    // ------------------------------------------------------------------ //
+    line("wiktionary: synonyms + homophones + russian") {
+        let d = try DicoClient.definition("chat")
+        let syn = (d.syn ?? []).compactMap(\.word)
+        let homo = (d.homo ?? []).compactMap(\.word)
+        let ru = d.ru ?? []
+        guard !syn.isEmpty else { throw Failed(why: "no synonyms for « chat »") }
+        guard !homo.isEmpty else { throw Failed(why: "no homophones for « chat »") }
+        guard let first = ru.first, (first.word ?? "").unicodeScalars
+                .contains(where: { (0x0400...0x04FF).contains($0.value) }) else {
+            throw Failed(why: "no Cyrillic translation for « chat »")
+        }
+        let host = NSHostingView(rootView:
+            DefinitionBody(def: d).frame(width: PanelSize.width - 40))
+        host.layoutSubtreeIfNeeded()
+        let ruHost = NSHostingView(rootView:
+            WiktionaryRuBody(terms: ru).frame(width: PanelSize.width - 40))
+        ruHost.layoutSubtreeIfNeeded()
+        let tr = first.tr.map { " [\($0)]" } ?? ""
+        return "syn \(syn.prefix(3).joined(separator: "·")) | homo \(homo.prefix(3).joined(separator: "·")) | ru \(first.word ?? "")\(tr) | body \(Int(host.fittingSize.height))pt, ru \(Int(ruHost.fittingSize.height))pt"
+    }
+
+    line("audio: a playable recording") {
+        let a = try DicoClient.audio("vert")
+        if let e = a.error, !e.isEmpty { throw Failed(why: e) }
+        guard let path = a.path, !path.isEmpty else { throw Failed(why: "no path returned") }
+        let size = ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int) ?? 0
+        guard size > 1000 else { throw Failed(why: "the file is \(size) bytes") }
+        // Built, never played: a self-test must stay silent.
+        guard NSSound(contentsOfFile: path, byReference: true) != nil else {
+            throw Failed(why: "AppKit cannot play \(path)")
+        }
+        return "\((path as NSString).lastPathComponent) — \(size / 1024) KB, NSSound ✓ (not played)"
     }
 
     // ------------------------------------------------------------------ //

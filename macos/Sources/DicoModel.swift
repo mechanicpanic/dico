@@ -139,6 +139,8 @@ final class DicoModel: ObservableObject {
     @Published var shown: Bool = false          // drives the appearance animation
     /// The ⌘/ sheet.
     @Published var showShortcuts: Bool = false
+    @Published private(set) var speaking: Bool = false
+    private var player: NSSound?
     /// The configured global hotkey, as text — the footer and the sheet show it.
     @Published var hotkeyLabel: String = HotkeyChoice.fallback.display
 
@@ -363,6 +365,34 @@ final class DicoModel: ObservableObject {
     }
 
     // MARK: Ask about the current word
+
+    /// « Listen »: the CLI downloads the Wiktionary/Commons recording (as MP3,
+    /// which AppKit can play) and hands back its path.
+    func speak(_ word: String) {
+        let w = word.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !w.isEmpty, !speaking else { return }
+        speaking = true
+        Task.detached(priority: .userInitiated) {
+            let outcome: (path: String?, problem: String?)
+            do {
+                let a = try DicoClient.audio(w)
+                outcome = (a.path, a.error)
+            } catch {
+                outcome = (nil, (error as? LocalizedError)?.errorDescription
+                                ?? error.localizedDescription)
+            }
+            let path = outcome.path, problem = outcome.problem
+            await MainActor.run {
+                self.speaking = false
+                if let path, !path.isEmpty, let sound = NSSound(contentsOfFile: path, byReference: true) {
+                    self.player = sound
+                    sound.play()
+                } else {
+                    self.flash(problem ?? "no recording for \u{ab} \(w) \u{bb}")
+                }
+            }
+        }
+    }
 
     func askAbout(_ word: String) {
         askContext = word

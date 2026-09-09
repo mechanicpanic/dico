@@ -125,6 +125,19 @@ struct ExamplePack: Decodable {
 }
 private struct ExamplesEnvelope: Decodable { var examples: ExamplePack? }
 
+/// A word with the register tag Wiktionary attaches to it (familier, vieilli…).
+struct WordNote: Decodable, Hashable {
+    var word: String?
+    var note: String?
+}
+
+/// A Russian translation: the word, its transliteration and its gender.
+struct RuTerm: Decodable, Hashable {
+    var word: String?
+    var tr: String?
+    var gender: String?
+}
+
 struct Definition: Decodable {
     var word: String?
     var ipa: String?
@@ -132,7 +145,17 @@ struct Definition: Decodable {
     var pos: String?
     var defs: [String]?
     var etym: String?
+    var syn: [WordNote]?
+    var homo: [WordNote]?
+    var ru: [RuTerm]?
+    var has_audio: Bool?
 }
+
+struct AudioResult: Decodable {
+    var path: String?
+    var error: String?
+}
+private struct AudioEnvelope: Decodable { var audio: AudioResult? }
 private struct DefinitionEnvelope: Decodable { var definition: Definition? }
 
 /// One translation inside a sense, with the optional note Multitran attaches
@@ -161,12 +184,16 @@ struct Multitran: Decodable {
     var lines: [String]?
     var groups: [MultitranGroup]?
     var error: String?
+    /// Russian from the Wiktionnaire, when Multitran is not installed.
+    var wiktionary_ru: [RuTerm]?
 
     /// Every group that actually carries something.
     var usableGroups: [MultitranGroup] {
         (groups ?? []).filter { !(($0.senses ?? []).isEmpty) }
     }
-    var isEmpty: Bool { usableGroups.isEmpty && (lines ?? []).isEmpty }
+    var isEmpty: Bool {
+        usableGroups.isEmpty && (lines ?? []).isEmpty && (wiktionary_ru ?? []).isEmpty
+    }
 }
 private struct MultitranEnvelope: Decodable { var multitran: Multitran? }
 
@@ -407,6 +434,13 @@ enum DicoClient {
 
     /// The Tatoeba example sentences of a French word (`--examples`).
     /// An empty pack is a valid answer — the view says "No examples found".
+    /// Downloads (once) the native recording and returns the local mp3 path.
+    static func audio(_ word: String) throws -> AudioResult {
+        let env = try call(AudioEnvelope.self, ["--json", "--say", word])
+        guard let a = env.audio else { throw DicoError.notFound }
+        return a
+    }
+
     static func examples(_ word: String) throws -> ExamplePack {
         let env = try call(ExamplesEnvelope.self, ["--json", "--examples", word])
         guard let p = env.examples else { throw DicoError.cli("No examples for \u{ab} \(word) \u{bb}.") }
