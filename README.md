@@ -212,5 +212,9 @@ Without a database the matching feature is simply off (`-m` without Multitran,
   **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugations · **spaCy**
   `fr_core_news_md` — MIT/CC BY-SA · **Wiktionary** — CC BY-SA · **Multitran**:
   proprietary Apple dictionaries, *bring your own*.
-- The quick translation goes through an unofficial Google endpoint
-  (rate-limited), with a MyMemory fallback.
+- The quick translation goes through an unofficial Google endpoint. It throttles
+  a burst of lookups with a 429; dico then falls back to **MyMemory** (the card
+  says so), stops asking Google for 15 minutes, and answers from its cache.
+  Every network source — translations, Tatoeba examples, Wiktionary — is cached
+  on disk for 30 days (`data/translate_cache.json`), so a word you have already
+  looked up comes back instantly and costs no request.

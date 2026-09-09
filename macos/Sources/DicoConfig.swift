@@ -188,7 +188,16 @@ final class ConfigStore: ObservableObject {
         // The CLI decides which backend to use by what is present in the file,
         // so a mode change has to clear the other backend's keys.
         switch tutor {
-        case .local, .none:
+        case .local:
+            // A local tutor still has an address: LM Studio, Ollama, a Spark on
+            // the network, and the model that was pinned there. Wiping those
+            // sent the CLI back to its slowest fallback (bug: the pinned
+            // gemma-4-12b disappeared the first time Settings saved anything).
+            put("llm_url", llmURL.isEmpty ? nil : llmURL)
+            put("llm_model", llmModel.isEmpty ? nil : llmModel)
+            put("llm_key", llmKey.isEmpty ? nil : llmKey)
+            put("anthropic_key", nil)
+        case .none:
             for k in ["llm_url", "llm_model", "llm_key", "anthropic_key"] { put(k, nil) }
         case .byok:
             put("llm_url", llmURL.isEmpty ? nil : llmURL)

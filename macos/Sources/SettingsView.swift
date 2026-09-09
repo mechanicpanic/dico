@@ -117,6 +117,7 @@ struct PillButton: View {
 struct TutorTab: View {
     @ObservedObject var store: ConfigStore
     @State private var detected: [String] = []
+    @State private var found: [(name: String, url: String, model: String)] = []
     @State private var probing = false
     @State private var testResult: String? = nil
     @State private var testing = false
@@ -183,6 +184,25 @@ struct TutorTab: View {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(detected, id: \.self) { d in
                             Text("✓ " + d).font(rounded(11, .regular)).foregroundStyle(Palette.vert)
+                        }
+                        Text("Click a model to pin it — otherwise dico takes whichever answers first.")
+                            .font(rounded(10, .regular)).foregroundStyle(.secondary)
+                        ForEach(found, id: \.model) { f in
+                            Button {
+                                store.llmURL = f.url
+                                store.llmModel = f.model
+                                store.save()
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: store.llmModel == f.model
+                                          ? "largecircle.fill.circle" : "circle")
+                                        .foregroundStyle(store.llmModel == f.model ? Palette.vert : .secondary)
+                                    Text(f.model).font(rounded(11, .medium))
+                                    Text(f.name).font(rounded(10, .regular)).foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .help("Pin \(f.model) at \(f.url)")
                         }
                     }
                 }
@@ -251,14 +271,16 @@ struct TutorTab: View {
         probing = true
         detected = []
         Task.detached(priority: .utility) {
-            var found: [String] = []
+            var lines: [String] = []
+            var models: [(name: String, url: String, model: String)] = []
             for (name, url) in DicoClient.localServers {
                 if let ids = DicoClient.models(at: url), !ids.isEmpty {
-                    found.append("\(name) at \(url) — \(ids.prefix(3).joined(separator: ", "))")
+                    lines.append("\(name) at \(url) — \(ids.prefix(3).joined(separator: ", "))")
+                    for id in ids.prefix(6) { models.append((name, url, id)) }
                 }
             }
-            let result = found
-            await MainActor.run { detected = result; probing = false }
+            let result = lines, picks = models
+            await MainActor.run { detected = result; found = picks; probing = false }
         }
     }
 

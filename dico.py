@@ -103,9 +103,91 @@ def _get(url):
 # --------------------------------------------------------------------------- #
 #  Level 1: quick translation                                                 #
 # --------------------------------------------------------------------------- #
+class RateLimited(Exception):
+    """Google's free endpoint is throttling this IP — the caller falls back."""
+
+
+# A lookup you have already done must never cost a request again: the same word
+# comes back in a lesson, and Google's free endpoint starts answering 429 after
+# a burst. Cached on disk, 30 days, oldest dropped past the cap.
+_TR_CACHE_PATH = os.path.join(DATA_DIR, "translate_cache.json")
+_TR_CACHE_TTL = 30 * 24 * 3600
+_TR_CACHE_MAX = 3000
+_TR_CACHE = None
+_TR_DIRTY = False
+
+
+def _cache_load():
+    global _TR_CACHE
+    if _TR_CACHE is None:
+        try:
+            with open(_TR_CACHE_PATH, encoding="utf-8") as f:
+                _TR_CACHE = json.load(f)
+        except Exception:
+            _TR_CACHE = {}
+    return _TR_CACHE
+
+
+def _cache_get(key):
+    row = _cache_load().get(key)
+    if not row or time.time() - row.get("t", 0) > _TR_CACHE_TTL:
+        return None
+    return row.get("v")
+
+
+def _cache_put(key, value):
+    global _TR_DIRTY
+    _cache_load()[key] = {"t": time.time(), "v": value}
+    _TR_DIRTY = True
+
+
+def cache_flush():
+    """Written once, at exit — a lookup must not pay for a file write."""
+    global _TR_DIRTY
+    if not _TR_DIRTY or _TR_CACHE is None:
+        return
+    try:
+        rows = _TR_CACHE
+        if len(rows) > _TR_CACHE_MAX:                      # drop the oldest
+            keep = sorted(rows.items(), key=lambda kv: -kv[1].get("t", 0))[:_TR_CACHE_MAX]
+            rows = dict(keep)
+        os.makedirs(os.path.dirname(_TR_CACHE_PATH), exist_ok=True)
+        tmp = _TR_CACHE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(rows, f)
+        os.replace(tmp, _TR_CACHE_PATH)
+    except Exception:
+        pass
+    _TR_DIRTY = False
+
+
+_RL_KEY = "!google_rate_limited_until"
+_RL_COOLDOWN = 15 * 60          # once throttled, stop asking for a quarter of an hour
+
+
+def _rate_limited_now():
+    row = _cache_load().get(_RL_KEY)
+    return bool(row) and time.time() < row.get("v", 0)
+
+
+def _mark_rate_limited():
+    global _TR_DIRTY
+    _cache_load()[_RL_KEY] = {"t": time.time(), "v": time.time() + _RL_COOLDOWN}
+    _TR_DIRTY = True
+
+
 def _google_query(word, tl="fr", sl="auto"):
     """Google's free endpoint (auto-detects the source language), raw JSON.
-    Retries once on a 429 (rate limit)."""
+    Cached; a 429 is retried once, briefly, then raises RateLimited so the
+    caller can fall back instead of making you wait for nothing. While the
+    throttle lasts we do not even try — that is the difference between a card
+    in 0.5 s and a card in 3 s."""
+    ck = f"g:{sl}>{tl}:{word.strip().lower()}"
+    hit = _cache_get(ck)
+    if hit is not None:
+        return hit
+    if _rate_limited_now():
+        raise RateLimited("Google is rate-limiting this address")
     q = urllib.parse.quote(word)
     url = ("https://translate.googleapis.com/translate_a/single"
            f"?client=gtx&sl={sl}&tl={tl}&dt=t&dt=bd&q={q}")
@@ -114,10 +196,20 @@ def _google_query(word, tl="fr", sl="auto"):
     except urllib.error.HTTPError as e:
         if e.code != 429:
             raise
-        time.sleep(1.5)
-        raw = _get(url)
-    return json.loads(raw)
+        time.sleep(0.6)
+        try:
+            raw = _get(url)
+        except urllib.error.HTTPError as e2:
+            if e2.code == 429:
+                _mark_rate_limited()
+                raise RateLimited("Google is rate-limiting this address") from e2
+            raise
+    data = json.loads(raw)
+    _cache_put(ck, data)
+    return data
 
+
+_FALLBACK_NOTE = ""      # set when a card came from the fallback, shown once
 
 _POS_FR = {"noun": "nom", "verb": "verbe", "adjective": "adjectif", "adverb": "adverbe",
            "preposition": "préposition", "pronoun": "pronom", "conjunction": "conjonction",
@@ -129,8 +221,28 @@ _POS_FR = {"noun": "nom", "verb": "verbe", "adjective": "adjectif", "adverb": "a
 def translate_rich(word, tl="fr", sl="auto"):
     """(translation, detected language, senses grouped by part of speech) —
     senses = [(pos, [(term, [back-translations]), …]), …]. This is the structure
-    of a real dictionary, which the old flat "also: …" line squashed."""
-    data = _google_query(word, tl, sl)
+    of a real dictionary, which the old flat "also: …" line squashed.
+
+    When Google throttles us, MyMemory still gives the translation — a card with
+    one sense beats an error message in the middle of a lesson."""
+    global _FALLBACK_NOTE
+    try:
+        data = _google_query(word, tl, sl)
+    except (RateLimited, urllib.error.HTTPError, urllib.error.URLError):
+        if tl != "fr":                       # FR → EN back-translation: no fallback
+            raise
+        src = detect_lang(word)
+        tr, _, alts = translate_mymemory(word, src)
+        _FALLBACK_NOTE = "Google is rate-limiting — translation via MyMemory (fewer senses)"
+        lx = lexique_lookup(tr)
+        # MyMemory gives no part of speech: only the main term can claim the one
+        # Lexique knows; the alternatives stay in an unlabelled group.
+        groups = [((lx["pos"] if lx else ""), [(tr, [])])]
+        others = [(a, []) for a in alts[:3] if a.lower() != tr.lower()]
+        if others:
+            groups.append(("", others))
+        return tr, src, groups
+    _FALLBACK_NOTE = ""
     translation = "".join(seg[0] for seg in data[0] if seg and seg[0]).strip()
     detected = data[2] if len(data) > 2 and isinstance(data[2], str) else None
     groups = []
@@ -162,7 +274,11 @@ def translate_google(word, tl="fr"):
 
 
 def translate_mymemory(word, src, tl="fr"):
-    """Fallback: the free MyMemory API."""
+    """Fallback: the free MyMemory API (cached like the main one)."""
+    ck = f"m:{src}>{tl}:{word.strip().lower()}"
+    hit = _cache_get(ck)
+    if hit is not None:
+        return tuple(hit)
     q = urllib.parse.quote(word)
     url = f"https://api.mymemory.translated.net/get?q={q}&langpair={src}|{tl}"
     data = json.loads(_get(url))
@@ -172,6 +288,7 @@ def translate_mymemory(word, src, tl="fr"):
         t = (m.get("translation") or "").strip()
         if t and t.lower() != translation.lower() and t not in alts:
             alts.append(t)
+    _cache_put(ck, [translation, src, alts[:6]])
     return translation, src, alts[:6]
 
 
@@ -187,7 +304,13 @@ def translate(word, tl="fr"):
 
 
 def _tatoeba(fr_word, to="eng", limit=1):
-    """Real example sentences (Tatoeba, CC-BY): [(FR sentence, translation)]."""
+    """Real example sentences (Tatoeba, CC-BY): [(FR sentence, translation)].
+    Cached: Tatoeba answers in 0.3 s on a good day and 2 s on a bad one, and
+    that latency was landing on every single card."""
+    ck = f"t:{to}:{limit}:{fr_word.strip().lower()}"
+    hit = _cache_get(ck)
+    if hit is not None:
+        return [tuple(x) for x in hit]
     try:
         url = ("https://tatoeba.org/en/api_v0/search?from=fra&to=" + to
                + "&query=" + urllib.parse.quote(f'"{fr_word}"')
@@ -204,6 +327,7 @@ def _tatoeba(fr_word, to="eng", limit=1):
         out.append((fr, trs[0].get("text", "")))
         if len(out) >= limit:
             break
+    _cache_put(ck, [list(x) for x in out])
     return out
 
 
@@ -242,6 +366,8 @@ def _fr_head(term):
 def _render_card_to_fr(word, src, translation, groups, examples=True):
     """RU/EN → FR card: numbered senses grouped by part of speech ("save N" saves sense N)."""
     print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}")
+    if _FALLBACK_NOTE:
+        print(f"     {DIM}⚠ {_FALLBACK_NOTE}{RESET}")
     # The main translation (the one autosave keeps) must be sense 1.
     tmain = (translation or "").strip().lower()
     groups = [(p, list(t)) for p, t in groups]
@@ -484,13 +610,19 @@ def _wikt_candidates(word):
 def wiktionary(word):
     """French entry for a word. Tries the word as typed first (minus any leading
     article), then an accent-tolerant search — keeping the RICHEST entry (avoids
-    "étre" for "être", or "un" for "cuisinier")."""
+    "étre" for "être", or "un" for "cuisinier"). Cached, like every other
+    network source."""
+    ck = f"w:{word.strip().lower()}"
+    hit = _cache_get(ck)
+    if hit is not None:
+        return hit
     tried = set()
     for cand in _wikt_candidates(word):
         if cand and cand not in tried:
             tried.add(cand)
             entry = _wikt_fetch(cand)
             if entry:
+                _cache_put(ck, entry)
                 return entry
     best = None
     for cand in _wikt_search_titles(word):
@@ -500,6 +632,8 @@ def wiktionary(word):
         entry = _wikt_fetch(cand)
         if entry and (best is None or len(entry["defs"]) > len(best["defs"])):
             best = entry
+    if best:
+        _cache_put(ck, best)
     return best
 
 
@@ -2357,6 +2491,13 @@ def run_setup(ask_llm=True):
 
 def as_json(text, args):
     """JSON representation of a lookup — for a graphical front-end."""
+    out = _as_json(text, args)
+    if _FALLBACK_NOTE and "note" not in out:
+        out["note"] = _FALLBACK_NOTE
+    return out
+
+
+def _as_json(text, args):
     text = text.strip()
     out = {"query": text}
     if not text:
@@ -2573,4 +2714,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        cache_flush()
