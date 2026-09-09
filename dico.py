@@ -561,7 +561,53 @@ def _parse_wiktionary(wikitext):
     if not (defs or ipa or gender):
         return None
     return {"pos": pos, "ipa": ipa, "gender": gender, "defs": defs,
-            "etym": _etymology(sec)}
+            "etym": _etymology(sec),
+            "syn": _wikt_bullets(sec, "synonymes"),
+            "homo": _wikt_bullets(sec, "homophones"),
+            "ru": _wikt_translations(sec, "ru"),
+            "audio": _wikt_audio_files(sec)}
+
+
+def _wikt_bullets(sec, name):
+    """The « * [[word]] » list under a {{S|name}} heading (synonyms, homophones)."""
+    m = re.search(r"\{\{S\|" + name + r"[|}][^\n]*\n(.*?)(?=\n=|\Z)", sec, re.S)
+    if not m:
+        return []
+    out = []
+    for line in m.group(1).splitlines():
+        if not line.startswith("*"):
+            continue
+        # Wiktionary writes these either as [[link]] or as {{lien|word|fr}};
+        # the register tags ({{familier}}, {{vieilli}}…) come along as a note.
+        words = (re.findall(r"\{\{lien\|([^|}]+)", line)
+                 + re.findall(r"\[\[([^\]|#]+)", line))
+        note = next((t for t in re.findall(r"\{\{(familier|vieilli|argot|soutenu|"
+                                           r"populaire|rare|vulgaire)[|}]", line)), "")
+        for w in words:
+            w = w.strip()
+            if w and not any(o["word"] == w for o in out):
+                out.append({"word": w, "note": note})
+    return out[:12]
+
+
+def _wikt_translations(sec, lang):
+    """« {{trad+|ru|кошка|tr=kóška|f}} » → [{"word", "tr", "gender"}]."""
+    out = []
+    for block in re.findall(r"\{\{T\|" + lang + r"\}\}([^\n]*)", sec):
+        for tpl in re.findall(r"\{\{trad[+\-]?\|" + lang + r"\|([^}]+)\}\}", block):
+            parts = [x.strip() for x in tpl.split("|")]
+            word = parts[0]
+            tr = next((x[3:] for x in parts[1:] if x.startswith("tr=")), "")
+            gender = next((x for x in parts[1:] if x in ("m", "f", "n")), "")
+            if word and not any(o["word"] == word for o in out):
+                out.append({"word": word, "tr": tr, "gender": gender})
+    return out[:10]
+
+
+def _wikt_audio_files(sec):
+    """Recording file names: « {{écouter|…|audio=Fr-chat.ogg}} »."""
+    files = [f.strip() for f in re.findall(r"audio\s*=\s*([^|}\n]+)", sec)]
+    return [f for f in dict.fromkeys(files) if f][:4]
 
 
 def _wikt_fetch(title):
@@ -618,7 +664,7 @@ def wiktionary(word):
     article), then an accent-tolerant search — keeping the RICHEST entry (avoids
     "étre" for "être", or "un" for "cuisinier"). Cached, like every other
     network source."""
-    ck = f"w:{word.strip().lower()}"
+    ck = f"w2:{word.strip().lower()}"     # w2 = the enriched entry (syn/homo/ru/audio)
     hit = _cache_get(ck)
     if hit is not None:
         return hit
@@ -643,6 +689,103 @@ def wiktionary(word):
     return best
 
 
+AUDIO_DIR = os.path.join(DATA_DIR, "audio")
+
+
+def _commons_mp3(filename):
+    """The URL of a Commons recording, as MP3.
+
+    Wikimedia stores these as .ogg/.wav — which macOS cannot play — but serves
+    an MP3 transcode of every one of them, so no ffmpeg is needed anywhere."""
+    api = ("https://fr.wiktionary.org/w/api.php?action=query&prop=imageinfo"
+           "&iiprop=url&format=json&formatversion=2&titles="
+           + urllib.parse.quote("File:" + filename))
+    try:
+        pages = json.loads(_get(api))["query"]["pages"]
+        orig = pages[0]["imageinfo"][0]["url"].split("?")[0]
+    except Exception:
+        return None
+    # …/commons/6/65/Fr-chat.ogg → …/commons/transcoded/6/65/Fr-chat.ogg/Fr-chat.ogg.mp3
+    m = re.match(r"(https://upload\.wikimedia\.org/wikipedia/commons)/(\w/\w\w)/(.+)$", orig)
+    if not m:
+        return None
+    base, path, name = m.groups()
+    if name.lower().endswith(".mp3"):
+        return orig
+    return f"{base}/transcoded/{path}/{name}/{name}.mp3"
+
+
+def audio_for(word):
+    """(local mp3 path, error) for a French word — downloaded once, then cached."""
+    try:
+        entry = wiktionary(word)
+    except Exception:
+        entry = None
+    files = (entry or {}).get("audio") or []
+    if not files:
+        return None, f"no recording for \u00ab {word} \u00bb on Wiktionary"
+    safe = re.sub(r"[^\w.-]", "_", files[0])
+    dest = os.path.join(AUDIO_DIR, safe + ".mp3")
+    if os.path.exists(dest) and os.path.getsize(dest) > 1000:
+        return dest, None
+    url = _commons_mp3(files[0])
+    if not url:
+        return None, "could not resolve the recording"
+    try:
+        os.makedirs(AUDIO_DIR, exist_ok=True)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r, open(dest + ".tmp", "wb") as f:
+            shutil.copyfileobj(r, f)
+        os.replace(dest + ".tmp", dest)
+    except Exception as e:
+        return None, str(e)
+    return dest, None
+
+
+def _show_audio(word):
+    """« say » — play the native recording (macOS: afplay handles the MP3)."""
+    path, err = audio_for(word)
+    if err:
+        print(f"  {DIM}🔈 {err}{RESET}")
+        return None
+    print(f"  🔈 {BOLD}{word}{RESET}  {DIM}(Wiktionnaire · Commons){RESET}")
+    player = shutil.which("afplay") or shutil.which("ffplay")
+    if not player:
+        print(f"     {DIM}{path}{RESET}")
+        return path
+    try:
+        subprocess.run([player, path] + ([] if player.endswith("afplay")
+                                         else ["-nodisp", "-autoexit"]),
+                       check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        print(f"     {DIM}({e}){RESET}")
+    return path
+
+
+def _show_synonyms(word):
+    """« syn » — synonyms and homophones, from the Wiktionnaire."""
+    try:
+        entry = wiktionary(word)
+    except Exception:
+        entry = None
+    syn = (entry or {}).get("syn") or []
+    homo = (entry or {}).get("homo") or []
+    if syn:
+        print(f"  {CYAN}≈ synonymes de {word}{RESET}  {_wikt_words(syn, 12)}")
+    if homo:
+        print(f"  {CYAN}♪ homophones{RESET}  {_wikt_words(homo, 12)}")
+    if not (syn or homo):
+        print(f"  {DIM}≈ no synonyms listed for « {word} »{RESET}")
+
+
+def _wikt_words(items, limit=8):
+    """[{"word","note"}] → « minet · greffier (familier) · matou »."""
+    out = []
+    for it in items[:limit]:
+        out.append(it["word"] + (f" {DIM}({it['note']}){RESET}" if it.get("note") else ""))
+    return " · ".join(out)
+
+
 def _show_wikt(lookup_word):
     try:
         entry = wiktionary(lookup_word)
@@ -661,6 +804,12 @@ def _show_wikt(lookup_word):
             print(f"     {DIM}{i}.{RESET} {d}")
         if entry.get("etym"):
             print(f"     {DIM}🌱 etym. {entry['etym']}{RESET}")
+        if entry.get("syn"):
+            print(f"     {DIM}≈ synonymes{RESET} {_wikt_words(entry['syn'])}")
+        if entry.get("homo"):
+            print(f"     {DIM}♪ homophones{RESET} {_wikt_words(entry['homo'])}")
+        if entry.get("audio"):
+            print(f"     {DIM}🔈 « say » to hear it{RESET}")
     else:
         print(f"  {DIM}📖 (no Wiktionary entry for \u00ab {lookup_word} \u00bb){RESET}")
     return entry
@@ -1737,10 +1886,33 @@ def _show_multitran(word):
             print(f"     {ln}")
         if len(lines) > 40:
             print(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
+    elif _show_wikt_ru(word):
+        pass                       # Wiktionary carried the Russian instead
     elif err:
         print(f"  {DIM}📚 Multitran: {err}{RESET}")
     else:
         print(f"  {DIM}📚 (not in Multitran {arrow}: « {word} »){RESET}")
+
+
+def _show_wikt_ru(word):
+    """Russian from the Wiktionnaire — what you get without Multitran
+    (proprietary, bring-your-own). True when something was printed."""
+    try:
+        entry = wiktionary(word)
+    except Exception:
+        return False
+    rows = (entry or {}).get("ru") or []
+    if not rows:
+        return False
+    print(f"  {CYAN}📚 russe {DIM}(Wiktionnaire){RESET}")
+    for r in rows[:8]:
+        bits = r["word"]
+        if r.get("tr"):
+            bits += f"  {DIM}[{r['tr']}]{RESET}"
+        if r.get("gender"):
+            bits += f"  {DIM}{r['gender']}.{RESET}"
+        print(f"     {bits}")
+    return True
 
 
 def _show_xray(sentence):
@@ -2154,7 +2326,7 @@ def show(word, want_dict=False, want_ai=False, want_save=False,
 # --------------------------------------------------------------------------- #
 #  Interactive mode                                                           #
 # --------------------------------------------------------------------------- #
-_FOLLOW_HINT = "↳  save N · conj · def · ru · ex · ? question"
+_FOLLOW_HINT = "↳  save N · conj · def · ru · ex · say · syn · ? question"
 
 
 def _follow_up(line):
@@ -2173,7 +2345,7 @@ def _follow_up(line):
         _print_cheatsheet()
         return True
     m = re.match(r"^(conj|conjugate|def|definition|define|ru|multitran|ex|examples|x|xray|x-ray"
-                 r"|grammar|check|xray)(?:\s+(.+))?$", low, re.I)
+                 r"|grammar|check|xray|say|listen|audio|syn|synonyms)(?:\s+(.+))?$", low, re.I)
     if not m:
         return False
     cmd, arg = m.group(1).lower(), (m.group(2) or "").strip()
@@ -2191,6 +2363,10 @@ def _follow_up(line):
             _show_wikt(fr)
         elif cmd in ("ru", "multitran"):
             _show_multitran(fr)
+        elif cmd in ("say", "listen", "audio"):
+            _show_audio(fr)
+        elif cmd in ("syn", "synonyms"):
+            _show_synonyms(fr)
         elif cmd in ("ex", "examples"):
             exs = _tatoeba(fr, "eng", limit=3) + _tatoeba(fr, "rus", limit=1)
             for s, t in exs:
@@ -2445,6 +2621,7 @@ def _print_cheatsheet():
             ("a French sentence", "grammar check + the rule"),
             ("save N", "save sense N of the last card"),
             ("conj · def · ru · ex", "on the last card — or give a word: « conj manger », « def maison »"),
+            ("say · syn", "hear a native recording · synonyms and homophones"),
             ("grammar · x [sentence]", "grammar check · x-ray, on the last sentence or the one you give"),
             ("? question", "ask the tutor, in context (?? = detailed)"),
             (":save on|off", "auto-save every lookup (also :forget word, :render, :llm, :spacy)"),
@@ -2588,14 +2765,33 @@ def _as_json(text, args):
         except Exception:
             pass
         out["definition"] = ({"word": e["lemma"], "ipa": e["ipa"], "gender": e["gender"],
-                              "pos": e["pos"], "defs": e["defs"], "etym": e.get("etym")}
+                              "pos": e["pos"], "defs": e["defs"], "etym": e.get("etym"),
+                              "syn": e.get("syn") or [], "homo": e.get("homo") or [],
+                              "ru": e.get("ru") or [], "has_audio": bool(e.get("audio"))}
                              if e else None)
+        return out
+    if args.say or args.syn:
+        e = None
+        try:
+            e = wiktionary(text)
+        except Exception:
+            pass
+        out["synonyms"] = (e or {}).get("syn") or []
+        out["homophones"] = (e or {}).get("homo") or []
+        if args.say:
+            path, err = audio_for(text)
+            out["audio"] = {"path": path, "error": err}
         return out
     if args.multitran:
         lines, direction, err = multitran_lookup(text)
         groups, _ = multitran_structured(text)
         out["multitran"] = {"direction": direction, "lines": lines or [], "groups": groups,
                             "error": err}
+        if not groups and not (lines or []):          # no Multitran → Wiktionary's Russian
+            try:
+                out["multitran"]["wiktionary_ru"] = (wiktionary(text) or {}).get("ru") or []
+            except Exception:
+                pass
         return out
     if args.conj:
         w, tense = _split_tense(text)
@@ -2675,6 +2871,10 @@ def main():
                    help="set up the tutor: local model, your own API key, or none")
     p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
     p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
+    p.add_argument("--say", action="store_true",
+                   help="play a native recording of the word (Wiktionary/Commons)")
+    p.add_argument("--syn", action="store_true",
+                   help="synonyms and homophones (Wiktionnaire)")
     p.add_argument("--examples", action="store_true",
                    help="example sentences for a French word (Tatoeba, EN + RU); with --json for GUIs")
     p.add_argument("--json", action="store_true",
@@ -2735,6 +2935,13 @@ def main():
 
     if not _data_ready() and args.words:
         print(f"  {DIM}(offline data not built — run: dico --setup){RESET}")
+    if args.words and (args.say or args.syn) and not args.json:
+        text = " ".join(args.words)
+        if args.syn:
+            _show_synonyms(text)
+        if args.say:
+            _show_audio(text)
+        return
     if args.words:
         show(" ".join(args.words), args.dico, args.ai, args.save,
              args.multitran, args.conj, args.profond, args.francais, args.save_main,
