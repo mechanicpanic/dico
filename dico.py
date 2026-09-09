@@ -2849,11 +2849,20 @@ def _as_json(text, args):
             e = wiktionary(target)
         except Exception:
             pass
-        out["definition"] = ({"word": e["lemma"], "ipa": e["ipa"], "gender": e["gender"],
-                              "pos": e["pos"], "defs": e["defs"], "etym": e.get("etym"),
-                              "syn": e.get("syn") or [], "homo": e.get("homo") or [],
-                              "ru": e.get("ru") or [], "has_audio": bool(e.get("audio"))}
-                             if e else None)
+        if e:
+            known = {_deaccent(h["word"]) for h in (e.get("homo") or [])}
+            homo = (e.get("homo") or []) + [{"word": w, "note": ""}
+                                            for w in homophones(e["lemma"])
+                                            if _deaccent(w) not in known]
+            lx = lexique_lookup(e["lemma"])
+            out["definition"] = {"word": e["lemma"], "ipa": e["ipa"] or (lx or {}).get("ipa"),
+                                 "gender": e["gender"], "pos": e["pos"], "defs": e["defs"],
+                                 "etym": e.get("etym"), "syn": e.get("syn") or [],
+                                 "homo": homo, "ru": e.get("ru") or [],
+                                 "cefr": (lx or {}).get("cefr") or "",
+                                 "has_audio": bool(e.get("audio"))}
+        else:
+            out["definition"] = None
         return out
     if args.say or args.syn:
         e = None
@@ -2910,8 +2919,14 @@ def _as_json(text, args):
         for term, back in terms:
             front, lx = _fr_head(term)
             senses.append({"pos": pos, "term": term, "front": front, "back": back,
-                           "gender": (lx["genre"] if lx else "") or "", "band": lx["band"] if lx else ""})
+                           "gender": (lx["genre"] if lx else "") or "",
+                           "band": lx["band"] if lx else "",
+                           "cefr": (lx or {}).get("cefr") or ""})
+    # The French RESULT deserves the same badges as a French query: what a
+    # learner wants to know about « cuisiner » does not depend on how they
+    # arrived at it.
     out.update({"direction": "to_fr", "src_lang": det or lang, "translation": tr,
+                "lexique": lexique_lookup(tr) if tr else None,
                 "senses": senses, "examples": _tatoeba(tr, "eng") if tr else []})
     return out
 

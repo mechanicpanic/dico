@@ -104,6 +104,11 @@ struct WordView: View {
                     Text("→").font(rounded(13, .medium)).foregroundStyle(.tertiary)
                     Text("🇫🇷").font(.system(size: 12))
                     Text(t).font(rounded(15, .semibold)).foregroundStyle(Palette.bleu)
+                    if let c = lookup.lexique?.cefr, !c.isEmpty { CEFRPill(level: c) }
+                    if let ipa = lookup.lexique?.ipa, !ipa.isEmpty {
+                        Text("/\(ipa)/").font(.system(size: 10.5, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -284,6 +289,7 @@ struct DefinitionBody: View {
                 if let g = def.gender, !g.isEmpty {
                     Text(g).font(rounded(10, .bold)).foregroundStyle(Palette.genderTint(g))
                 }
+                if let c = def.cefr, !c.isEmpty { CEFRPill(level: c) }
                 Spacer(minLength: 0)
             }
             ForEach(Array((def.defs ?? []).enumerated()), id: \.offset) { i, d in
@@ -598,6 +604,9 @@ struct SenseChip: View {
                 let stars = Palette.stars(sense.band)
                 if !stars.isEmpty {
                     Text(stars).font(.system(size: 8)).foregroundStyle(Palette.jaune)
+                }
+                if let c = sense.cefr, !c.isEmpty {
+                    Text(c).font(rounded(8.5, .bold)).foregroundStyle(.tertiary)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 5)

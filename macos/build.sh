@@ -10,6 +10,12 @@ RES="$APP/Contents/Resources"
 rm -rf "$APP"
 mkdir -p "$MACOS" "$RES"
 
+echo "→ icon…"
+# Regenerated only when the recipe changes: iconutil takes a couple of seconds.
+if [ ! -f build/Dico.icns ] || [ make_icon.swift -nt build/Dico.icns ]; then
+  xcrun swift make_icon.swift >/dev/null
+fi
+
 echo "→ compiling…"
 xcrun swiftc -O -parse-as-library \
   -target arm64-apple-macos14 \
@@ -32,6 +38,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key>    <string>14.0</string>
   <key>LSUIElement</key>               <true/>
   <key>NSHighResolutionCapable</key>   <true/>
+  <key>CFBundleIconFile</key>          <string>Dico</string>
   <!-- Right-click ▸ Services ▸ "Look up in Dico" — no permission needed. -->
   <key>NSServices</key>
   <array>
@@ -45,6 +52,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+cp build/Dico.icns "$RES/Dico.icns"
 
 # Ad-hoc signature: the global hotkey and keychain access like a stable identity.
 codesign --force --sign - "$APP" 2>/dev/null || true

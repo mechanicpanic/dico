@@ -1,0 +1,963 @@
+2026-09-09 11:45:10,127 - verbecc - INFO - verbs.py:29 - loaded verbecc config: VerbeccConfig(version=1, ENABLE_ML_PREDICTION=True, JSBEAUTIFIER_ENABLE=True, JSBEAUTIFIER_OPTS=JSBeautifierOpts(brace_style='expand', break_chained_methods=False, comma_first=False, e4x=False, end_with_newline=False, indent_char=' ', indent_empty_lines=False, indent_inner_html=False, indent_scripts='normal', indent_size=4, jslint_happy=False, keep_array_indentation=False, max_preserve_newlines=-1, preserve_newlines=False, space_before_conditional=True, unescape_strings=False, wrap_line_length=80), JSON_OPTS=JSONOpts(allow_nan=False, sort_keys=True, ensure_ascii=False, indent=4))
+2026-09-09 11:45:10,131 - verbecc - WARNING - model_utils.py:60 - Exception loading model data/models/trained_model-fr.zip: [Errno 2] No such file or directory: '/Users/aleph/.cache/uv/environments-v2/build-conjugations-e364b163d51f10c3/lib/python3.13/site-packages/verbecc/data/models/trained_model-fr.zip'
+Traceback (most recent call last):
+  File "/Users/aleph/.cache/uv/environments-v2/build-conjugations-e364b163d51f10c3/lib/python3.13/site-packages/verbecc/src/mlconjug/model_utils.py", line 50, in load_model
+    with ZipFile(f) as zf:
+         ~~~~~~~^^^
+  File "/Users/aleph/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/zipfile/__init__.py", line 1383, in __init__
+    self.fp = io.open(file, filemode)
+              ~~~~~~~^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/aleph/.cache/uv/environments-v2/build-conjugations-e364b163d51f10c3/lib/python3.13/site-packages/verbecc/data/models/trained_model-fr.zip'
+2026-09-09 11:45:10,133 - verbecc - INFO - predictor.py:23 - Could not load existing model, training new model...
+2026-09-09 11:45:12,326 - verbecc - INFO - model_utils.py:35 - Saved model pickle filename trained_model-fr.pickle to zip filename data/models/trained_model-fr.zip.
+2026-09-09 11:45:12,326 - verbecc - INFO - predictor.py:27 - Model training complete. Model saved to data/models/trained_model-fr.zip.
+2026-09-09 11:45:12,815 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,815 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,815 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,816 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,816 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,816 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,816 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,816 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,838 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:12,839 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:12,839 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:14,010 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:14,010 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:14,010 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:14,010 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,737 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=apparoir verb=infinitive=apparoir infinitive_no_accents=apparoir template=app:aroir translation_en=prove impersonal=False predicted=False pred_score=1.0 template=lang=fr name=app:aroir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['aroir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ert']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=app is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=apparoir verb=infinitive=apparoir infinitive_no_accents=apparoir template=app:aroir translation_en=prove impersonal=False predicted=False pred_score=1.0 template=lang=fr name=app:aroir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['aroir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ert']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=app is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=apparoir verb=infinitive=apparoir infinitive_no_accents=apparoir template=app:aroir translation_en=prove impersonal=False predicted=False pred_score=1.0 template=lang=fr name=app:aroir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['aroir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ert']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=app is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=apparoir verb=infinitive=apparoir infinitive_no_accents=apparoir template=app:aroir translation_en=prove impersonal=False predicted=False pred_score=1.0 template=lang=fr name=app:aroir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['aroir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ert']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=app is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=apparoir verb=infinitive=apparoir infinitive_no_accents=apparoir template=app:aroir translation_en=prove impersonal=False predicted=False pred_score=1.0 template=lang=fr name=app:aroir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['aroir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ert']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=app is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,738 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:16,739 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,453 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,454 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:18,668 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,197 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,198 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,957 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,957 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,957 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,957 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:22,975 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,888 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=chaloir verb=infinitive=chaloir infinitive_no_accents=chaloir template=cha:loir translation_en=matter impersonal=False predicted=False pred_score=1.0 template=lang=fr name=cha:loir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['loir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ut']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=cha is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=chaloir verb=infinitive=chaloir infinitive_no_accents=chaloir template=cha:loir translation_en=matter impersonal=False predicted=False pred_score=1.0 template=lang=fr name=cha:loir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['loir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ut']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=cha is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=chaloir verb=infinitive=chaloir infinitive_no_accents=chaloir template=cha:loir translation_en=matter impersonal=False predicted=False pred_score=1.0 template=lang=fr name=cha:loir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['loir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ut']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=cha is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=chaloir verb=infinitive=chaloir infinitive_no_accents=chaloir template=cha:loir translation_en=matter impersonal=False predicted=False pred_score=1.0 template=lang=fr name=cha:loir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['loir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ut']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=cha is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=chaloir verb=infinitive=chaloir infinitive_no_accents=chaloir template=cha:loir translation_en=matter impersonal=False predicted=False pred_score=1.0 template=lang=fr name=cha:loir mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['loir']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ut']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=cha is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:25,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:26,907 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,062 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,062 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,062 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,062 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:28,063 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:31,004 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:31,005 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,307 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,307 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,307 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,307 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,308 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,308 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,308 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,308 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:35,445 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,050 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,051 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,051 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,051 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,051 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,051 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:38,277 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:49,484 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,133 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,133 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,134 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,460 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,460 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,460 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,460 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,515 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,516 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,516 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,516 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:54,516 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:54,516 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,414 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,415 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,979 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,980 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:56,981 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,482 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,482 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,482 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,482 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:45:57,483 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:00,627 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:00,631 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:00,631 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:00,631 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,066 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,067 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,071 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,071 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,071 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:01,075 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:01,075 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,578 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,578 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:10,579 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:13,254 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:13,254 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:13,254 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:13,254 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:16,889 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:16,890 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:16,890 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:18,642 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:18,642 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:18,642 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:18,642 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:18,875 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:18,875 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:18,875 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:18,875 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:19,735 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:19,735 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:19,736 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:19,736 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:23,151 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:23,152 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,629 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,629 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,629 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["je suis"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,630 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["tu es"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,630 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["il est"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,631 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elle est"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,632 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["on est"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,633 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["nous sommes"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,636 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["vous êtes"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,637 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["ils sont"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,637 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elles sont"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,638 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,638 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,638 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["j'étais"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,639 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["tu étais"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,640 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["il était"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,641 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elle était"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,641 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["on était"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,642 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["nous étions"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,643 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["vous étiez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,644 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["ils étaient"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,645 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elles étaient"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,646 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,646 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,646 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["je serai"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,647 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["tu seras"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,648 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["il sera"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,648 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elle sera"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,649 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["on sera"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,650 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["nous serons"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,651 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["vous serez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,651 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["ils seront"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,652 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elles seront"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,653 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,653 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,653 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["je fus"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,654 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["tu fus"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,655 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["il fut"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,655 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elle fut"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,656 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["on fut"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,657 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["nous fûmes"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,658 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["vous fûtes"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,659 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["ils furent"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,660 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elles furent"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,660 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,660 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,661 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["je serais"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,661 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["tu serais"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,662 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["il serait"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,663 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elle serait"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,664 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["on serait"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,664 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["nous serions"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,665 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["vous seriez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,666 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["ils seraient"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,667 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["elles seraient"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,668 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,668 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,668 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que je sois"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,669 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que tu sois"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,669 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'il soit"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,670 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'elle soit"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,671 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'on soit"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,672 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que nous soyons"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,673 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que vous soyez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,673 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'ils soient"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,674 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'elles soient"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,675 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,675 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,675 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que je fusse"],
+    "n": "s",
+    "p": "1",
+    "pr": "je"
+} aux_verb=être
+2026-09-09 11:46:27,676 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que tu fusses"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,677 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'il fût"],
+    "g": "m",
+    "n": "s",
+    "p": "3",
+    "pr": "il"
+} aux_verb=être
+2026-09-09 11:46:27,678 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'elle fût"],
+    "g": "f",
+    "n": "s",
+    "p": "3",
+    "pr": "elle"
+} aux_verb=être
+2026-09-09 11:46:27,678 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'on fût"],
+    "n": "s",
+    "p": "3",
+    "pr": "on"
+} aux_verb=être
+2026-09-09 11:46:27,679 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que nous fussions"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,680 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["que vous fussiez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,681 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'ils fussent"],
+    "g": "m",
+    "n": "p",
+    "p": "3",
+    "pr": "ils"
+} aux_verb=être
+2026-09-09 11:46:27,682 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["qu'elles fussent"],
+    "g": "f",
+    "n": "p",
+    "p": "3",
+    "pr": "elles"
+} aux_verb=être
+2026-09-09 11:46:27,683 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,683 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:27,683 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["sois"],
+    "n": "s",
+    "p": "2",
+    "pr": "tu"
+} aux_verb=être
+2026-09-09 11:46:27,683 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["soyons"],
+    "n": "p",
+    "p": "1",
+    "pr": "nous"
+} aux_verb=être
+2026-09-09 11:46:27,684 - verbecc - WARNING - tense_conjugator_compound.py:317 - Skipping compound conjugation, participle conjugation is empty. aux_pc={
+    "c": ["soyez"],
+    "n": "p",
+    "p": "2",
+    "pr": "vous"
+} aux_verb=être
+2026-09-09 11:46:27,685 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:27,685 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:28,212 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,436 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,436 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,436 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,436 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:35,437 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,810 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,811 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_compound.py:240 - (aux verb not inflected) primary (participle) conjugation is empty: co=infinitive=sourdre verb=infinitive=sourdre infinitive_no_accents=sourdre template=s:ourdre translation_en=well up, to accumulate impersonal=False predicted=False pred_score=1.0 template=lang=fr name=s:ourdre mood_templates={<MoodFr.Infinitif: 'infinitif'>: lang=fr mood=infinitif tense_templates={<TenseFr.InfinitifPrésent: 'infinitif-présent'>: lang=fr mood=infinitif tense=infinitif-présent person_endings=[person=None number=None gender=None endings=['ourdre']]}, <MoodFr.Indicatif: 'indicatif'>: lang=fr mood=indicatif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=indicatif tense=présent person_endings=[person=3 number=s gender=None endings=['ourd'], person=3 number=p gender=None endings=['ourdent']], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=indicatif tense=imparfait person_endings=[person=3 number=s gender=None endings=['ourdait'], person=3 number=p gender=None endings=['ourdaient']], <TenseFr.FuturSimple: 'futur-simple'>: lang=fr mood=indicatif tense=futur-simple person_endings=[], <TenseFr.PasséSimple: 'passé-simple'>: lang=fr mood=indicatif tense=passé-simple person_endings=[]}, <MoodFr.Conditionnel: 'conditionnel'>: lang=fr mood=conditionnel tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=conditionnel tense=présent person_endings=[]}, <MoodFr.Subjonctif: 'subjonctif'>: lang=fr mood=subjonctif tense_templates={<TenseFr.Présent: 'présent'>: lang=fr mood=subjonctif tense=présent person_endings=[], <TenseFr.Imparfait: 'imparfait'>: lang=fr mood=subjonctif tense=imparfait person_endings=[]}, <MoodFr.Imperatif: 'imperatif'>: lang=fr mood=imperatif tense_templates={<TenseFr.ImperatifPrésent: 'imperatif-présent'>: lang=fr mood=imperatif tense=imperatif-présent person_endings=[]}, <MoodFr.Participe: 'participe'>: lang=fr mood=participe tense_templates={<TenseFr.ParticipePresent: 'participe-présent'>: lang=fr mood=participe tense=participe-présent person_endings=[], <TenseFr.ParticipePassé: 'participe-passé'>: lang=fr mood=participe tense=participe-passé person_endings=[]}} modify_stem= verb_stem=s is_reflexive=False p_mood=participe p_tense=participe-passé
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:36,812 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:36,813 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:37,038 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:37,039 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:37,039 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:42,089 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:42,089 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:42,089 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:42,090 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:42,090 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:42,090 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:42,090 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:42,090 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,756 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,756 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,756 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,756 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:59 - tense_template.person_endings is empty
+2026-09-09 11:46:47,897 - verbecc - WARNING - tense_conjugator_simple.py:104 - conjugation is empty

@@ -863,6 +863,22 @@ func runSelfTest() -> Int32 {
         return seen.joined(separator: " | ") + " | pill \(Int(pill.fittingSize.width))×\(Int(pill.fittingSize.height))"
     }
 
+    line("badges reach a translation card too") {
+        let l = try DicoClient.lookup("cook")
+        guard let lvl = l.lexique?.cefr, !lvl.isEmpty else {
+            throw Failed(why: "no CEFR level on the French result of « cook »")
+        }
+        guard let ipa = l.lexique?.ipa, !ipa.isEmpty else {
+            throw Failed(why: "no IPA on the French result of « cook »")
+        }
+        let graded = (l.senses ?? []).filter { !($0.cefr ?? "").isEmpty }
+        guard !graded.isEmpty else { throw Failed(why: "no sense carries a level") }
+        let host = NSHostingView(rootView: WordView(lookup: l, model: DicoModel(recentKey: testKey))
+            .frame(width: PanelSize.width - 32))
+        host.layoutSubtreeIfNeeded()
+        return "\(l.translation ?? "") \(lvl) /\(ipa)/ | \(graded.count)/\((l.senses ?? []).count) senses graded | card \(Int(host.fittingSize.height))pt"
+    }
+
     line("audio: a playable recording") {
         let a = try DicoClient.audio("vert")
         if let e = a.error, !e.isEmpty { throw Failed(why: e) }

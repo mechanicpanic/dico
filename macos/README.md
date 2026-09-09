@@ -144,6 +144,23 @@ Switching tutor backend clears the other backend's keys, exactly as
 - the tutor has to be configured — in **Settings ▸ Tutor**, or with
   `dico --llm`.
 
+## The icon
+
+`make_icon.swift` draws it with CoreGraphics and runs `iconutil` — no asset
+catalogue, no design tool. The mark is **« é »**: the accented letter, because
+typing accents is exactly what dico spares you. It sits on a cream page over a
+squircle running from French blue to rose.
+
+Below 32 pt the page and the letter fight over the same ten pixels, so the
+small sizes **drop the page** and show a white « é » straight on the gradient —
+same idea, still legible at 16. `build.sh` regenerates `build/Dico.icns` only
+when the recipe changes, and copies it into the bundle
+(`CFBundleIconFile`).
+
+```bash
+xcrun swift make_icon.swift    # → build/Dico.icns + build/icon-preview.png
+```
+
 ## Building
 
 ```bash
@@ -219,4 +236,5 @@ Sources/Selection.swift    the front app's selection (AX API, ⌘C fallback); th
 Sources/Shortcuts.swift    the shortcut catalogue, the ⌘/ sheet, the list
 Sources/SettingsView.swift the ⚙︎ window: tutor, vocabulary, general, data, keys
 Sources/DicoApp.swift      @main, menu bar, panel, the hotkey, --selftest
+make_icon.swift            draws the app icon (CoreGraphics → .icns)
 ```

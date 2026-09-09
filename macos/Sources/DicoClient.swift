@@ -12,6 +12,7 @@ struct Sense: Decodable, Hashable {
     var terms: [String]?
     var gender: String?
     var band: String?
+    var cefr: String?
 
     /// What the chip shows.
     var display: String { front ?? term ?? terms?.first ?? "?" }
@@ -151,6 +152,7 @@ struct Definition: Decodable {
     var pos: String?
     var defs: [String]?
     var etym: String?
+    var cefr: String?
     var syn: [WordNote]?
     var homo: [WordNote]?
     var ru: [RuTerm]?
