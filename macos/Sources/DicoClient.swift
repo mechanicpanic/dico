@@ -394,6 +394,13 @@ enum DicoClient {
     }
     /// `dico --backup`: pull, render, commit, push the cards. Slow-ish (git + network).
     struct Backup: Decodable { var repo: String?; var remote: String?; var steps: [String]?; var error: String? }
+    /// `dico --backup-init [URL]`: the cards get a repository of their own.
+    struct BackupInit: Decodable { var repo: String?; var remote: String?; var moved: Bool?; var pushed: Bool?; var error: String? }
+    static func backupInit(remote: String) throws -> BackupInit {
+        var args = ["--json", "--backup-init"]
+        if !remote.isEmpty { args.append(remote) }
+        return try call(BackupInit.self, args, timeout: 90)
+    }
     static func backup(pullOnly: Bool = false) throws -> Backup {
         try call(Backup.self, ["--json", pullOnly ? "--pull" : "--backup"], timeout: 90)
     }

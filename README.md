@@ -184,9 +184,21 @@ edit by hand, and `push_anki.py` reads the store directly. Curation is
 | `dico -s word` | save this word now (even when autosave is off) |
 | `dico --forget word` | drop a word (subtractive curation) |
 | `dico --render` | regenerate the markdown from the JSON store |
+| `dico --review` | review the saved words — spaced repetition, in the terminal |
+| `dico --enrich` | backfill gloss, example, IPA, CEFR and gender on every saved word |
+| `dico --backup-init [URL]` | give the cards a git repository of their own (and a remote) |
+| `dico --backup` / `--pull` | pull, render, commit and push the cards / only pull |
 
-Every save enriches the word with its **gender** (→ *un/une*), the accented
-lemma, the part of speech and the source language; repeats bump an `×N` counter.
+Every save enriches the word: **gender** (→ *un/une*), the accented lemma, the
+part of speech, an **English gloss**, a real **example sentence** with its
+translation (Tatoeba), **IPA** and **CEFR level** — everything a flashcard
+needs. Each word is a card: `dico --review` (or the popup's 🎴 Cards mode)
+schedules them with an Anki-style SM-2 whose state lives in the store.
+
+**Backup.** Once the cards have a repository (`--backup-init`, or Settings ▸
+Vocabulary ▸ Backup ▸ Turn on), every change is a commit; with a remote they
+are pushed and other machines can write to them. The popup pulls at launch and
+pushes after saves.
 Where the files live: `vocab_path` / `store_path` in `~/.dico_config.json`
 (the popup's Settings ▸ Vocabulary sets them), or `DICO_VOCAB` / `DICO_STORE`,
 which win over the config.

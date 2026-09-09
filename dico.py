@@ -1610,6 +1610,85 @@ def run_backup(as_json=False, pull_only=False):
         print(f"{GREEN}✓ cards backed up{RESET} {DIM}({done}) → {remote if ok_remote else repo}{RESET}")
 
 
+def _config_set(**kv):
+    """Write keys into ~/.dico_config.json (chmod 600), keeping the rest."""
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    for k, v in kv.items():
+        if v is None:
+            cfg.pop(k, None)
+        else:
+            cfg[k] = v
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    os.chmod(CONFIG_PATH, 0o600)
+
+
+def run_backup_init(remote="", as_json=False):
+    """dico --backup-init [URL]: give the cards a git repository of their own.
+
+    The store moves to <its folder>/cards/ (or stays where it is when that
+    folder is already a repo), gets a README and a .gitignore, a first
+    commit, and — with a URL — a remote and a first push. The config then
+    points at the new place and turns the automatic backup on."""
+    result = {"repo": "", "remote": remote or "", "moved": False, "pushed": False, "error": None}
+    repo = cards_repo()
+    if not repo:
+        base = os.path.dirname(os.path.abspath(STORE))
+        repo = base if os.path.basename(base) == "cards" else os.path.join(base, "cards")
+        os.makedirs(repo, exist_ok=True)
+        target = os.path.join(repo, "dico_vocab.json")
+        if os.path.abspath(STORE) != os.path.abspath(target):
+            if os.path.exists(STORE):
+                shutil.move(STORE, target)
+            elif not os.path.exists(target):
+                with open(target, "w", encoding="utf-8") as f:
+                    json.dump({"version": 1, "entries": []}, f)
+            result["moved"] = True
+            _config_set(store_path=target)
+            globals()["STORE"] = target
+        readme = os.path.join(repo, "README.md")
+        if not os.path.exists(readme):
+            with open(readme, "w", encoding="utf-8") as f:
+                f.write("# dico — cards\n\nThe vocabulary store of dico: every word looked up, with its "
+                        "gloss, example, IPA, CEFR level and spaced-repetition state. `dico_vocab.json` "
+                        "is the source of truth; `vocabulaire.md` is regenerated from it.\n\n"
+                        "`dico --backup` pulls, renders, commits and pushes.\n")
+        with open(os.path.join(repo, ".gitignore"), "w", encoding="utf-8") as f:
+            f.write(".DS_Store\n*.before-*.json\n")
+        ok, out = _git(["init", "-q", "-b", "main"], repo)
+        if not ok:
+            result["error"] = f"git init: {out or 'is git installed? (xcode-select --install)'}"
+            return print(json.dumps(result)) if as_json else print(f"{YELLOW}✗ {result['error']}{RESET}")
+        store_render(os.path.join(repo, "vocabulaire.md"))
+        _git(["add", "-A"], repo)
+        _git(["-c", "commit.gpgsign=false", "-c", "user.name=dico", "-c", "user.email=dico@localhost",
+              "commit", "-q", "-m", "cards: first backup"], repo)
+    result["repo"] = repo
+    if remote:
+        ok, cur = _git(["remote", "get-url", "origin"], repo)
+        if ok:
+            _git(["remote", "set-url", "origin", remote], repo)
+        else:
+            _git(["remote", "add", "origin", remote], repo)
+        ok, out = _git(["push", "-q", "-u", "origin", "HEAD"], repo)
+        result["pushed"] = ok
+        if not ok:
+            lines = out.splitlines() or ["?"]
+            last = next((l for l in lines if "fatal:" in l or "error:" in l or "denied" in l.lower()), lines[-1])
+            result["error"] = (f"push: {last.strip()} — create an empty repository at that address first "
+                               "(no README), then press again")
+    _config_set(cards_autosync=True)
+    if as_json:
+        return print(json.dumps(result, ensure_ascii=False))
+    if result["error"]:
+        print(f"{YELLOW}✗ {result['error']}{RESET}")
+    print(f"{GREEN}✓ cards repository:{RESET} {repo}" + (f"  → {remote}" if result["pushed"] else ""))
+
+
 def store_forget(word):
     data = store_load()
     k = store_key(word)
@@ -3348,6 +3427,8 @@ def main():
                    help="1 again · 2 hard · 3 good · 4 easy (with --grade)")
     p.add_argument("--backup", action="store_true",
                    help="pull, commit and push the cards (the store's folder must be a git repo)")
+    p.add_argument("--backup-init", nargs="?", const="", metavar="URL",
+                   help="give the cards a git repository of their own (with a remote, when a URL is given)")
     p.add_argument("--pull", action="store_true",
                    help="only pull what other sources wrote to the cards")
     p.add_argument("--paths", action="store_true",
@@ -3401,6 +3482,8 @@ def main():
         if card is None:
             return print(json.dumps({"error": f"no card « {args.grade} »"}, ensure_ascii=False))
         return print(json.dumps({"card": card}, ensure_ascii=False))
+    if args.backup_init is not None:
+        return run_backup_init(args.backup_init, as_json=args.json)
     if args.backup or args.pull:
         return run_backup(as_json=args.json, pull_only=args.pull)
     if args.paths:

@@ -359,6 +359,8 @@ struct VocabularyTab: View {
     @State private var paths: DicoClient.Paths? = nil
     @State private var backingUp = false
     @State private var backupResult: String? = nil
+    @State private var remoteURL = ""
+    @State private var hasRemote = false
 
     var body: some View {
         ScrollView {
@@ -388,8 +390,9 @@ struct VocabularyTab: View {
 
                 SettingsCard(title: "Backup",
                              caption: (paths?.cards_repo ?? "").isEmpty
-                                ? "Put the store in a git repository with a remote and dico pulls, commits and pushes it — « dico --backup »."
-                                : "The cards live in a git repository; other machines and scripts can write to it. dico pulls at launch and pushes after saves.") {
+                                ? "Every change to the cards becomes a git commit, kept in a folder of their own. Add a remote (GitHub, Gitea, anything) and it is pushed there too — and other machines can write to it."
+                                : (hasRemote ? "The cards live in a git repository with a remote; other machines and scripts can write to it. dico pulls at launch and pushes after saves."
+                                             : "The cards have a git history on this Mac. Paste the address of an empty repository to push them somewhere.")) {
                     if let repo = paths?.cards_repo, !repo.isEmpty {
                         HStack(spacing: 10) {
                             Text(repo.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
@@ -399,10 +402,21 @@ struct VocabularyTab: View {
                         }
                         SwitchRow(title: "Back up to git after every save", isOn: $store.cardsAutosync)
                             .onChange(of: store.cardsAutosync) { _, _ in store.save() }
-                        if let r = backupResult {
-                            Text(r).font(sans(11.5)).foregroundStyle(r.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
-                                .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if (paths?.cards_repo ?? "").isEmpty || !hasRemote {
+                        HStack(spacing: 6) {
+                            Text("Remote").font(sans(12, .medium)).frame(width: 78, alignment: .leading)
+                            TextField("git@github.com:you/dico-cards.git  (optional)", text: $remoteURL)
+                                .modifier(WellField())
+                            PillButton(label: backingUp ? "Setting up…" : ((paths?.cards_repo ?? "").isEmpty ? "Turn on" : "Connect"),
+                                       help: "Create the repository, and push when an address is given", busy: backingUp) {
+                                setUp()
+                            }
                         }
+                    }
+                    if let r = backupResult {
+                        Text(r).font(sans(11.5)).foregroundStyle(r.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -419,7 +433,47 @@ struct VocabularyTab: View {
                 Spacer(minLength: 0)
             }
         }
-        .onAppear { Task.detached { let p = try? DicoClient.paths(); await MainActor.run { paths = p } } }
+        .onAppear { loadPaths() }
+    }
+
+    private func loadPaths() {
+        Task.detached {
+            let p = try? DicoClient.paths()
+            var remote = false
+            if let repo = p?.cards_repo, !repo.isEmpty {
+                let t = Process(); t.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                t.arguments = ["-C", repo, "remote", "get-url", "origin"]
+                t.standardOutput = Pipe(); t.standardError = Pipe()
+                try? t.run(); t.waitUntilExit()
+                remote = t.terminationStatus == 0
+            }
+            let r = remote
+            await MainActor.run { paths = p; hasRemote = r }
+        }
+    }
+
+    private func setUp() {
+        backingUp = true
+        backupResult = nil
+        let url = remoteURL.trimmingCharacters(in: .whitespaces)
+        Task.detached(priority: .userInitiated) {
+            let msg: String
+            do {
+                let r = try DicoClient.backupInit(remote: url)
+                if let e = r.error, !e.isEmpty { msg = "✗ \(e)" }
+                else {
+                    let where_ = (r.repo ?? "").replacingOccurrences(of: NSHomeDirectory(), with: "~")
+                    msg = "✓ cards repository at \(where_)" + ((r.pushed ?? false) ? " — pushed to \(r.remote ?? "")" : "")
+                }
+            } catch {
+                msg = "✗ \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
+            }
+            let out = msg
+            await MainActor.run {
+                backupResult = out; backingUp = false
+                store.reload(); loadPaths()
+            }
+        }
     }
 
     private func backupNow() {

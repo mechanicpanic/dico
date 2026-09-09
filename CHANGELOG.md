@@ -61,8 +61,10 @@ and a macOS popup.
   cards (« 20 cards to review — 0 due · 3 learning · 331 new », Review),
   the words saved lately with their gloss, and the recent searches. The
   four « try one » examples only greet a first run.
-- **The cards live in git.** Keep the store in a repository with a remote
-  and `dico --backup` pulls what other sources wrote, renders
+- **The cards live in git.** Settings ▸ Vocabulary ▸ Backup ▸ « Turn on »
+  (or `dico --backup-init [URL]`) moves the store into a folder of its own,
+  makes it a repository and, given the address of an empty remote, pushes
+  it. Then `dico --backup` pulls what other sources wrote, renders
   `vocabulaire.md`, commits and pushes; `dico --pull` only pulls. The app
   pulls at launch and backs up 20 s after a save (a minute after a grade),
   coalesced — Settings ▸ Vocabulary ▸ Backup switches that off.
