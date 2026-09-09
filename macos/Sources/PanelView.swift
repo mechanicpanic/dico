@@ -67,6 +67,12 @@ struct PanelView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dicoFocusField)) { _ in
             focused = true
         }
+        // Cards has no field; coming back to a mode that has one, the cursor
+        // must be in it again — the field is re-created, so give it a tick.
+        .onChange(of: model.mode) { _, m in
+            guard m != .cartes else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
+        }
     }
 
     // MARK: Query bar
