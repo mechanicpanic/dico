@@ -341,7 +341,7 @@ struct CEFRPill: View {
     var body: some View {
         Text(level).font(sans(9.5, .semibold)).tracking(0.6)
             .foregroundStyle(Palette.cefrTint(level))
-            .help("CEFR level \(level) — when a learner is expected to meet this word (FLELex)")
+            .help("Textbook level \(level) — the first CEFR level whose course books use this word (FLELex). A measure of curricula, not of difficulty: « chaton » is B1")
     }
 }
 
