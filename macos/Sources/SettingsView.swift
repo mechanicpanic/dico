@@ -366,6 +366,16 @@ struct VocabularyTab: View {
                     .onChange(of: store.autosave) { _, _ in store.save() }
                 }
 
+                SettingsCard(title: "Anki",
+                             caption: "The 🎴 Cards mode reviews this deck through Anki (with the AnkiConnect add-on, 2055492159) and can push every saved word into it.") {
+                    HStack(spacing: 6) {
+                        Text("Deck").font(sans(12, .medium)).frame(width: 78, alignment: .leading)
+                        TextField(AnkiClient.defaultDeck, text: $store.ankiDeck)
+                            .modifier(WellField())
+                            .onChange(of: store.ankiDeck) { _, _ in store.scheduleSave() }
+                    }
+                }
+
                 SettingsCard(title: "Vocabulary location", caption: envCaption) {
                     pathRow("Markdown", text: $store.vocabPath,
                             placeholder: ConfigStore.defaultVocabPath,

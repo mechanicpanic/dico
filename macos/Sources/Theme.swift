@@ -86,6 +86,7 @@ extension Mode {
         switch self {
         case .grammaire: return Palette.vert
         case .demander: return Palette.rose
+        case .cartes: return Palette.jaune
         default: return Palette.bleu
         }
     }
@@ -93,6 +94,7 @@ extension Mode {
         switch self {
         case .grammaire: return Palette.vertInk
         case .demander: return Palette.roseInk
+        case .cartes: return Palette.jauneInk
         default: return Palette.bleuInk
         }
     }
@@ -104,6 +106,7 @@ extension Mode {
         case .grammaire: return "Gram."
         case .rayonsX: return "X-ray"
         case .demander: return "Ask"
+        case .cartes: return "Cards"
         }
     }
 }

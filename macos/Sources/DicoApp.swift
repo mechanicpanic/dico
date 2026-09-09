@@ -269,6 +269,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             escape()
             return nil
         }
+        // 🎴 Cards: Space / ⏎ / 1–4 drive the review, with no modifier.
+        if event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+           model.reviewKey(event.charactersIgnoringModifiers ?? "", keyCode: event.keyCode) {
+            return nil
+        }
         guard event.modifierFlags.contains(.command) else { return event }
         let chars = (event.charactersIgnoringModifiers ?? "").lowercased()
         let shift = event.modifierFlags.contains(.shift)
@@ -392,6 +397,7 @@ func runSelfTest() -> Int32 {
             || m.contains("endpoint unreachable")
             || m.contains("no tutor")
             || m.contains("the tutor answered nothing")
+            || m.contains("anki is not running")
     }
 
     struct Failed: LocalizedError {
@@ -926,6 +932,51 @@ func runSelfTest() -> Int32 {
             + " | \(Int(host.fittingSize.height))pt"
     }
 
+    // ------------------------------------------------------------------ //
+    // 6d. 🎴 Cards: the review screen lays out; Anki itself is optional.
+    // ------------------------------------------------------------------ //
+    line("cards: review screen + HTML → lines") {
+        let lines = AnkiClient.lines(fromHTML: "hello / good morning<br><i>Bonjour, comment allez-vous ?</i>")
+        guard lines == ["hello / good morning", "Bonjour, comment allez-vous ?"] else {
+            throw Failed(why: "lines = \(lines)")
+        }
+        let model = DicoModel(recentKey: testKey)
+        model.mode = .cartes
+        model.review.cards = [AnkiCard(id: 1, front: "bonjour", back: "hello<br><i>Bonjour !</i>",
+                                       queue: 0, interval: 0, reps: 0, deck: "x")]
+        model.review.counts = AnkiCounts(new: 1)
+        let hidden = render(model)
+        model.reveal()
+        let shown = render(model)
+        guard model.review.revealed, model.reviewKey("3", keyCode: 0) else {
+            throw Failed(why: "the keys did not drive the review")
+        }
+        return "\(lines.count) lines | question \(hidden) → answer \(shown) | keys ✓"
+    }
+    line("cards: AnkiConnect") {
+        guard AnkiClient.reachable() else { throw Failed(why: "Anki is not running") }
+        let deck = AnkiClient.deck
+        let c = try AnkiClient.counts(deck: deck)
+        let q = try AnkiClient.queue(deck: deck)
+        // A real push and a real grade — in a throwaway deck, deleted afterwards.
+        let tmp = "Dico self-test \(Int(Date().timeIntervalSince1970))"
+        defer { _ = try? AnkiClient.invoke("deleteDecks", ["decks": [tmp], "cardsToo": true]) }
+        let n = try AnkiClient.push([("essai", "test<br><i>Un essai.</i>")], deck: tmp)
+        guard n == 1 else { throw Failed(why: "push added \(n) notes, expected 1") }
+        guard try AnkiClient.push([("essai", "test")], deck: tmp) == 0 else {
+            throw Failed(why: "a second push duplicated the card")
+        }
+        guard let card = try AnkiClient.queue(deck: tmp).first, card.front == "essai",
+              card.backLines == ["test", "Un essai."] else {
+            throw Failed(why: "the pushed card did not come back as expected")
+        }
+        try AnkiClient.answer(card, ease: 3)
+        guard try AnkiClient.queue(deck: tmp).first?.isLearning == true else {
+            throw Failed(why: "after Good, the card should be in learning")
+        }
+        return "\u{ab} \(deck) \u{bb} — \(c.new) new · \(c.learning) learning · \(c.due) due | queue \(q.count): \(q.prefix(3).map(\.front).joined(separator: " · ")) | push + grade round-trip in a temp deck ✓"
+    }
+
     line("menu bar mark is a template image") {
         let img = AppDelegate.menuBarMark()
         guard img.isTemplate else { throw Failed(why: "not a template: it will not follow dark mode") }
@@ -1078,6 +1129,17 @@ func renderShots(into dir: String) -> Int32 {
     }
     do {
         let m = model("dire"); m.showShortcuts = true; panel("70-shortcuts", m)
+    }
+    do {
+        let m = model(mode: .cartes)
+        m.review.cards = [AnkiCard(id: 1, front: "cuire", back: "to cook<br><i>Il faut cuire les légumes à feu doux.</i>",
+                                   queue: 2, interval: 4, reps: 3, deck: "x"),
+                          AnkiCard(id: 2, front: "un chat", back: "cat", queue: 0, interval: 0, reps: 0, deck: "x")]
+        m.review.counts = AnkiCounts(new: 42, learning: 0, due: 12)
+        panel("55-cards-question", m)
+        m.reveal(); panel("56-cards-answer", m)
+        let m2 = model(mode: .cartes); m2.review.unreachable = true; panel("57-cards-closed", m2)
+        let m3 = model(mode: .cartes); m3.review.graded = 14; panel("58-cards-done", m3)
     }
     do {
         let m = model("chat"); m.toast = "✓ \u{ab} un chat \u{bb} added"; panel("80-toast", m)

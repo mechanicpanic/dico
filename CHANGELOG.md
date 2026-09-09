@@ -44,6 +44,18 @@ and a macOS popup.
 - `Dico --shots DIR` renders every screen, dark and light, to PNG — off
   screen, for design review.
 
+### 🎴 Cards — Anki, in the panel
+- A sixth mode reviews the Anki deck (« Français — Vocabulaire », set in
+  Settings ▸ Vocabulary) through the AnkiConnect add-on: the front in serif,
+  Space or ⏎ for the answer, 1–4 or the buttons to grade. Anki keeps the
+  schedule; nothing touches the collection file. Learning cards come first,
+  then due reviews, then up to twenty new ones.
+- **Push saved words to Anki** sends every word dico saved that the deck
+  does not have yet (front = the word, back = meaning + example), without
+  duplicates. « Look it up » opens the Word card for the card on screen.
+- When Anki is closed the panel says so and can open it. `dico --paths`
+  reports where the config, vocabulary, store and data live.
+
 ### Looking things up
 - A real **dictionary card**: senses grouped by part of speech and numbered,
   article and gender on every noun, frequency in ★, back-translations, and a

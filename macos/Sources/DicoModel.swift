@@ -3,7 +3,7 @@ import AppKit
 
 /// The five modes of the panel.
 enum Mode: String, CaseIterable, Identifiable {
-    case mot, conjuguer, grammaire, rayonsX, demander
+    case mot, conjuguer, grammaire, rayonsX, demander, cartes
     var id: String { rawValue }
 
     var label: String {
@@ -13,6 +13,7 @@ enum Mode: String, CaseIterable, Identifiable {
         case .grammaire: return "Grammar"
         case .rayonsX: return "X-ray"
         case .demander: return "Ask"
+        case .cartes: return "Cards"
         }
     }
     var icon: String {
@@ -22,6 +23,7 @@ enum Mode: String, CaseIterable, Identifiable {
         case .grammaire: return "✅"
         case .rayonsX: return "🔬"
         case .demander: return "💬"
+        case .cartes: return "🎴"
         }
     }
     var placeholder: String {
@@ -31,6 +33,7 @@ enum Mode: String, CaseIterable, Identifiable {
         case .grammaire: return "a sentence to correct…"
         case .rayonsX: return "a sentence to dissect…"
         case .demander: return "a question for the tutor…"
+        case .cartes: return "reviewing — Space shows the answer, 1–4 grade"
         }
     }
 }
@@ -154,6 +157,9 @@ final class DicoModel: ObservableObject {
     @Published private(set) var lastOpened: Section? = nil
     /// The word the tutor is being asked about (set by the card's "Ask ?" button).
     @Published private(set) var askContext: String? = nil
+    /// 🎴 Cards: the Anki queue and where we are in it.
+    @Published var review = ReviewState()
+    @Published private(set) var ankiDeck: String = AnkiClient.defaultDeck
 
     /// Last word / sentence looked up — used as `--context` for the tutor.
     private(set) var lastContext: String = ""
@@ -249,6 +255,7 @@ final class DicoModel: ObservableObject {
     }
 
     func submit() {
+        if mode == .cartes { return }              // nothing to look up: the deck is the query
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { clearResults(); return }
         generation += 1
@@ -272,6 +279,7 @@ final class DicoModel: ObservableObject {
                 case .grammaire: result = .success(.grammaire(try DicoClient.grammar(q), q))
                 case .rayonsX:   result = .success(.rayonsX(try DicoClient.xray(q)))
                 case .demander:  result = .success(.reponse(try DicoClient.ask(q, context: ctx)))
+                case .cartes:    result = .success(.vide)
                 }
             } catch {
                 result = .failure(error)
@@ -444,11 +452,129 @@ final class DicoModel: ObservableObject {
 
     // MARK: What the keyboard shortcuts drive
 
-    /// ⌘⇧1…⌘⇧5 — switch mode, and re-run the current query in it.
+    /// ⌘⇧1…⌘⇧6 — switch mode, and re-run the current query in it.
     func setMode(_ m: Mode) {
         guard mode != m else { return }
         mode = m
+        if m == .cartes { startReview(); return }
         if !query.trimmingCharacters(in: .whitespaces).isEmpty { submit() }
+    }
+
+    // MARK: 🎴 Cards — Anki, through AnkiConnect
+
+    private var reviewGeneration = 0
+
+    /// Fetches the deck's queue. Called when the mode is picked.
+    func startReview() {
+        ankiDeck = AnkiClient.deck
+        let deck = ankiDeck
+        reviewGeneration += 1
+        let gen = reviewGeneration
+        review.loading = true
+        review.error = nil
+        review.unreachable = false
+        Task.detached(priority: .userInitiated) {
+            let outcome: Result<([AnkiCard], AnkiCounts), Error>
+            do {
+                let cards = try AnkiClient.queue(deck: deck)
+                let counts = try AnkiClient.counts(deck: deck)
+                outcome = .success((cards, counts))
+            } catch {
+                outcome = .failure(error)
+            }
+            await MainActor.run { [weak self] in
+                guard let self, gen == self.reviewGeneration else { return }
+                self.review.loading = false
+                self.review.launching = false
+                switch outcome {
+                case .success(let (cards, counts)):
+                    self.review.cards = cards
+                    self.review.counts = counts
+                    self.review.index = 0
+                    self.review.revealed = false
+                    self.review.unreachable = false
+                case .failure(let e):
+                    if case AnkiError.unreachable = e { self.review.unreachable = true }
+                    else { self.review.error = (e as? LocalizedError)?.errorDescription ?? "\(e)" }
+                }
+            }
+        }
+    }
+
+    func reveal() {
+        guard review.current != nil else { return }
+        review.revealed = true
+    }
+
+    /// 1 again · 2 hard · 3 good · 4 easy — sent to Anki, then the next card.
+    func grade(_ ease: Int) {
+        guard review.revealed, let card = review.current, (1...4).contains(ease) else { return }
+        review.error = nil
+        Task.detached(priority: .userInitiated) {
+            var problem: String? = nil
+            do { try AnkiClient.answer(card, ease: ease) }
+            catch { problem = (error as? LocalizedError)?.errorDescription ?? "\(error)" }
+            let failed = problem
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if let failed { self.review.error = failed; return }
+                self.review.graded += 1
+                if ease == 1 {                       // again: it comes back at the end
+                    self.review.cards.append(card)
+                }
+                self.review.index += 1
+                self.review.revealed = false
+                if self.review.current == nil { self.startReview() }   // learning steps may be due again
+            }
+        }
+    }
+
+    /// Space / ⏎ / 1–4 while the Cards mode is up. Returns true when consumed.
+    func reviewKey(_ chars: String, keyCode: UInt16) -> Bool {
+        guard mode == .cartes else { return false }
+        if keyCode == 49 || keyCode == 36 {          // Space, Return
+            if review.revealed { grade(3) } else { reveal() }
+            return true
+        }
+        if review.revealed, let n = Int(chars), (1...4).contains(n) { grade(n); return true }
+        return false
+    }
+
+    func openAnki() {
+        review.launching = true
+        AnkiClient.launch()
+        // AnkiConnect comes up with Anki: poll for up to 20 s.
+        Task.detached(priority: .utility) {
+            for _ in 0..<40 {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if AnkiClient.reachable() { break }
+            }
+            await MainActor.run { [weak self] in self?.startReview() }
+        }
+    }
+
+    /// Every word dico saved, into the deck — the ones it does not have yet.
+    func pushToAnki() {
+        guard !review.pushing else { return }
+        review.pushing = true
+        review.pushed = nil
+        let deck = ankiDeck
+        Task.detached(priority: .userInitiated) {
+            let msg: String
+            do {
+                let rows = try AnkiClient.storeRows()
+                let n = try AnkiClient.push(rows, deck: deck)
+                msg = n == 0 ? "✓ Anki already has every saved word" : "✓ \(n) new card\(n == 1 ? "" : "s") in Anki"
+            } catch {
+                msg = "✗ \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+            }
+            let out = msg
+            await MainActor.run { [weak self] in
+                self?.review.pushing = false
+                self?.review.pushed = out
+                if out.hasPrefix("✓") { self?.startReview() }
+            }
+        }
     }
 
     /// The sections the current card offers — nil when there is no card.

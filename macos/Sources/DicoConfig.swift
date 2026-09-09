@@ -119,6 +119,8 @@ final class ConfigStore: ObservableObject {
     @Published var selection: Bool = true
     /// « system », « dark » or « light » — the panel and Settings follow it.
     @Published var appearance: String = "system"
+    /// The Anki deck the Cards mode reviews (AnkiConnect).
+    @Published var ankiDeck: String = ""
 
     init(path: String = ConfigPath.current) {
         self.path = path
@@ -142,6 +144,7 @@ final class ConfigStore: ObservableObject {
         hotkey = HotkeyChoice.from(string("popup_hotkey"))
         selection = bool(Selection.configKey) ?? true
         appearance = string(Appearance.configKey) ?? "system"
+        ankiDeck = string(AnkiClient.configKey) ?? ""
     }
 
     private func string(_ k: String) -> String? { raw[k] as? String }
@@ -186,6 +189,7 @@ final class ConfigStore: ObservableObject {
         put("popup_hotkey", hotkey.id)
         put(Selection.configKey, selection)
         put(Appearance.configKey, appearance == "system" ? nil : appearance)
+        put(AnkiClient.configKey, ankiDeck.trimmingCharacters(in: .whitespaces).isEmpty ? nil : ankiDeck)
         put("vocab_path", vocabPath.isEmpty ? nil : vocabPath)
         put("store_path", storePath.isEmpty ? nil : storePath)
 

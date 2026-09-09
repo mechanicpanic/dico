@@ -34,6 +34,7 @@ enum Shortcuts {
             .init(keys: "⌘⇧3", what: "✅ Grammar", group: "Modes"),
             .init(keys: "⌘⇧4", what: "🔬 X-ray", group: "Modes"),
             .init(keys: "⌘⇧5", what: "💬 Ask", group: "Modes"),
+            .init(keys: "⌘⇧6", what: "🎴 Cards", group: "Modes"),
 
             .init(keys: "⌘1…⌘9", what: "Save sense N", group: "Word card"),
             .init(keys: "⌘D", what: "Definitions — Wiktionary", group: "Word card"),
@@ -44,17 +45,21 @@ enum Shortcuts {
             .init(keys: "⌘P", what: "Hear it said", group: "Word card"),
 
             .init(keys: "⌘⇧C", what: "Copy the corrected sentence", group: "Grammar"),
+
+            .init(keys: "Space · ⏎", what: "Show the answer — then Good", group: "Cards"),
+            .init(keys: "1 · 2 · 3 · 4", what: "Again · Hard · Good · Easy", group: "Cards"),
         ]
     }
 
     /// In the order the sheet shows them.
-    static let groups = ["Panel", "Modes", "Word card", "Grammar"]
+    static let groups = ["Panel", "Modes", "Word card", "Grammar", "Cards"]
 
     /// The eyebrow of each group takes the accent of what it drives.
     static func tint(_ group: String) -> Color {
         switch group {
         case "Word card": return Palette.roseInk
         case "Grammar": return Palette.vertInk
+        case "Cards": return Palette.jauneInk
         default: return Palette.bleuInk
         }
     }
@@ -87,7 +92,9 @@ struct ShortcutsSheet: View {
                 .help("Close (Esc)")
             }
             .padding(.bottom, 14)
-            ShortcutsList(columns: 2, keyWidth: 76, keySize: 10, whatSize: 11.5, groupGap: 14)
+            ScrollView(showsIndicators: false) {
+                ShortcutsList(columns: 2, keyWidth: 76, keySize: 10, whatSize: 11.5, groupGap: 12)
+            }
             Spacer(minLength: 0)
             Text("The hotkey shown is the one set in Settings ▸ General.")
                 .font(sans(11)).foregroundStyle(Palette.ink(0.30))
@@ -114,10 +121,10 @@ struct ShortcutsList: View {
     var body: some View {
         let grouped = Shortcuts.grouped()
         if columns > 1 {
-            let half = (grouped.count + 1) / 2
+            // Panel + Modes on the left; what the results listen to on the right.
             HStack(alignment: .top, spacing: 26) {
-                column(Array(grouped.prefix(half)))
-                column(Array(grouped.dropFirst(half)))
+                column(Array(grouped.prefix(2)))
+                column(Array(grouped.dropFirst(2)))
             }
         } else {
             column(grouped)
@@ -127,7 +134,7 @@ struct ShortcutsList: View {
     private func column(_ groups: [(String, [Shortcut])]) -> some View {
         VStack(alignment: .leading, spacing: groupGap) {
             ForEach(groups, id: \.0) { name, items in
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Eyebrow(name, tint: Shortcuts.tint(name))
                     ForEach(items) { s in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {

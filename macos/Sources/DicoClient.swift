@@ -355,6 +355,10 @@ enum DicoClient {
         return nil
     }
 
+    /// Where the CLI keeps things — the store is what the Anki push reads.
+    struct Paths: Decodable { var config: String; var vocab: String; var store: String; var data: String }
+    static func paths() throws -> Paths { try call(Paths.self, ["--json", "--paths"]) }
+
     /// Runs the CLI and returns raw stdout. Blocking — call it off the main thread.
     static func raw(_ args: [String], timeout: TimeInterval = 30) throws -> String {
         _ = seedOnce                    // the databases must exist before the first call

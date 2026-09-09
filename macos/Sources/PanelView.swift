@@ -21,9 +21,13 @@ struct PanelView: View {
             }
             Rectangle().fill(Palette.hairline).frame(width: 1)
             VStack(spacing: 0) {
-                queryBar
-                Hairline(structural: true)
-                results
+                if model.mode == .cartes {
+                    ReviewView(model: model)
+                } else {
+                    queryBar
+                    Hairline(structural: true)
+                    results
+                }
                 if showsFooter {
                     Hairline(structural: true)
                     footer

@@ -2979,6 +2979,8 @@ def main():
     p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
     p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
     p.add_argument("--version", action="version", version=f"dico {__version__}")
+    p.add_argument("--paths", action="store_true",
+                   help="where the config, the vocabulary, the store and the data live (JSON with --json)")
     p.add_argument("--say", action="store_true",
                    help="play a native recording of the word (Wiktionary/Commons)")
     p.add_argument("--syn", action="store_true",
@@ -2998,6 +3000,14 @@ def main():
                         "pronouns, conjunctions, auxiliaries) — the grammatical scaffolding")
     args = p.parse_args()
 
+    if args.paths:
+        paths = {"config": CONFIG_PATH, "vocab": VOCAB, "store": STORE, "data": DATA_DIR,
+                 "home": DICO_HOME}
+        if args.json:
+            return print(json.dumps(paths, ensure_ascii=False))
+        for k, v in paths.items():
+            print(f"{k:7} {v}")
+        return
     if args.setup:
         return run_setup(ask_llm=not args.no_llm)
     if args.llm:
