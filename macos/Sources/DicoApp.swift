@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         DicoClient.seedDataIfNeeded()               // first run: unpack the bundled data
+        Appearance.apply(ConfigStore.readRaw(at: ConfigPath.current))
         NSApp.mainMenu = AppDelegate.editingMenu()   // ⌘C ⌘V ⌘A ⌘Z reach the text field
         buildStatusItem()
         buildPanel()

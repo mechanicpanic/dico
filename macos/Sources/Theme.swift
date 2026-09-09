@@ -122,6 +122,25 @@ extension Section {
     }
 }
 
+// MARK: - Appearance
+
+enum Appearance {
+    static let configKey = "popup_appearance"
+    static let choices: [(String, String)] = [("system", "System"), ("dark", "Dark"), ("light", "Light")]
+
+    /// Applies the configured appearance to every window of the app.
+    @MainActor static func apply(_ raw: [String: Any]) {
+        apply(raw[configKey] as? String ?? "system")
+    }
+    @MainActor static func apply(_ choice: String) {
+        switch choice {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: NSApp.appearance = nil
+        }
+    }
+}
+
 // MARK: - Geometry
 
 /// The content size of the panel. 600 pt fits the seven-tense grid.
@@ -260,6 +279,7 @@ struct ChipRow<T: Hashable>: View {
                         .foregroundStyle(on ? Palette.bleuInk : Palette.ink(0.65))
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
         }
     }

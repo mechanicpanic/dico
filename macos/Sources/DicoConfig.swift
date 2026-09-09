@@ -117,6 +117,8 @@ final class ConfigStore: ObservableObject {
     @Published var xraySpacy: Bool = true
     @Published var hotkey: HotkeyChoice = .fallback
     @Published var selection: Bool = true
+    /// « system », « dark » or « light » — the panel and Settings follow it.
+    @Published var appearance: String = "system"
 
     init(path: String = ConfigPath.current) {
         self.path = path
@@ -139,6 +141,7 @@ final class ConfigStore: ObservableObject {
         xraySpacy = bool("xray_spacy") ?? true
         hotkey = HotkeyChoice.from(string("popup_hotkey"))
         selection = bool(Selection.configKey) ?? true
+        appearance = string(Appearance.configKey) ?? "system"
     }
 
     private func string(_ k: String) -> String? { raw[k] as? String }
@@ -182,6 +185,7 @@ final class ConfigStore: ObservableObject {
         put("xray_spacy", xraySpacy)
         put("popup_hotkey", hotkey.id)
         put(Selection.configKey, selection)
+        put(Appearance.configKey, appearance == "system" ? nil : appearance)
         put("vocab_path", vocabPath.isEmpty ? nil : vocabPath)
         put("store_path", storePath.isEmpty ? nil : storePath)
 

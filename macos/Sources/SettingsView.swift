@@ -68,6 +68,7 @@ struct SettingsView: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    .focusable(false)
                 }
                 Spacer(minLength: 0)
             }
@@ -452,6 +453,15 @@ struct GeneralTab: View {
                     .onChange(of: store.xraySpacy) { _, _ in store.save() }
                 }
 
+                SettingsCard(title: "Appearance",
+                             caption: "The panel and this window. « System » follows macOS.") {
+                    ChipRow(items: Appearance.choices, selection: $store.appearance)
+                        .onChange(of: store.appearance) { _, a in
+                            store.save()
+                            Appearance.apply(a)
+                        }
+                }
+
                 SettingsCard(title: "Global hotkey",
                              caption: "Opens and closes the panel from any app. Registered with Carbon — no Accessibility permission is asked for.") {
                     ChipRow(items: HotkeyChoice.all.map { ($0.id, $0.display) },
@@ -500,6 +510,13 @@ struct GeneralTab: View {
         }
         .onAppear {
             loginItem = SMAppService.mainApp.status == .enabled
+            axTrusted = Selection.trusted
+        }
+        // The grant happens in System Settings: notice it without a click.
+        .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
+            if store.selection && !axTrusted { axTrusted = Selection.trusted }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             axTrusted = Selection.trusted
         }
     }
