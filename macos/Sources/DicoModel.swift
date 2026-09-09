@@ -157,6 +157,9 @@ final class DicoModel: ObservableObject {
     @Published private(set) var lastOpened: Section? = nil
     /// The word the tutor is being asked about (set by the card's "Ask ?" button).
     @Published private(set) var askContext: String? = nil
+    /// The empty screen, once there is a history: what is due, what was saved lately.
+    @Published private(set) var home: DicoClient.Deck? = nil
+    private var homeFetchedAt: Date = .distantPast
     /// 🎴 Cards: the Anki queue and where we are in it.
     @Published var review = ReviewState()
     @Published private(set) var ankiDeck: String = AnkiClient.defaultDeck
@@ -186,6 +189,18 @@ final class DicoModel: ObservableObject {
 
     /// Called after Settings changed the hotkey.
     func refreshHotkeyLabel() { hotkeyLabel = Shortcuts.globalHotkey }
+
+    // MARK: The empty screen
+
+    /// Refreshes what the empty screen shows — at most every 20 s unless forced.
+    func refreshHome(force: Bool = false) {
+        guard force || Date().timeIntervalSince(homeFetchedAt) > 20 else { return }
+        homeFetchedAt = Date()
+        Task.detached(priority: .utility) {
+            guard let d = try? DicoClient.due() else { return }
+            await MainActor.run { [weak self] in self?.home = d }
+        }
+    }
 
     // MARK: Recent list
 
@@ -501,7 +516,10 @@ final class DicoModel: ObservableObject {
             } catch {
                 msg = "⚠︎ not saved — \((error as? LocalizedError)?.errorDescription ?? "error")"
             }
-            await MainActor.run { [weak self] in self?.flash(msg) }
+            await MainActor.run { [weak self] in
+                self?.flash(msg)
+                if msg.hasPrefix("✓") { self?.refreshHome(force: true) }
+            }
         }
     }
 

@@ -368,7 +368,9 @@ enum DicoClient {
             }
         }
         struct Counts: Decodable { var learning: Int?; var due: Int?; var new: Int? }
+        struct Saved: Decodable, Hashable { var front: String?; var gloss: String? }
         var cards: [Card]?; var counts: Counts?
+        var total: Int?; var recent: [Saved]?
         var ankiCounts: AnkiCounts { AnkiCounts(new: counts?.new ?? 0, learning: counts?.learning ?? 0, due: counts?.due ?? 0) }
     }
     static func due() throws -> Deck { try call(Deck.self, ["--json", "--due"]) }

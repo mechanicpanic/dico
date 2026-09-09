@@ -57,6 +57,10 @@ and a macOS popup.
   there), then a real example sentence and its translation — the card's own
   when the lookup had one, Tatoeba otherwise. `dico --enrich` backfills all
   of this on the words saved before.
+- **The empty screen is yours.** Once there is a history it shows today's
+  cards (« 20 cards to review — 0 due · 3 learning · 331 new », Review),
+  the words saved lately with their gloss, and the recent searches. The
+  four « try one » examples only greet a first run.
 - **Anything can become a card.** ⌘S saves what is on screen: the phrase
   in the field, the corrected sentence in Grammar, the tutor's answer in
   Ask (front: the word it was about, back: the answer), sense 1 of a Word

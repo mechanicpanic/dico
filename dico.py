@@ -3311,7 +3311,13 @@ def main():
         return run_review()
     if args.due:
         cards, counts = srs_queue()
-        return print(json.dumps({"deck": "dico", "cards": cards, "counts": counts}, ensure_ascii=False))
+        entries = store_load()["entries"]
+        latest = sorted((e for e in entries if e.get("front") or e.get("lemma")),
+                        key=lambda e: e.get("last_seen", ""), reverse=True)[:6]
+        recent = [{"front": e.get("front") or e.get("lemma"), "gloss": (e.get("gloss") or e.get("sens") or "")}
+                  for e in latest]
+        return print(json.dumps({"deck": "dico", "cards": cards, "counts": counts,
+                                 "total": len(entries), "recent": recent}, ensure_ascii=False))
     if args.card:
         data = store_load()
         for e in data["entries"]:

@@ -191,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showPanel() {
         center()
+        model.refreshHome()
         model.shown = false
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -1110,7 +1111,12 @@ func renderShots(into dir: String) -> Int32 {
         return m
     }
 
-    panel("00-empty", model(recent: ["dire", "кошка", "chat", "cuire", "aller"]))
+    do {
+        let m = model(recent: ["dire", "кошка", "chat", "cuire", "aller"])
+        m.refreshHome(force: true)
+        for _ in 0..<40 where m.home == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
+        panel("00-empty", m)
+    }
     panel("00-firstrun", model())
 
     func card(_ name: String, _ q: String, section: Section?, content: ((String) throws -> SectionContent)?) {

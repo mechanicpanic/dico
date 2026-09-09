@@ -274,9 +274,13 @@ struct EmptyStateView: View {
         ("elle est parti", "to correct", .grammaire),
     ]
 
+    /// Someone with a deck and a history does not need the examples.
+    private var seasoned: Bool { !model.recent.isEmpty || (model.home?.total ?? 0) > 0 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 9) {
+            if seasoned { today }
+            if !seasoned { VStack(alignment: .leading, spacing: 9) {
                 Eyebrow("try one")
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
                           spacing: 8) {
@@ -294,7 +298,7 @@ struct EmptyStateView: View {
                         .help("Run \u{ab} \(ex.query) \u{bb}")
                     }
                 }
-            }
+            } }
 
             if !model.recent.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -307,13 +311,57 @@ struct EmptyStateView: View {
                         }
                     }
                 }
-            } else {
+            } else if !seasoned {
                 Text("\(model.hotkeyLabel) opens this from any app · ⌘/ shows every shortcut")
                     .font(sans(10.5)).foregroundStyle(Palette.ink(0.30))
             }
         }
         .padding(.top, 20).padding(.horizontal, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { model.refreshHome() }
+    }
+
+    /// « TODAY — 12 due · 3 learning · 20 new   Review → » and the last words saved.
+    private var today: some View {
+        let d = model.home
+        let c = d?.ankiCounts ?? AnkiCounts()
+        let waiting = c.due + c.learning + min(c.new, 20)
+        return VStack(alignment: .leading, spacing: 9) {
+            Eyebrow("today", trailing: AnyView(
+                Text("\(d?.total ?? 0) words in the deck").font(sans(10.5)).foregroundStyle(Palette.ink(0.30))))
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                if waiting > 0 {
+                    (Text("\(waiting) card\(waiting == 1 ? "" : "s") to review").foregroundStyle(Palette.ink)
+                        + Text(" — \(c.due) due · \(c.learning) learning · \(c.new) new").foregroundStyle(Palette.ink(0.4)))
+                        .font(sans(12.5))
+                    TintButton(label: "Review", keys: "⌘⇧6", tint: Palette.jaune, ink: Palette.jauneInk,
+                               help: "Open the Cards mode") { model.setMode(.cartes) }
+                } else if d != nil {
+                    Text("Nothing to review. Every word you look up becomes a card.")
+                        .font(sans(12.5)).foregroundStyle(Palette.ink(0.5))
+                } else {
+                    Text("…").font(sans(12.5)).foregroundStyle(Palette.ink(0.3))
+                }
+                Spacer(minLength: 0)
+            }
+            if let saved = d?.recent, !saved.isEmpty {
+                Eyebrow("saved lately").padding(.top, 8)
+                FlowLayout(spacing: 18, lineSpacing: 4) {
+                    ForEach(saved, id: \.self) { w in
+                        Button { model.run(w.front ?? "", mode: .mot) } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(w.front ?? "").font(serif(16)).foregroundStyle(Palette.ink(0.85))
+                                if let g = w.gloss, !g.isEmpty {
+                                    Text(g).font(sans(10.5)).foregroundStyle(Palette.ink(0.35)).lineLimit(1)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help("Look \u{ab} \(w.front ?? "") \u{bb} up again")
+                    }
+                }
+            }
+        }
     }
 }
 
