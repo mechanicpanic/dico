@@ -15,6 +15,9 @@ python3 build_conj_forms.py
 echo "==> Lexique 3.83 (frequency, lemmas, genders, function words)…"
 python3 build_lexique.py
 
+echo "==> FLELex (CEFR level A1…C2 for every lemma)…"
+python3 build_flelex.py
+
 echo "==> Grammalecte (offline grammar checker, for dico -g)…"
 python3 build_grammalecte.py
 

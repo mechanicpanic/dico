@@ -7,7 +7,9 @@ without dependencies: the lemma, the part of speech (cgram), the gender
 subtitles + books). It is used to:
   - enrich autosave (lemma/gender offline → no more network request);
   - show a frequency badge ("très courant" … "rare");
-  - extract the core function words (`dico --mots-outils`).
+  - extract the core function words (`dico --mots-outils`);
+  - the phonetic form and the syllables, and therefore the **homophones**
+    offline: every word sharing a `phon` value (vert / vair / ver / verre / vers).
 
 Downloads Lexique383.tsv if it is missing (~26 MB). The TSV is kept (a cached,
 un-versioned source) for fast rebuilds.
@@ -52,7 +54,8 @@ def main():
     con.execute("DROP TABLE IF EXISTS lexique")
     con.execute("""CREATE TABLE lexique (
         ortho TEXT, northo TEXT, lemme TEXT, cgram TEXT,
-        genre TEXT, nombre TEXT, freqfilms REAL, freqlivres REAL)""")
+        genre TEXT, nombre TEXT, freqfilms REAL, freqlivres REAL,
+        phon TEXT, syll TEXT, nbsyll INTEGER, nbhomoph INTEGER, morphoder TEXT)""")
     rows = []
     with open(TSV, encoding="utf-8") as f:
         f.readline()                          # header row
@@ -61,13 +64,20 @@ def main():
             if len(c) < 10 or not c[0]:
                 continue
             ortho, lemme, cgram, genre, nombre = c[0], c[2], c[3], c[4], c[5]
+            # phon/syll are Lexique's own phonetic alphabet ("vER" = /vɛʁ/);
+            # grouping on `phon` gives real homophones with no network at all.
+            phon, nbhomoph = c[1], c[12]
+            syll, nbsyll = (c[22], c[23]) if len(c) > 23 else ("", "")
+            morphoder = c[33] if len(c) > 33 else ""
             rows.append((ortho, deaccent(ortho), lemme, cgram, genre, nombre,
-                         fnum(c[8]), fnum(c[9])))      # freqfilms2, freqlivres
+                         fnum(c[8]), fnum(c[9]),       # freqfilms2, freqlivres
+                         phon, syll, int(fnum(nbsyll)), int(fnum(nbhomoph)), morphoder))
     con.executemany(
-        "INSERT INTO lexique VALUES (?,?,?,?,?,?,?,?)", rows)
+        "INSERT INTO lexique VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     con.execute("CREATE INDEX idx_lex_northo ON lexique(northo)")
     con.execute("CREATE INDEX idx_lex_ortho ON lexique(ortho)")
     con.execute("CREATE INDEX idx_lex_cgram ON lexique(cgram, freqfilms)")
+    con.execute("CREATE INDEX idx_lex_phon ON lexique(phon)")
     con.commit()
     n = con.execute("SELECT count(*) FROM lexique").fetchone()[0]
     con.close()

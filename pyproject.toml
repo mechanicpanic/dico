@@ -18,5 +18,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["dico.py", "build_conjugations.py", "build_conj_forms.py",
-                "build_lexique.py", "build_grammalecte.py", "build_multitran.py",
+                "build_lexique.py", "build_flelex.py", "build_grammalecte.py",
+                "build_multitran.py",
                 "setup.sh", "tools/xray_spacy.py"]

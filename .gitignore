@@ -14,3 +14,6 @@ data/*.tsv
 data/grammalecte/
 data/*.zip
 dist/
+data/*.csv
+data/audio/
+data/translate_cache.json

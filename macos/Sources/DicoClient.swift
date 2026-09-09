@@ -27,6 +27,12 @@ struct Lexique: Decodable {
     var nombre: String?
     var article: String?
     var band: String?
+    /// A1…C2 — the level a learner meets the word at (FLELex), which is a
+    /// different question from how frequent it is for a native (`band`).
+    var cefr: String?
+    /// Pronunciation, offline, from Lexique's own alphabet turned into IPA.
+    var ipa: String?
+    var syll: String?
 }
 
 struct Lookup: Decodable {

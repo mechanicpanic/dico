@@ -91,6 +91,13 @@ struct WordView: View {
                     Text("\(Palette.stars(b)) \(b)")
                         .font(rounded(10, .medium)).foregroundStyle(.tertiary)
                 }
+                if let c = lookup.lexique?.cefr, !c.isEmpty {
+                    CEFRPill(level: c)
+                }
+                if let ipa = lookup.lexique?.ipa, !ipa.isEmpty {
+                    Text("/\(ipa)/").font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
             } else if let t = lookup.translation, !t.isEmpty {
                 // « 🇷🇺 сказать → 🇫🇷 dire » — each side keeps its own flag.
                 HStack(spacing: 5) {
@@ -297,6 +304,27 @@ struct DefinitionBody: View {
             WordNoteRow(icon: "≈", title: "synonymes", words: def.syn ?? [])
             WordNoteRow(icon: "♪", title: "homophones", words: def.homo ?? [])
         }
+    }
+}
+
+/// The CEFR level as a pill, greener the earlier a learner meets the word.
+struct CEFRPill: View {
+    let level: String
+
+    private var tint: Color {
+        switch level.prefix(1) {
+        case "A": return Palette.vert
+        case "B": return Palette.bleu
+        default:  return Palette.rouge
+        }
+    }
+
+    var body: some View {
+        Text(level).font(rounded(10, .bold))
+            .padding(.horizontal, 5).padding(.vertical, 1.5)
+            .background(tint.opacity(0.18), in: Capsule())
+            .foregroundStyle(tint)
+            .help("CEFR level \(level) — when a learner is expected to meet this word (FLELex)")
     }
 }
 

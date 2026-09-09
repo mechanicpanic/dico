@@ -842,6 +842,27 @@ func runSelfTest() -> Int32 {
         return "syn \(syn.prefix(3).joined(separator: "·")) | homo \(homo.prefix(3).joined(separator: "·")) | ru \(first.word ?? "")\(tr) | body \(Int(host.fittingSize.height))pt, ru \(Int(ruHost.fittingSize.height))pt"
     }
 
+    line("CEFR level + offline IPA on the card") {
+        var seen: [String] = []
+        for (word, want) in [("maison", "A1"), ("neanmoins", "B1")] {
+            let l = try DicoClient.lookup(word)
+            guard let lvl = l.lexique?.cefr, lvl == want else {
+                throw Failed(why: "\(word) → \(l.lexique?.cefr ?? "nil"), wanted \(want)")
+            }
+            guard let ipa = l.lexique?.ipa, !ipa.isEmpty,
+                  ipa.rangeOfCharacter(from: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZ")) == nil else {
+                throw Failed(why: "\(word): « \(l.lexique?.ipa ?? "") » is not IPA")
+            }
+            seen.append("\(word) \(lvl) /\(ipa)/")
+            let host = NSHostingView(rootView: WordView(lookup: l, model: DicoModel(recentKey: testKey))
+                .frame(width: PanelSize.width - 32))
+            host.layoutSubtreeIfNeeded()
+        }
+        let pill = NSHostingView(rootView: CEFRPill(level: "B2"))
+        pill.layoutSubtreeIfNeeded()
+        return seen.joined(separator: " | ") + " | pill \(Int(pill.fittingSize.width))×\(Int(pill.fittingSize.height))"
+    }
+
     line("audio: a playable recording") {
         let a = try DicoClient.audio("vert")
         if let e = a.error, !e.isEmpty { throw Failed(why: e) }

@@ -427,7 +427,12 @@ def _render_card_fr(word, lex, examples=True):
         if head != word:
             bits.append(head)
         bits.append(lex["band"])
-    print(f"  🇫🇷 {BOLD}{word}{RESET}" + (f"   {DIM}{' · '.join(bits)}{RESET}" if bits else ""))
+        if lex.get("cefr"):
+            bits.append(lex["cefr"])
+    line = f"  🇫🇷 {BOLD}{word}{RESET}" + (f"   {DIM}{' · '.join(bits)}{RESET}" if bits else "")
+    if lex and lex.get("ipa"):
+        line += f"   {DIM}/{lex['ipa']}/{RESET}"
+    print(line)
     try:
         _, _, groups = translate_rich(word, tl="en", sl="fr")   # explicit sl → grouped senses
     except Exception:
@@ -770,6 +775,11 @@ def _show_synonyms(word):
         entry = None
     syn = (entry or {}).get("syn") or []
     homo = (entry or {}).get("homo") or []
+    # Lexique settles the homophones offline and exactly (same `phon`); the
+    # Wiktionnaire adds the ones it happens to list.
+    known = {_deaccent(h["word"]) for h in homo}
+    homo = homo + [{"word": w, "note": ""} for w in homophones(word)
+                   if _deaccent(w) not in known]
     if syn:
         print(f"  {CYAN}≈ synonymes de {word}{RESET}  {_wikt_words(syn, 12)}")
     if homo:
@@ -806,8 +816,12 @@ def _show_wikt(lookup_word):
             print(f"     {DIM}🌱 etym. {entry['etym']}{RESET}")
         if entry.get("syn"):
             print(f"     {DIM}≈ synonymes{RESET} {_wikt_words(entry['syn'])}")
-        if entry.get("homo"):
-            print(f"     {DIM}♪ homophones{RESET} {_wikt_words(entry['homo'])}")
+        homo = entry.get("homo") or []
+        known = {_deaccent(h["word"]) for h in homo}
+        homo = homo + [{"word": w, "note": ""} for w in homophones(entry["lemma"])
+                       if _deaccent(w) not in known]
+        if homo:
+            print(f"     {DIM}♪ homophones{RESET} {_wikt_words(homo)}")
         if entry.get("audio"):
             print(f"     {DIM}🔈 « say » to hear it{RESET}")
     else:
@@ -1616,7 +1630,8 @@ def lexique_lookup(word):
     w = (word or "").strip().lower()
     if not w:
         return None
-    cols = "ortho,lemme,cgram,genre,nombre,freqfilms,freqlivres"
+    cols = ("ortho,lemme,cgram,genre,nombre,freqfilms,freqlivres,"
+            "phon,syll,nbsyll,nbhomoph")
     try:
         con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
         rows = con.execute(f"SELECT {cols} FROM lexique WHERE ortho=? "
@@ -1630,14 +1645,81 @@ def lexique_lookup(word):
         return None
     if not rows:
         return None
-    ortho, lemme, cgram, genre, nombre, ff, fl = rows
+    ortho, lemme, cgram, genre, nombre, ff, fl, phon, syll, nbsyll, nbhomoph = rows
     article = None
     if (cgram or "").startswith("NOM"):
         article = {"m": "un", "f": "une"}.get(genre)
     return {"ortho": ortho, "lemma": lemme, "cgram": cgram,
             "pos": _cgram_label(cgram), "genre": genre or None,
             "nombre": nombre or None, "freqfilms": ff, "freqlivres": fl,
-            "article": article, "band": _freq_band(ff)}
+            "article": article, "band": _freq_band(ff),
+            "phon": phon or "", "ipa": sampa_to_ipa(phon or ""),
+            "syll": sampa_to_ipa(syll or ""), "nbsyll": nbsyll or 0,
+            "nbhomoph": nbhomoph or 0,
+            "cefr": cefr_level(lemme or ortho, cgram)}
+
+
+# Lexique writes pronunciations in its own SAMPA-like alphabet ("vER" = /vɛʁ/).
+# The table below turns it into IPA — offline, for every one of the 142 000
+# forms, so a word has a pronunciation even when Wiktionary has no recording.
+_SAMPA_IPA = {"A": "ɑ", "E": "ɛ", "O": "ɔ", "9": "œ", "2": "ø", "°": "ə",
+              "@": "ɑ̃", "§": "ɔ̃", "5": "ɛ̃", "1": "œ̃", "S": "ʃ", "Z": "ʒ",
+              "N": "ŋ", "J": "ɲ", "R": "ʁ", "8": "ɥ", "y": "y", "j": "j",
+              "w": "w", "g": "ɡ", "x": "x"}
+
+
+def sampa_to_ipa(phon):
+    return "".join(_SAMPA_IPA.get(c, c) for c in phon)
+
+
+def cefr_level(lemma, cgram=None):
+    """A1…C2 from FLELex — the level at which a learner is expected to meet the
+    word (a different question from how frequent it is for a native)."""
+    if not lemma or not os.path.exists(LEXIQUE_DB):
+        return None
+    try:
+        con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
+        if not con.execute("SELECT name FROM sqlite_master WHERE type='table' "
+                           "AND name='cefr'").fetchone():
+            con.close()
+            return None
+        w = lemma.strip().lower()
+        row = None
+        if cgram:
+            row = con.execute("SELECT level FROM cefr WHERE nlemma=? AND cgram=? "
+                              "ORDER BY freq DESC LIMIT 1",
+                              (_deaccent(w), (cgram or "")[:3])).fetchone()
+        if row is None:
+            row = con.execute("SELECT level FROM cefr WHERE nlemma=? "
+                              "ORDER BY freq DESC LIMIT 1", (_deaccent(w),)).fetchone()
+        con.close()
+    except Exception:
+        return None
+    return row[0] if row else None
+
+
+def homophones(word, limit=10):
+    """Offline homophones: every other spelling with the same Lexique `phon`
+    (vert → vair · ver · verre · vers). Beats a network lookup, and it is exact."""
+    if not os.path.exists(LEXIQUE_DB):
+        return []
+    lex = lexique_lookup(word)
+    if not lex or not lex.get("phon"):
+        return []
+    try:
+        con = sqlite3.connect(f"file:{LEXIQUE_DB}?mode=ro", uri=True)
+        rows = con.execute(
+            "SELECT ortho, lemme, max(freqfilms) f FROM lexique WHERE phon=? "
+            "GROUP BY ortho ORDER BY f DESC", (lex["phon"],)).fetchall()
+        con.close()
+    except Exception:
+        return []
+    # « verts » is not a homophone of « vert », it is the same word: drop
+    # everything that shares its lemma.
+    mine = _deaccent(lex.get("lemma") or lex["ortho"])
+    me = _deaccent(lex["ortho"])
+    return [o for o, lem, _ in rows
+            if _deaccent(o) != me and _deaccent(lem or o) != mine][:limit]
 
 
 # English gloss (+ a usage hint for the trickiest ones) for the function words.
@@ -2447,7 +2529,9 @@ def _save_term(french, sens, src_lang="en", tier="google", quiet=False):
     lemma = (lex["lemma"] if lex else french)
     rec = {"key": store_key(lemma), "front": front, "lemma": lemma, "sens": sens,
            "pos": (lex["pos"] if lex else ""), "gender": (lex["genre"] if lex else "") or "",
-           "example": "", "src_word": sens, "src_lang": src_lang, "tier": tier}
+           "example": "", "src_word": sens, "src_lang": src_lang, "tier": tier,
+           # Offline extras, so a card carries them into Anki/Obsidian too.
+           "cefr": (lex or {}).get("cefr") or "", "ipa": (lex or {}).get("ipa") or ""}
     status, cnt = store_upsert(rec)
     if quiet:
         return front, status, cnt
@@ -2676,6 +2760,7 @@ def run_setup(ask_llm=True):
     steps = [("Conjugations (verbecc, through uv)", ["uv", "run", os.path.join(_HERE, "build_conjugations.py")]),
              ("Form index (doit → devoir)", [sys.executable, os.path.join(_HERE, "build_conj_forms.py")]),
              ("Lexique 3.83 (frequency, genders)", [sys.executable, os.path.join(_HERE, "build_lexique.py")]),
+             ("FLELex (CEFR levels A1…C2)", [sys.executable, os.path.join(_HERE, "build_flelex.py")]),
              ("Grammalecte (dico -g)", [sys.executable, os.path.join(_HERE, "build_grammalecte.py")])]
     bundles = os.path.expanduser("~/Library/Dictionaries")
     if all(os.path.isdir(os.path.join(bundles, f"multitran_{d}.dictionary")) for d in ("rufr", "frru")):
@@ -2777,7 +2862,12 @@ def _as_json(text, args):
         except Exception:
             pass
         out["synonyms"] = (e or {}).get("syn") or []
-        out["homophones"] = (e or {}).get("homo") or []
+        known = {_deaccent(h["word"]) for h in ((e or {}).get("homo") or [])}
+        out["homophones"] = ((e or {}).get("homo") or []) + [
+            {"word": w, "note": ""} for w in homophones(text) if _deaccent(w) not in known]
+        lx = lexique_lookup(text)
+        out["cefr"] = (lx or {}).get("cefr")
+        out["ipa"] = (lx or {}).get("ipa")
         if args.say:
             path, err = audio_for(text)
             out["audio"] = {"path": path, "error": err}
