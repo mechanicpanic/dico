@@ -280,10 +280,58 @@ enum DicoClient {
     ]
 
     /// Possible locations of the script when the `dico` binary does not exist.
-    private static let scriptCandidates = [
-        NSHomeDirectory() + "/Projects/vibes/dico/dico.py",
-        NSHomeDirectory() + "/dico/dico.py",
-    ]
+    /// A checkout comes FIRST: on a machine that has one, its data directory is
+    /// the real one (it may hold Multitran, which the bundle never can). The
+    /// bundled copy is the fallback that makes the app work on its own.
+    private static var scriptCandidates: [String] {
+        var out = [NSHomeDirectory() + "/Projects/vibes/dico/dico.py",
+                   NSHomeDirectory() + "/dico/dico.py"]
+        if let bundled = bundledScript { out.append(bundled) }
+        return out
+    }
+
+    static var bundledScript: String? { Bundle.main.path(forResource: "dico", ofType: "py") }
+
+    /// Where the app keeps the offline databases: ~/.dico/data, the same place
+    /// the CLI uses. The bundle carries a copy, which is seeded on first run.
+    static var dataDir: String { NSHomeDirectory() + "/.dico/data" }
+
+    /// Set by resolve(): true when we fell back to the copy inside the app.
+    /// Only then do we impose ~/.dico — a script that lives in a checkout
+    /// resolves its own data directory, and that one may have Multitran in it.
+    private(set) static var usingBundledScript = false
+
+    /// Guards the seeding so it is attempted once per run, whichever entry
+    /// point gets there first (the panel, a Service, or --selftest).
+    private static let seedOnce: Bool = seedData()
+
+    /// Copies the databases out of the app bundle on first run — 20 MB, a
+    /// second or two, no network, no `uv`, no Terminal. This is what makes the
+    /// app work by being dragged to /Applications.
+    /// Returns true if it actually seeded something.
+    @discardableResult
+    static func seedDataIfNeeded() -> Bool { seedOnce }
+
+    private static func seedData() -> Bool {
+        let fm = FileManager.default
+        guard let packed = Bundle.main.resourcePath.map({ $0 + "/data" }),
+              fm.fileExists(atPath: packed) else { return false }
+        // Already there? A single file is enough to tell: the CLI checks each.
+        if fm.fileExists(atPath: dataDir + "/lexique.db") { return false }
+        try? fm.createDirectory(atPath: dataDir, withIntermediateDirectories: true)
+        var seeded = false
+        for item in (try? fm.contentsOfDirectory(atPath: packed)) ?? [] {
+            let dest = dataDir + "/" + item
+            guard !fm.fileExists(atPath: dest) else { continue }
+            do {
+                try fm.copyItem(atPath: packed + "/" + item, toPath: dest)
+                seeded = true
+            } catch {
+                continue
+            }
+        }
+        return seeded
+    }
 
     /// Resolves (executable, argument prefix).
     private static func resolve() -> (String, [String])? {
@@ -296,6 +344,9 @@ enum DicoClient {
         var scripts = scriptCandidates
         if let s = ProcessInfo.processInfo.environment["DICO_SCRIPT"] { scripts.insert(s, at: 0) }
         for s in scripts where FileManager.default.fileExists(atPath: s) {
+            usingBundledScript = (s == bundledScript)
+            // dico is pure standard library and runs on the python macOS ships
+            // (3.9), so no interpreter has to be installed either.
             for py in ["/opt/homebrew/bin/python3", "/usr/bin/python3", "/usr/local/bin/python3"]
             where FileManager.default.isExecutableFile(atPath: py) {
                 return (py, [s])
@@ -306,6 +357,7 @@ enum DicoClient {
 
     /// Runs the CLI and returns raw stdout. Blocking — call it off the main thread.
     static func raw(_ args: [String], timeout: TimeInterval = 30) throws -> String {
+        _ = seedOnce                    // the databases must exist before the first call
         guard let (exe, prefix) = resolve() else { throw DicoError.notFound }
 
         let task = Process()
@@ -314,6 +366,11 @@ enum DicoClient {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = searchPath.joined(separator: ":")
         env["PYTHONIOENCODING"] = "utf-8"
+        // The bundled script has no repo next to it: point it at ~/.dico.
+        if usingBundledScript {
+            if env["DICO_DATA"] == nil { env["DICO_DATA"] = dataDir }
+            if env["DICO_HOME"] == nil { env["DICO_HOME"] = NSHomeDirectory() + "/.dico" }
+        }
         task.environment = env
 
         let out = Pipe(), err = Pipe()
@@ -473,6 +530,11 @@ enum DicoClient {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = searchPath.joined(separator: ":")
         env["PYTHONIOENCODING"] = "utf-8"
+        // The bundled script has no repo next to it: point it at ~/.dico.
+        if usingBundledScript {
+            if env["DICO_DATA"] == nil { env["DICO_DATA"] = dataDir }
+            if env["DICO_HOME"] == nil { env["DICO_HOME"] = NSHomeDirectory() + "/.dico" }
+        }
         task.environment = env
 
         let pipe = Pipe()

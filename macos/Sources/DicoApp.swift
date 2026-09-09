@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let services = DicoServices()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DicoClient.seedDataIfNeeded()               // first run: unpack the bundled data
         NSApp.mainMenu = AppDelegate.editingMenu()   // ⌘C ⌘V ⌘A ⌘Z reach the text field
         buildStatusItem()
         buildPanel()
@@ -332,6 +333,7 @@ func runSelfTest() -> Int32 {
 
     let testKey = "dico.recent.selftest"
     var failures = 0
+    var skipped = 0
 
     /// Force the layout of the whole panel, off screen: this is what really
     /// exercises the rendering (FlowLayout, Grid, markdown…).
@@ -363,10 +365,29 @@ func runSelfTest() -> Int32 {
             let s = try body().replacingOccurrences(of: "\n", with: " ")
             print("✓ \(label): \(s.prefix(170))")
         } catch {
-            failures += 1
             let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            print("✗ \(label): \(msg)")
+            // Multitran needs proprietary dictionaries and the tutor needs a
+            // model: on a machine that has neither — which is every machine
+            // dico has just been installed on — that is not a failure.
+            if isOptional(msg) {
+                skipped += 1
+                print("⊘ \(label): \(msg.prefix(120)) — optional, skipped")
+            } else {
+                failures += 1
+                print("✗ \(label): \(msg)")
+            }
         }
+    }
+
+    /// True when the message only says an optional extra is absent.
+    func isOptional(_ msg: String) -> Bool {
+        let m = msg.lowercased()
+        return m.contains("multitran not installed")
+            || m.contains("empty response")
+            || m.contains("no model loaded")
+            || m.contains("endpoint unreachable")
+            || m.contains("no tutor")
+            || m.contains("the tutor answered nothing")
     }
 
     struct Failed: LocalizedError {
@@ -941,7 +962,8 @@ func runSelfTest() -> Int32 {
         return "[\(a.model ?? "?")] \(text.prefix(60))"
     }
 
-    print(failures == 0 ? "✓ all good" : "✗ \(failures) failure(s)")
+    let tail = skipped > 0 ? " (\(skipped) optional skipped)" : ""
+    print(failures == 0 ? "✓ all good\(tail)" : "✗ \(failures) failure(s)\(tail)")
     return failures == 0 ? 0 : 1
 }
 

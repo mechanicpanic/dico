@@ -60,6 +60,22 @@ sed -i '' "s/__VERSION__/$VERSION/g" "$APP/Contents/Info.plist"
 
 cp build/Dico.icns "$RES/Dico.icns"
 
+# Self-contained: the CLI and the offline databases ride inside the app, so it
+# works by being dragged to /Applications — no uv, no Python to install, no
+# Terminal, no setup step. (~20 MB of data; Multitran stays bring-your-own.)
+cp ../dico.py "$RES/dico.py"
+DATA_SRC="${DICO_DATA:-../data}"
+if [ "${SKIP_DATA:-}" != "1" ] && [ -f "$DATA_SRC/lexique.db" ]; then
+  mkdir -p "$RES/data"
+  for f in lexique.db conjugations.db; do
+    [ -f "$DATA_SRC/$f" ] && cp "$DATA_SRC/$f" "$RES/data/$f"
+  done
+  [ -d "$DATA_SRC/grammalecte" ] && cp -R "$DATA_SRC/grammalecte" "$RES/data/grammalecte"
+  echo "  bundled data: $(du -sh "$RES/data" | cut -f1)"
+else
+  echo "  (no data bundled — build it with ./setup.sh in the repo root)"
+fi
+
 # Ad-hoc signature: the global hotkey and keychain access like a stable identity.
 codesign --force --sign - "$APP" 2>/dev/null || true
 
