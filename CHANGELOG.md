@@ -1,6 +1,27 @@
 # Changelog
 
-## 1.0.0 — 2026-09-09
+## 0.9.1 — 2026-09-09
+
+Installing it used to mean: get access to the repository, install `uv`, install
+the CLI, run `dico --setup` (which needs `uv` again), then build the app. This
+release is the one you can hand to a person.
+
+- **Nothing to install.** `Dico.app` carries the dictionary code and the 71 MB
+  of offline data (Lexique, conjugations, Grammalecte) inside it, and unpacks
+  the databases into `~/.dico/data` the first time it is asked for anything.
+  dico is pure standard library and runs on the Python macOS already ships, so
+  there is no Python to install, no `uv`, no Terminal and no setup step.
+- **A DMG**: drag Dico to Applications, press ⌥D. `READ ME FIRST.txt` explains
+  the one-off Gatekeeper block (System Settings ▸ Privacy & Security ▸ Open
+  Anyway — Apple removed right-click ▸ Open in macOS 15).
+- **A first run that teaches itself**: four examples to click instead of an
+  empty box, and a line naming the key that opens the panel from anywhere.
+- A checkout still wins over the bundled copy, so a machine with its own data
+  directory (with Multitran in it) keeps using that one.
+- The self-test reports absent *optional* extras — Multitran, a tutor — as
+  skips rather than failures, so a freshly installed machine reads as healthy.
+
+## 1.0.0 — unreleased
 
 The first release: a French dictionary for a Russian/English speaker, as a CLI
 and a macOS popup.
