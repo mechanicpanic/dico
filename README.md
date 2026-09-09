@@ -47,13 +47,17 @@ words:
 » def                 → dictionary definitions       (or: def maison)
 » ru                  → Russian, Multitran, offline  (or: ru chat)
 » ex                  → example sentences EN + RU    (or: ex partir)
+» say · syn           → hear it said · synonyms and homophones
 » grammar · x         → grammar check · x-ray, on the last sentence or one you give
 » ? is it formal      → ask the tutor about what you're looking at (?? = detailed)
 » help                → the cheat-sheet
 ```
 
 Sense 1 is the one autosave keeps; `save N` saves sense N — no more fighting
-with a translator that picked the wrong part of speech. **No need to type
+with a translator that picked the wrong part of speech. `say` plays a **native
+speaker recording** (Wiktionary/Commons), `syn` gives **synonyms with their
+register** (*greffier (familier)*) and **homophones** — `vert` → *vair · ver ·
+vers · verre*. **No need to type
 accents**: `etre` finds *être*, `creche` finds *crèche*.
 
 Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>` ·
@@ -73,6 +77,8 @@ Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>` ·
 | `dico -x "j'habitais à Lyon"` | **X-ray** — every word: lemma, tense, gender, role, meaning | no* 🔌 |
 | `dico -a "tu ou vous ?"` | **Tutor** — a question (`-p` for a detailed answer) | no* |
 | `dico -s house` | save this word now | yes |
+| `dico --say chat` | **native recording** (Wiktionary/Commons, MP3, cached) | yes |
+| `dico --syn heureux` | **synonyms + homophones** (Wiktionnaire) | yes |
 | `dico --mots-outils` | **grammatical core** (Lexique): articles, prepositions, pronouns… | **no** 🔌 |
 
 They combine: `dico -mc хотеть`, `dico -fc manger`. `*` local = no internet needed.
@@ -208,6 +214,10 @@ Without a database the matching feature is simply off (`-m` without Multitran,
 
 - Code: **MIT**. Everything else is downloaded from its own author by
   `dico --setup`, never redistributed here.
+- **Wiktionnaire / Wikimedia Commons** — definitions, etymology, synonyms,
+  homophones, Russian translations *and* the spoken recordings (CC BY-SA).
+  Multitran stays optional and bring-your-own; without it, `ru` answers from
+  the Wiktionnaire (with transliteration and gender).
 - **Lexique 3.83** (New, Pallier et al.) — CC BY-SA · **Tatoeba** — CC BY 2.0 fr ·
   **Grammalecte** (Olivier R.) — GPL 3 · **verbecc** — conjugations · **spaCy**
   `fr_core_news_md` — MIT/CC BY-SA · **Wiktionary** — CC BY-SA · **Multitran**:

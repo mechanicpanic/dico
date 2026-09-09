@@ -36,8 +36,9 @@ The card is the whole dictionary, not just the translation:
 
 | Button | What it opens | CLI behind it |
 |---|---|---|
-| **Definitions** | the Wiktionary entry: IPA, part of speech, numbered definitions, etymology | `-f` |
-| **Russian** | the offline Multitran entry **in full** — one section per part of speech, one row per sense (number + domain tag: общ., юр., тех., gener.…), the translations flowing separated by « · », each note in small italic grey right after its translation. Nothing is capped or truncated: long notes are whole example sentences and they wrap; the card scrolls. | `-m` |
+| **Definitions** | the Wiktionary entry: IPA, part of speech, numbered definitions, etymology, then **≈ synonymes** (each keeping its register: *greffier (familier)*) and **♪ homophones** as chips | `-f` |
+| **Listen 🔈** | a native speaker saying the word. Wikimedia stores the recordings as `.ogg`, which AppKit cannot play, and serves an **MP3 transcode** of each — that is what is downloaded (once, into `data/audio/`) and played through `NSSound`. | `--say` |
+| **Russian** | Multitran when it is installed; otherwise the **Wiktionnaire's** Russian translations with transliteration and gender (`кошка [kóška] f.`), so the section still answers on a machine without the proprietary dictionaries. Multitran itself is shown **in full** — one section per part of speech, one row per sense (number + domain tag: общ., юр., тех., gener.…), the translations flowing separated by « · », each note in small italic grey right after its translation. Nothing is capped or truncated: long notes are whole example sentences and they wrap; the card scrolls. | `-m` |
 | **Examples** | Tatoeba sentences: up to 4 with an English translation, then up to 2 with a Russian one (🇷🇺); the card's own example stays first unless Tatoeba already has it. “No examples found” when both lists are empty | `--examples` |
 | **Conjugate** | the conjugation grid, inline (verbs only) | `-c` |
 | **Ask ?** | switches to Ask with this word as the tutor's context | `-a --context` |
@@ -72,6 +73,7 @@ every button carries the same thing as a tooltip.
 | `⌘E` | Examples |
 | `⌘J` | Conjugate (on a verb card) |
 | `⌘L` | ask the tutor about this word |
+| `⌘P` | hear the word said by a native speaker |
 | `⌘⇧C` | copy the corrected sentence (Grammar) |
 | click outside | close |
 
@@ -178,6 +180,10 @@ top of that it:
   text rejected) and the mode pick (phrase → card, French sentence → Grammar,
   EN/RU sentence → card), the service selector and the `NSServices` entry in
   the built `Info.plist`, and that `popup_selection` round-trips (default on);
+- checks the Wiktionnaire's extra layers on « chat » — synonyms, homophones
+  and a Cyrillic translation — and lays out both the definition body and the
+  Russian fallback; downloads the recording for « vert » and checks `NSSound`
+  can open it (**without playing it**: a self-test stays silent);
 - runs the Settings ▸ Test call (`--json -a`) once.
 
 It prints one ✓ per line and exits non-zero on the first ✗.
