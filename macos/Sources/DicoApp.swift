@@ -355,7 +355,7 @@ func runSelfTest() -> Int32 {
     /// Lays the Word card out on its own, so the measured height is meaningful.
     func renderCard(_ model: DicoModel, _ lookup: Lookup) -> String {
         let host = NSHostingView(rootView:
-            WordView(lookup: lookup, model: model).frame(width: PanelSize.width - 32))
+            WordView(lookup: lookup, model: model).frame(width: PanelSize.content))
         host.layoutSubtreeIfNeeded()
         return "card \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height))"
     }
@@ -433,7 +433,7 @@ func runSelfTest() -> Int32 {
         // The card's own example must not be repeated once Tatoeba has it.
         let own = [["Dois-tu cuisiner ?", "Do you have to cook?"], ["Une phrase inédite.", "A brand-new sentence."]]
         let host = NSHostingView(rootView:
-            ExamplesBody(pack: p, own: own).frame(width: PanelSize.width - 60))
+            ExamplesBody(pack: p, own: own).frame(width: PanelSize.paneBody))
         host.layoutSubtreeIfNeeded()
         let merged = ExamplesBody(pack: p, own: own)
         return "\(en.count) en / \(ru.count) ru — \(en.first?.fr ?? "") / \(ru.first?.ru ?? "") | body \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height)) | \(merged.debugSummary)"
@@ -442,7 +442,7 @@ func runSelfTest() -> Int32 {
         let p = try DicoClient.examples("zzqqzzxyw")
         guard p.isEmpty else { throw Failed(why: "expected an empty pack") }
         let host = NSHostingView(rootView:
-            ExamplesBody(pack: p).frame(width: PanelSize.width - 60))
+            ExamplesBody(pack: p).frame(width: PanelSize.paneBody))
         host.layoutSubtreeIfNeeded()
         return "empty → \"No examples found\" (body \(Int(host.fittingSize.width))×\(Int(host.fittingSize.height)))"
     }
@@ -606,7 +606,7 @@ func runSelfTest() -> Int32 {
             }
         }
         // And it lays out — no fixed height, so the card just gets taller.
-        let host = NSHostingView(rootView: body.frame(width: PanelSize.width - 60))
+        let host = NSHostingView(rootView: body.frame(width: PanelSize.paneBody))
         host.layoutSubtreeIfNeeded()
         let size = host.fittingSize
         return "\(m.direction ?? "?") — \(groups.count) group(s), \(senses) sense(s), \(items) item(s), \(notes) note(s) all present | body \(Int(size.width))×\(Int(size.height))"
@@ -873,10 +873,10 @@ func runSelfTest() -> Int32 {
             throw Failed(why: "no Cyrillic translation for « chat »")
         }
         let host = NSHostingView(rootView:
-            DefinitionBody(def: d).frame(width: PanelSize.width - 40))
+            DefinitionBody(def: d).frame(width: PanelSize.paneBody))
         host.layoutSubtreeIfNeeded()
         let ruHost = NSHostingView(rootView:
-            WiktionaryRuBody(terms: ru).frame(width: PanelSize.width - 40))
+            WiktionaryRuBody(terms: ru).frame(width: PanelSize.paneBody))
         ruHost.layoutSubtreeIfNeeded()
         let tr = first.tr.map { " [\($0)]" } ?? ""
         return "syn \(syn.prefix(3).joined(separator: "·")) | homo \(homo.prefix(3).joined(separator: "·")) | ru \(first.word ?? "")\(tr) | body \(Int(host.fittingSize.height))pt, ru \(Int(ruHost.fittingSize.height))pt"
@@ -895,7 +895,7 @@ func runSelfTest() -> Int32 {
             }
             seen.append("\(word) \(lvl) /\(ipa)/")
             let host = NSHostingView(rootView: WordView(lookup: l, model: DicoModel(recentKey: testKey))
-                .frame(width: PanelSize.width - 32))
+                .frame(width: PanelSize.content))
             host.layoutSubtreeIfNeeded()
         }
         let pill = NSHostingView(rootView: CEFRPill(level: "B2"))
@@ -908,7 +908,7 @@ func runSelfTest() -> Int32 {
         model.forgetRecent()
         guard model.recent.isEmpty else { throw Failed(why: "recents were not cleared") }
         let host = NSHostingView(rootView: EmptyStateView(model: model)
-            .frame(width: PanelSize.width - 32))
+            .frame(width: PanelSize.content))
         host.layoutSubtreeIfNeeded()
         guard host.fittingSize.height > 120 else {
             throw Failed(why: "the first-run state is \(Int(host.fittingSize.height))pt — the examples are missing")
@@ -953,7 +953,7 @@ func runSelfTest() -> Int32 {
         let graded = (l.senses ?? []).filter { !($0.cefr ?? "").isEmpty }
         guard !graded.isEmpty else { throw Failed(why: "no sense carries a level") }
         let host = NSHostingView(rootView: WordView(lookup: l, model: DicoModel(recentKey: testKey))
-            .frame(width: PanelSize.width - 32))
+            .frame(width: PanelSize.content))
         host.layoutSubtreeIfNeeded()
         return "\(l.translation ?? "") \(lvl) /\(ipa)/ | \(graded.count)/\((l.senses ?? []).count) senses graded | card \(Int(host.fittingSize.height))pt"
     }
@@ -986,6 +986,116 @@ func runSelfTest() -> Int32 {
     return failures == 0 ? 0 : 1
 }
 
+// MARK: - Screenshots (`--shots DIR`): every screen, both appearances, off screen
+
+/// Renders the panel in each of its states — and the Settings tabs — to PNG
+/// files, without ever touching the screen. For design review.
+@MainActor
+func renderShots(into dir: String) -> Int32 {
+    _ = NSApplication.shared
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let testKey = "dico.recent.shots"
+    var count = 0
+
+    func png<V: View>(_ name: String, _ view: V, size: NSSize, dark: Bool) {
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(origin: .zero, size: size)
+        host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        host.layoutSubtreeIfNeeded()
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return }
+        let path = "\(dir)/\(name)-\(dark ? "dark" : "light").png"
+        try? data.write(to: URL(fileURLWithPath: path))
+        count += 1
+        print("→ \(path)")
+    }
+
+    func panel(_ name: String, _ model: DicoModel) {
+        model.shown = true
+        let size = NSSize(width: PanelSize.width + 2 * PanelSize.margin,
+                          height: PanelSize.height + 2 * PanelSize.margin)
+        for dark in [true, false] {
+            png(name, PanelView(model: model).background(dark ? Color.black : Color(white: 0.93)),
+                size: size, dark: dark)
+        }
+    }
+
+    func model(_ query: String = "", mode: Mode = .mot, recent: [String] = []) -> DicoModel {
+        UserDefaults.standard.set(recent, forKey: testKey)
+        let m = DicoModel(recentKey: testKey)
+        m.query = query
+        m.mode = mode
+        return m
+    }
+
+    panel("00-empty", model(recent: ["dire", "кошка", "chat", "cuire", "aller"]))
+    panel("00-firstrun", model())
+
+    func card(_ name: String, _ q: String, section: Section?, content: ((String) throws -> SectionContent)?) {
+        do {
+            let l = try DicoClient.lookup(q)
+            let m = model(q)
+            m.preload(card: l, query: q)
+            if let section, let content {
+                let term = m.cardTerm
+                m.preload(card: l, query: q, section: section, content: try content(term))
+            }
+            panel(name, m)
+        } catch {
+            print("⊘ \(name): \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
+        }
+    }
+    card("10-card-definitions", "cook", section: .definitions) { .definition(try DicoClient.definition($0)) }
+    card("11-card-examples", "chat", section: .exemples) { .examples(try DicoClient.examples($0)) }
+    card("12-card-russian", "chat", section: .russe) { .multitran(try DicoClient.multitran($0)) }
+    card("13-card-conj", "cuisiner", section: .conjugaison) { .conjugation(try DicoClient.conjugate($0)) }
+    card("14-card-ru-query", "кошка", section: .definitions) { .definition(try DicoClient.definition($0)) }
+
+    if let c = try? DicoClient.conjugate("dire") {
+        let m = model("dire", mode: .conjuguer); m.outcome = .conjugaison(c); panel("20-conjugate", m)
+    }
+    if let g = try? DicoClient.grammar("elle est parti hier avec ces amis") {
+        let m = model("elle est parti hier avec ces amis", mode: .grammaire)
+        m.outcome = .grammaire(g, "elle est parti hier avec ces amis"); panel("30-grammar", m)
+    }
+    if let t = try? DicoClient.xray("le chat noir dort sur la table") {
+        let m = model("le chat noir dort sur la table", mode: .rayonsX); m.outcome = .rayonsX(t); panel("40-xray", m)
+    }
+    do {
+        let m = model("quand employer le subjonctif ?", mode: .demander)
+        m.askAbout("dire"); m.query = "quand employer le subjonctif ?"
+        m.outcome = .reponse(Answer(answer: "Le subjonctif exprime ce qui n'est pas présenté comme un fait : le doute, le souhait, l'obligation.\n- Après **il faut que**, **bien que**, **pour que** : *il faut que tu dises la vérité*.\n- Après les verbes de volonté et d'émotion : **vouloir que**, **craindre que**.\n- Jamais après **après que**, malgré l'usage courant.", error: nil, model: "mistral-small-latest · local"))
+        panel("50-ask", m)
+    }
+    do {
+        let m = model("maison"); m.outcome = .erreur(.notInstalled); panel("60-not-installed", m)
+        let m2 = model("maison"); m2.outcome = .erreur(.plain("The tutor answered nothing — is LM Studio running?")); panel("61-error", m2)
+    }
+    do {
+        let m = model("dire"); m.showShortcuts = true; panel("70-shortcuts", m)
+    }
+    do {
+        let m = model("chat"); m.toast = "✓ \u{ab} un chat \u{bb} added"; panel("80-toast", m)
+    }
+
+    // Settings, every tab.
+    let dir2 = NSTemporaryDirectory() + "dico-shots-\(UUID().uuidString)"
+    try? FileManager.default.createDirectory(atPath: dir2, withIntermediateDirectories: true)
+    _ = ConfigStore.writeRaw(["llm": "local", "llm_model": "gemma-3-12b"], to: dir2 + "/config.json")
+    let store = ConfigStore(path: dir2 + "/config.json")
+    for (id, name) in SettingsView.tabs {
+        for dark in [true, false] {
+            png("90-settings-\(name.lowercased().replacingOccurrences(of: " ", with: "-"))",
+                SettingsView(store: store, initialTab: id), size: NSSize(width: 640, height: 540), dark: dark)
+        }
+    }
+    try? FileManager.default.removeItem(atPath: dir2)
+    UserDefaults.standard.removeObject(forKey: testKey)
+    print("✓ \(count) shots in \(dir)")
+    return 0
+}
+
 // MARK: - Entry point
 
 @main
@@ -993,6 +1103,9 @@ struct DicoMain {
     @MainActor static func main() {
         if CommandLine.arguments.contains("--selftest") {
             exit(runSelfTest())
+        }
+        if let i = CommandLine.arguments.firstIndex(of: "--shots"), i + 1 < CommandLine.arguments.count {
+            exit(renderShots(into: CommandLine.arguments[i + 1]))
         }
         let app = NSApplication.shared
         let delegate = AppDelegate()

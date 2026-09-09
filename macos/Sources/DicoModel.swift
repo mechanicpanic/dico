@@ -26,8 +26,8 @@ enum Mode: String, CaseIterable, Identifiable {
     }
     var placeholder: String {
         switch self {
-        case .mot: return "a word… (cook, кошка, maison)"
-        case .conjuguer: return "a verb… (aller)"
+        case .mot: return "a word, a sentence, a question…"
+        case .conjuguer: return "a verb to conjugate…"
         case .grammaire: return "a sentence to correct…"
         case .rayonsX: return "a sentence to dissect…"
         case .demander: return "a question for the tutor…"
@@ -284,7 +284,10 @@ final class DicoModel: ObservableObject {
                     self.outcome = o
                     self.remember(q)
                     if mode != .demander { self.lastContext = q }
-                    if case .mot(let l) = o { self.adopt(card: l, query: q) }
+                    if case .mot(let l) = o {
+                        self.adopt(card: l, query: q)
+                        self.toggle(.definitions)     // the right pane is never empty
+                    }
                 case .failure(let e):
                     self.outcome = .erreur(Issue.from(e))
                 }
@@ -309,12 +312,9 @@ final class DicoModel: ObservableObject {
 
     // MARK: Sections of the Word card
 
+    /// Shows one pane of the card (the panes never stack: nothing pushes).
     func toggle(_ section: Section) {
-        if open.contains(section) {
-            open.remove(section)
-            return
-        }
-        open.insert(section)
+        open = [section]
         lastOpened = section
         guard sections[section] == nil else { return }
         load(section)
@@ -406,10 +406,17 @@ final class DicoModel: ObservableObject {
     // MARK: Saving a sense
 
     /// Save the n-th sense of the current card (1-indexed), for ⌘1…⌘9.
+    /// On a conjugation, ⌘1 saves the infinitive.
     func saveSense(number n: Int) {
-        guard case .mot(let lookup) = outcome else { return }
-        if let senses = lookup.senses, n >= 1, n <= senses.count {
-            save(sense: senses[n - 1], lookup: lookup)
+        switch outcome {
+        case .mot(let lookup):
+            if let senses = lookup.senses, n >= 1, n <= senses.count {
+                save(sense: senses[n - 1], lookup: lookup)
+            }
+        case .conjugaison(let c):
+            if n == 1, let inf = c.infinitive, !inf.isEmpty { saveTerm(inf, sens: inf, shown: inf) }
+        default:
+            break
         }
     }
 
@@ -418,7 +425,10 @@ final class DicoModel: ObservableObject {
         let term = sense.saveTerm ?? lookup.head ?? lookup.query ?? ""
         guard !term.isEmpty else { return }
         let sens = currentSource.isEmpty ? (lookup.query ?? term) : currentSource
-        let shown = sense.front ?? term
+        saveTerm(term, sens: sens, shown: sense.front ?? term)
+    }
+
+    private func saveTerm(_ term: String, sens: String, shown: String) {
         Task.detached(priority: .userInitiated) {
             let msg: String
             do {

@@ -39,57 +39,80 @@ struct SettingsTab: Hashable { let id: String }
 
 struct SettingsView: View {
     var onHotkeyChange: (HotkeyChoice) -> Void = { _ in }
-    @StateObject private var store = ConfigStore()
-    @State private var tab = "tutor"
+    @StateObject private var store: ConfigStore
+    @State private var tab: String
+
+    init(onHotkeyChange: @escaping (HotkeyChoice) -> Void = { _ in },
+         store: ConfigStore? = nil, initialTab: String = "tutor") {
+        self.onHotkeyChange = onHotkeyChange
+        _store = StateObject(wrappedValue: store ?? ConfigStore())
+        _tab = State(initialValue: initialTab)
+    }
+
+    static let tabs: [(String, String)] = [
+        ("tutor", "Tutor"), ("vocab", "Vocabulary"), ("general", "General"),
+        ("data", "Offline data"), ("keys", "Shortcuts"),
+    ]
 
     var body: some View {
-        TabView(selection: $tab) {
-            TutorTab(store: store)
-                .tabItem { Label("Tutor", systemImage: "bubble.left.and.text.bubble.right") }
-                .tag("tutor")
-            VocabularyTab(store: store)
-                .tabItem { Label("Vocabulary", systemImage: "square.and.arrow.down") }
-                .tag("vocab")
-            GeneralTab(store: store, onHotkeyChange: onHotkeyChange)
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag("general")
-            OfflineDataTab()
-                .tabItem { Label("Offline data", systemImage: "internaldrive") }
-                .tag("data")
-            ShortcutsTab()
-                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
-                .tag("keys")
+        VStack(spacing: 0) {
+            HStack(spacing: 20) {
+                ForEach(SettingsView.tabs, id: \.0) { id, name in
+                    let on = tab == id
+                    Button { tab = id } label: {
+                        Text(name).font(sans(12.5, on ? .semibold : .regular))
+                            .foregroundStyle(on ? Palette.bleuInk : Palette.ink(0.45))
+                            .padding(.top, 12).padding(.bottom, 10)
+                            .overlay(alignment: .bottom) {
+                                Rectangle().fill(on ? Palette.bleuInk : .clear).frame(height: 2)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            Hairline()
+            Group {
+                switch tab {
+                case "vocab": VocabularyTab(store: store)
+                case "general": GeneralTab(store: store, onHotkeyChange: onHotkeyChange)
+                case "data": OfflineDataTab()
+                case "keys": ShortcutsTab()
+                default: TutorTab(store: store)
+                }
+            }
+            .padding(.vertical, 20).padding(.horizontal, 22)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(16)
         .frame(width: 640, height: 540)
+        .background(Palette.panel)
+        .tint(Palette.vert)
     }
 }
 
 // MARK: - Shared bits of visual language
 
-/// A titled block, rounded like the panel's sections.
+/// A section: a mono eyebrow riding on a hairline, the content, a dimmed caption.
 struct SettingsCard<Content: View>: View {
     let title: String
     var caption: String? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(rounded(9.5, .bold)).foregroundStyle(.tertiary).tracking(0.7)
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(title)
             content
             if let caption {
-                Text(caption).font(rounded(10.5, .regular)).foregroundStyle(.tertiary)
+                Text(caption).font(sans(11)).foregroundStyle(Palette.ink(0.35))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
-/// A small pill button, like the panel's chips.
+/// A small tinted button: accent fill at 0.16, accent ink text.
 struct PillButton: View {
     let label: String
     var tint: Color = Palette.bleu
@@ -98,17 +121,40 @@ struct PillButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if busy { ProgressView().controlSize(.small).scaleEffect(0.5).frame(width: 10, height: 10) }
-                Text(label).font(rounded(11.5, .medium))
+        TintButton(label: label, tint: tint, ink: tint == Palette.vert ? Palette.vertInk : Palette.bleuInk,
+                   help: help, busy: busy, action: action)
+    }
+}
+
+/// A switch on the left, the title and a dimmed caption on the right.
+struct SwitchRow: View {
+    let title: String
+    var caption: String? = nil
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Toggle("", isOn: $isOn).toggleStyle(.switch).labelsHidden().controlSize(.small)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(sans(12.5, .medium)).foregroundStyle(Palette.ink)
+                if let caption {
+                    Text(caption).font(sans(11)).foregroundStyle(Palette.ink(0.35))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(tint.opacity(0.15), in: Capsule())
-            .foregroundStyle(tint)
         }
-        .buttonStyle(.plain)
-        .help(help.isEmpty ? label : help)
+    }
+}
+
+/// The mono text well the paths and keys live in.
+struct WellField: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain).font(mono(11)).foregroundStyle(Palette.ink(0.75))
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Palette.hairline, lineWidth: 1))
     }
 }
 
@@ -125,20 +171,17 @@ struct TutorTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 18) {
                 SettingsCard(title: "Tutor",
                              caption: "Powers Ask mode 💬 and « ? » in the CLI. Stored as « llm » in ~/.dico_config.json.") {
-                    Picker("", selection: $store.tutor) {
-                        ForEach(TutorKind.allCases) { k in Text(k.label).tag(k) }
-                    }
-                    .pickerStyle(.segmented).labelsHidden()
+                    ChipRow(items: TutorKind.allCases.map { ($0, $0.label) }, selection: $store.tutor)
                     .onChange(of: store.tutor) { _, new in
                         if new == .byok, store.llmURL.isEmpty {
                             apply(ProviderPreset.all[0])
                         }
                         store.save()
                     }
-                    Text(store.tutor.blurb).font(rounded(11, .regular)).foregroundStyle(.secondary)
+                    Text(store.tutor.blurb).font(sans(11.5)).foregroundStyle(Palette.ink(0.45))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -155,8 +198,8 @@ struct TutorTab: View {
                         PillButton(label: testing ? "Asking…" : "Test the tutor",
                                    help: "Ask the tutor one word", busy: testing) { runTest() }
                         if let r = testResult {
-                            Text(r).font(rounded(11, .regular))
-                                .foregroundStyle(r.hasPrefix("✓") ? Palette.vert : Palette.rouge)
+                            Text(r).font(sans(11.5))
+                                .foregroundStyle(r.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
@@ -177,29 +220,35 @@ struct TutorTab: View {
             HStack(spacing: 8) {
                 if probing {
                     ProgressView().controlSize(.small).scaleEffect(0.6)
-                    Text("looking for a local server…").font(rounded(11, .regular)).foregroundStyle(.secondary)
+                    Text("looking for a local server…").font(sans(11.5)).foregroundStyle(Palette.ink(0.45))
                 } else if detected.isEmpty {
-                    Text("No local server answered.").font(rounded(11, .regular)).foregroundStyle(Palette.rouge)
+                    Text("No local server answered.").font(sans(11.5)).foregroundStyle(Palette.rougeInk)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(detected, id: \.self) { d in
-                            Text("✓ " + d).font(rounded(11, .regular)).foregroundStyle(Palette.vert)
+                            Text("✓ " + d).font(sans(11.5)).foregroundStyle(Palette.vertInk)
                         }
                         Text("Click a model to pin it — otherwise dico takes whichever answers first.")
-                            .font(rounded(10, .regular)).foregroundStyle(.secondary)
+                            .font(sans(11)).foregroundStyle(Palette.ink(0.35))
                         ForEach(found, id: \.model) { f in
                             Button {
                                 store.llmURL = f.url
                                 store.llmModel = f.model
                                 store.save()
                             } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: store.llmModel == f.model
-                                          ? "largecircle.fill.circle" : "circle")
-                                        .foregroundStyle(store.llmModel == f.model ? Palette.vert : .secondary)
-                                    Text(f.model).font(rounded(11, .medium))
-                                    Text(f.name).font(rounded(10, .regular)).foregroundStyle(.secondary)
+                                let pinned = store.llmModel == f.model
+                                HStack(spacing: 9) {
+                                    Text(pinned ? "◉" : "○").font(sans(11))
+                                        .foregroundStyle(pinned ? Palette.vertInk : Palette.ink(0.35))
+                                    Text(f.model).font(mono(12)).foregroundStyle(Palette.ink(pinned ? 1 : 0.7))
+                                    Text(f.name).font(sans(10.5)).foregroundStyle(Palette.ink(0.35))
+                                    Spacer(minLength: 0)
+                                    if pinned { Text("pinned").font(sans(10.5)).foregroundStyle(Palette.ink(0.35)) }
                                 }
+                                .padding(.horizontal, 9).padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(pinned ? Palette.bleu.opacity(0.12) : .clear))
+                                .padding(.horizontal, -9)
                             }
                             .buttonStyle(.plain)
                             .help("Pin \(f.model) at \(f.url)")
@@ -207,7 +256,7 @@ struct TutorTab: View {
                     }
                 }
                 Spacer(minLength: 0)
-                PillButton(label: "Detect again", tint: .secondary, help: "GET /v1/models on :1234 and :11434") { probe() }
+                LinkButton(label: "Detect again", help: "GET /v1/models on :1234 and :11434") { probe() }
             }
         }
     }
@@ -216,7 +265,7 @@ struct TutorTab: View {
         SettingsCard(title: "Bring your own key",
                      caption: "Any OpenAI-compatible endpoint. The base URL ends in /v1. The key is stored in ~/.dico_config.json (chmod 600).") {
             HStack(spacing: 6) {
-                Text("Provider").font(rounded(11, .medium)).frame(width: 66, alignment: .leading)
+                Text("Provider").font(sans(12, .medium)).frame(width: 66, alignment: .leading)
                 Picker("", selection: $preset) {
                     ForEach(ProviderPreset.all) { p in Text(p.name).tag(p.id) }
                 }
@@ -243,18 +292,18 @@ struct TutorTab: View {
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
         HStack(spacing: 6) {
-            Text(label).font(rounded(11, .medium)).frame(width: 66, alignment: .leading)
+            Text(label).font(sans(12, .medium)).frame(width: 66, alignment: .leading)
             TextField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder).font(rounded(11.5, .regular))
+                .modifier(WellField())
                 .onChange(of: text.wrappedValue) { _, _ in store.scheduleSave() }
         }
     }
 
     private func secureField(_ label: String, text: Binding<String>) -> some View {
         HStack(spacing: 6) {
-            Text(label).font(rounded(11, .medium)).frame(width: 66, alignment: .leading)
+            Text(label).font(sans(12, .medium)).frame(width: 66, alignment: .leading)
             SecureField("sk-…", text: text)
-                .textFieldStyle(.roundedBorder).font(rounded(11.5, .regular))
+                .modifier(WellField())
                 .onChange(of: text.wrappedValue) { _, _ in store.scheduleSave() }
         }
     }
@@ -309,13 +358,10 @@ struct VocabularyTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 18) {
                 SettingsCard(title: "Auto-save",
                              caption: "With it on, every lookup becomes a flashcard — no need to click a sense.") {
-                    Toggle(isOn: $store.autosave) {
-                        Text("Save every lookup automatically").font(rounded(12, .medium))
-                    }
-                    .toggleStyle(.switch)
+                    SwitchRow(title: "Save every lookup automatically", isOn: $store.autosave)
                     .onChange(of: store.autosave) { _, _ in store.save() }
                 }
 
@@ -345,16 +391,16 @@ struct VocabularyTab: View {
     private func pathRow(_ label: String, text: Binding<String>, placeholder: String,
                          help: String, types: [String]) -> some View {
         HStack(spacing: 6) {
-            Text(label).font(rounded(11, .medium)).frame(width: 78, alignment: .leading)
+            Text(label).font(sans(12, .medium)).frame(width: 78, alignment: .leading)
             TextField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder).font(rounded(11, .regular))
+                .modifier(WellField())
                 .onChange(of: text.wrappedValue) { _, _ in store.scheduleSave() }
                 .help(help)
-            PillButton(label: "Choose…", tint: .secondary, help: help) {
+            LinkButton(label: "Choose…", help: help) {
                 pick(into: text, types: types)
             }
             if !text.wrappedValue.isEmpty {
-                PillButton(label: "Default", tint: .secondary, help: "Back to ~/.dico/") {
+                LinkButton(label: "Default", tint: Palette.ink(0.4), help: "Back to ~/.dico/") {
                     text.wrappedValue = ""
                     store.save()
                 }
@@ -394,78 +440,59 @@ struct GeneralTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 18) {
                 SettingsCard(title: "Word card") {
-                    Toggle(isOn: $store.examples) {
-                        Text("Show an example sentence").font(rounded(12, .medium))
-                    }
-                    .toggleStyle(.switch)
+                    SwitchRow(title: "Show an example sentence", isOn: $store.examples)
                     .onChange(of: store.examples) { _, _ in store.save() }
                 }
 
                 SettingsCard(title: "X-ray roles",
                              caption: "off = instant · on = about 3 s, and it needs `uv` on the PATH.") {
-                    Toggle(isOn: $store.xraySpacy) {
-                        Text("Grammatical roles via spaCy").font(rounded(12, .medium))
-                    }
-                    .toggleStyle(.switch)
+                    SwitchRow(title: "Grammatical roles via spaCy", isOn: $store.xraySpacy)
                     .onChange(of: store.xraySpacy) { _, _ in store.save() }
                 }
 
                 SettingsCard(title: "Global hotkey",
                              caption: "Opens and closes the panel from any app. Registered with Carbon — no Accessibility permission is asked for.") {
-                    HStack(spacing: 6) {
-                        ForEach(HotkeyChoice.all) { h in
-                            Button {
+                    ChipRow(items: HotkeyChoice.all.map { ($0.id, $0.display) },
+                            selection: Binding(get: { store.hotkey.id }, set: { id in
+                                guard let h = HotkeyChoice.all.first(where: { $0.id == id }) else { return }
                                 store.hotkey = h
                                 store.save()
                                 onHotkeyChange(h)
-                            } label: {
-                                Text(h.display)
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .padding(.horizontal, 11).padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(store.hotkey.id == h.id
-                                                  ? Palette.bleu.opacity(0.85)
-                                                  : Color.primary.opacity(0.08))
-                                    )
-                                    .foregroundStyle(store.hotkey.id == h.id ? Color.white : Color.primary)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Use \(h.display) to open the panel")
-                        }
-                        Spacer(minLength: 0)
-                    }
+                            }), monoKeys: true)
                 }
 
                 SettingsCard(title: "Look up the selection",
                              caption: selectionCaption) {
-                    Toggle(isOn: $store.selection) {
-                        Text("\(store.hotkey.display) with text selected looks it up").font(rounded(12, .medium))
-                    }
-                    .toggleStyle(.switch)
+                    SwitchRow(title: "\(store.hotkey.display) with text selected looks it up", isOn: $store.selection)
                     .onChange(of: store.selection) { _, on in
                         store.save()
                         if on && !Selection.trusted { Selection.requestAccess() }
                         axTrusted = Selection.trusted
                     }
                     if store.selection && !axTrusted {
-                        HStack(spacing: 8) {
-                            Button("Grant access…") { Selection.requestAccess() }
-                                .help("Opens System Settings ▸ Privacy & Security ▸ Accessibility")
-                            Button("Check again") { axTrusted = Selection.trusted }
+                        HStack(spacing: 9) {
+                            Text("Accessibility not granted yet — the hotkey only opens the panel.")
+                                .font(sans(11.5)).foregroundStyle(Palette.jauneInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            TintButton(label: "Grant access…", tint: Palette.jaune, ink: Palette.jauneInk,
+                                       help: "Opens System Settings ▸ Privacy & Security ▸ Accessibility") {
+                                Selection.requestAccess()
+                            }
+                            LinkButton(label: "Check again", tint: Palette.ink(0.4)) { axTrusted = Selection.trusted }
                         }
-                        .controlSize(.small)
+                        .padding(.horizontal, 11).padding(.vertical, 9)
+                        .background(Palette.jaune.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Palette.jaune.opacity(0.2), lineWidth: 1))
                     }
                 }
 
                 SettingsCard(title: "Launch at login",
                              caption: loginError ?? "macOS keeps Dico in the menu bar from the next login on.") {
-                    Toggle(isOn: $loginItem) {
-                        Text("Start Dico when I log in").font(rounded(12, .medium))
-                    }
-                    .toggleStyle(.switch)
+                    SwitchRow(title: "Start Dico when I log in", isOn: $loginItem)
                     .onChange(of: loginItem) { _, want in setLogin(want) }
                 }
                 Spacer(minLength: 0)
@@ -505,6 +532,7 @@ struct OfflineDataTab: View {
                     PillButton(label: "Take the tour", tint: Palette.vert,
                                help: "Opens Terminal and runs dico --tour") { tour() }
                     Spacer(minLength: 0)
+                    Text("a few minutes, once").font(sans(11)).foregroundStyle(Palette.ink(0.35))
                 }
             }
             ScrollViewReader { proxy in
@@ -512,21 +540,24 @@ struct OfflineDataTab: View {
                     VStack(alignment: .leading, spacing: 2) {
                         if log.isEmpty {
                             Text("Nothing yet — the output of « dico --setup » will show up here.")
-                                .font(rounded(11, .regular)).foregroundStyle(.tertiary)
+                                .font(mono(10.5)).foregroundStyle(Palette.ink(0.35))
                         }
                         ForEach(Array(log.enumerated()), id: \.offset) { i, line in
                             Text(line)
-                                .font(.system(size: 10.5, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .font(mono(10.5)).lineSpacing(4)
+                                .foregroundStyle(Palette.ink(line.hasPrefix("$") ? 0.75 : 0.5))
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(i)
                         }
                     }
-                    .padding(9)
+                    .padding(.horizontal, 13).padding(.vertical, 12)
                 }
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+                .frame(maxWidth: .infinity)
+                .background(Palette.well, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(Palette.ink(0.06), lineWidth: 1))
                 .onChange(of: log.count) { _, n in
                     withAnimation { proxy.scrollTo(n - 1, anchor: .bottom) }
                 }
@@ -568,11 +599,9 @@ struct ShortcutsTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Every shortcut the panel listens to. The global one is set in General.")
-                    .font(rounded(11, .regular)).foregroundStyle(.secondary)
+                    .font(sans(11.5)).foregroundStyle(Palette.ink(0.45))
                 ShortcutsList(columns: 2)
-                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
                 Spacer(minLength: 0)
             }
         }

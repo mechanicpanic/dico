@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// MARK: - 📖 Word
+// MARK: - 📖 Word — two panes: the card on the left, one section on the right
 
 struct WordView: View {
     let lookup: Lookup
@@ -22,10 +22,10 @@ struct WordView: View {
         return cyrillic ? "🇷🇺" : "🇬🇧"
     }
 
-    private var flag: String {
-        isFrench ? "🇫🇷"
-                 : WordView.flag(forQuery: lookup.query ?? "", srcLang: lookup.src_lang)
+    private var queryFlag: String {
+        WordView.flag(forQuery: lookup.query ?? "", srcLang: lookup.src_lang)
     }
+
     /// Senses grouped by part of speech, in order of appearance, keeping the
     /// global number (the one used by the ⌘1…⌘9 shortcuts).
     private var groups: [(String, [(Int, Sense)])] {
@@ -40,111 +40,127 @@ struct WordView: View {
         return order.map { ($0, dict[$0] ?? []) }
     }
 
-    /// The sections offered under the senses.
+    /// The panes offered on the right.
     private var offered: [Section] {
         var s: [Section] = [.definitions, .russe, .exemples]
         if model.cardIsVerb { s.append(.conjugaison) }
         return s
     }
 
+    private var selected: Section? { offered.first { model.open.contains($0) } }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            header
-            ForEach(groups, id: \.0) { pos, items in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(pos.uppercased())
-                        .font(rounded(9.5, .bold)).foregroundStyle(.tertiary).tracking(0.6)
-                    FlowLayout(spacing: 6) {
-                        ForEach(items, id: \.0) { n, s in
-                            SenseChip(number: n, sense: s, highlighted: n == 1) {
+        HStack(spacing: 0) {
+            leftPane.frame(width: PanelSize.leftPane)
+            Rectangle().fill(Palette.hairline).frame(width: 1)
+            rightPane.frame(width: PanelSize.rightPane)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    // MARK: Left: headword, senses, example
+
+    private var headword: String {
+        if isFrench { return lookup.head ?? lookup.query ?? "" }
+        return lookup.translation ?? lookup.senses?.first?.term ?? ""
+    }
+    private var headGender: String? {
+        let g = isFrench ? lookup.lexique?.genre : lookup.senses?.first?.gender
+        return (g ?? "").isEmpty ? nil : g
+    }
+
+    private var leftPane: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text(headword).font(serif(28, .medium)).foregroundStyle(Palette.ink)
+                            .lineLimit(2).minimumScaleFactor(0.6)
+                        if let g = headGender {
+                            Text(g).font(sans(10, .semibold)).foregroundStyle(Palette.genderTint(g))
+                        }
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if let ipa = lookup.lexique?.ipa, !ipa.isEmpty {
+                            Text("/\(ipa)/").font(mono(10.5)).foregroundStyle(Palette.ink(0.35))
+                        }
+                        if let c = lookup.lexique?.cefr, !c.isEmpty { CEFRPill(level: c) }
+                        let stars = Palette.stars(lookup.lexique?.band)
+                        if !stars.isEmpty {
+                            Text(stars).font(.system(size: 9.5)).foregroundStyle(Palette.jauneInk)
+                                .help(lookup.lexique?.band ?? "")
+                        }
+                    }
+                    if !isFrench, let q = lookup.query, !q.isEmpty {
+                        Text("\(queryFlag) \(q)").font(sans(11)).foregroundStyle(Palette.ink(0.35))
+                            .lineLimit(1)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(groups.enumerated()), id: \.offset) { gi, group in
+                        Text(group.0.uppercased()).font(mono(9)).tracking(0.9)
+                            .foregroundStyle(Palette.ink(0.30))
+                            .padding(.top, gi == 0 ? 0 : 8).padding(.bottom, 3)
+                        ForEach(group.1, id: \.0) { n, s in
+                            SenseRow(number: n, sense: s, accent: model.mode.accentInk,
+                                     fill: model.mode.accent) {
                                 model.save(sense: s, lookup: lookup)
                             }
                         }
                     }
                 }
+
+                if let ex = lookup.examples?.first, ex.count >= 2 {
+                    ExampleLine(fr: ex[0], en: ex[1])
+                }
             }
-            if let back = lookup.senses?.first?.back, !back.isEmpty {
-                Text("← " + back.prefix(6).joined(separator: ", "))
-                    .font(rounded(11, .regular)).foregroundStyle(.tertiary)
-            }
-            ForEach(Array((lookup.examples ?? []).prefix(2).enumerated()), id: \.offset) { _, ex in
-                if ex.count >= 2 { ExampleLine(fr: ex[0], en: ex[1]) }
-            }
-            actions
-            sections
+            .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 12)
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(flag).font(.system(size: 17))
-            Text(isFrench ? (lookup.head ?? lookup.query ?? "") : (lookup.query ?? ""))
-                .font(rounded(21, .bold))
-            if isFrench {
-                if let g = lookup.lexique?.genre, !g.isEmpty {
-                    Text(g).font(rounded(11, .bold))
-                        .padding(.horizontal, 5).padding(.vertical, 1.5)
-                        .background(Palette.genderTint(g).opacity(0.20), in: Capsule())
-                        .foregroundStyle(Palette.genderTint(g))
-                }
-                if let b = lookup.lexique?.band, !b.isEmpty {
-                    Text("\(Palette.stars(b)) \(b)")
-                        .font(rounded(10, .medium)).foregroundStyle(.tertiary)
-                }
-                if let c = lookup.lexique?.cefr, !c.isEmpty {
-                    CEFRPill(level: c)
-                }
-                if let ipa = lookup.lexique?.ipa, !ipa.isEmpty {
-                    Text("/\(ipa)/").font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
-            } else if let t = lookup.translation, !t.isEmpty {
-                // « 🇷🇺 сказать → 🇫🇷 dire » — each side keeps its own flag.
-                HStack(spacing: 5) {
-                    Text("→").font(rounded(13, .medium)).foregroundStyle(.tertiary)
-                    Text("🇫🇷").font(.system(size: 12))
-                    Text(t).font(rounded(15, .semibold)).foregroundStyle(Palette.bleu)
-                    if let c = lookup.lexique?.cefr, !c.isEmpty { CEFRPill(level: c) }
-                    if let ipa = lookup.lexique?.ipa, !ipa.isEmpty {
-                        Text("/\(ipa)/").font(.system(size: 10.5, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-        }
-    }
+    // MARK: Right: pane tabs, the pane, the action row
 
-    /// One button per section, plus "Ask ?" — no flags, no syntax.
-    private var actions: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Divider().opacity(0.3)
-            FlowLayout(spacing: 6) {
+    private var rightPane: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 2) {
                 ForEach(offered) { s in
-                    ActionButton(icon: s.icon, label: s.label,
-                                 active: model.open.contains(s),
-                                 busy: isLoading(s),
-                                 help: "\(s.label) (\(s.shortcut)) — \(s.blurb)") {
-                        withAnimation(.easeOut(duration: 0.15)) { model.toggle(s) }
+                    PaneTab(section: s, active: selected == s, busy: isLoading(s)) {
+                        model.toggle(s)
                     }
                 }
-                ActionButton(icon: "speaker.wave.2", label: "Listen",
-                             active: false, busy: model.speaking,
-                             help: "Hear \u{ab} \(model.cardTerm) \u{bb} said by a native speaker (⌘P) — Wiktionary/Commons") {
-                    model.speak(model.cardTerm)
-                }
-                ActionButton(icon: "bubble.left.and.text.bubble.right", label: "Ask ?",
-                             active: false, busy: false,
-                             help: "Ask the tutor about \u{ab} \(model.cardTerm) \u{bb} (⌘L)") {
-                    model.askAbout(model.cardTerm)
-                }
+                Spacer(minLength: 0)
             }
-            if !model.cardTerm.isEmpty {
-                Text("about \u{ab} \(model.cardTerm) \u{bb}")
-                    .font(rounded(10, .regular)).foregroundStyle(.quaternary)
+            .padding(.top, 10).padding(.horizontal, 14)
+
+            ScrollView {
+                paneBody
+                    .padding(.top, 12).padding(.horizontal, 14).padding(.bottom, 12)
+                    .frame(width: PanelSize.rightPane, alignment: .leading)
             }
+            .frame(maxHeight: .infinity)
+
+            Hairline()
+            HStack(spacing: 8) {
+                Button { model.speak(model.cardTerm) } label: {
+                    if model.speaking {
+                        ProgressView().controlSize(.small).scaleEffect(0.55).frame(width: 14, height: 14)
+                    } else {
+                        Text("🔈").font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.plain)
+                .help("Hear \u{ab} \(model.cardTerm) \u{bb} said by a native speaker (⌘P)")
+                Button { model.askAbout(model.cardTerm) } label: {
+                    Text("💬").font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .help("Ask the tutor about \u{ab} \(model.cardTerm) \u{bb} (⌘L)")
+                Spacer(minLength: 0)
+                KeyHint(offered.map(\.shortcut).joined(separator: " "), alpha: 0.25)
+            }
+            .padding(.top, 10).padding(.horizontal, 14).padding(.bottom, 12)
         }
-        .padding(.top, 2)
     }
 
     private func isLoading(_ s: Section) -> Bool {
@@ -152,190 +168,174 @@ struct WordView: View {
         return false
     }
 
-    private var sections: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            ForEach(offered.filter { model.open.contains($0) }) { s in
-                SectionView(section: s, state: model.sections[s], model: model).id(s)
+    @ViewBuilder private var paneBody: some View {
+        if let s = selected {
+            switch model.sections[s] {
+            case .none, .some(.chargement):
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.small).scaleEffect(0.7)
+                    Text("loading…").font(sans(11)).foregroundStyle(Palette.ink(0.45))
+                }
+            case .some(.erreur(let issue)):
+                VStack(alignment: .leading, spacing: 8) {
+                    IssueView(issue: issue, model: model)
+                    LinkButton(label: "Try again", tint: s.accentInk) { model.reload(s) }
+                }
+            case .some(.pret(let payload)):
+                switch payload {
+                case .definition(let d):   DefinitionBody(def: d)
+                case .multitran(let m):    MultitranBody(entry: m)
+                case .examples(let pack):  ExamplesBody(pack: pack, own: model.cardExamples)
+                case .conjugation(let c):  ConjugationView(conj: c, compact: true)
+                }
             }
+        } else {
+            Text("Pick a pane above — or press \(offered.map(\.shortcut).joined(separator: " · ")).")
+                .font(sans(11)).foregroundStyle(Palette.ink(0.35))
         }
     }
 }
 
+/// One sense: a row that saves the term when clicked. The first one is the
+/// highlighted default and shows ⌘1.
+struct SenseRow: View {
+    let number: Int
+    let sense: Sense
+    let accent: Color
+    let fill: Color
+    let action: () -> Void
+    @State private var hover = false
+
+    private var first: Bool { number == 1 }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(number)").font(mono(10))
+                    .foregroundStyle(first ? accent : Palette.ink(0.30))
+                Text(sense.display).font(serif(15.5))
+                    .foregroundStyle(Palette.ink(first ? 1 : 0.85))
+                    .lineLimit(2).minimumScaleFactor(0.8)
+                if let g = sense.gender, !g.isEmpty {
+                    Text(g).font(sans(9.5, .semibold)).foregroundStyle(Palette.genderTint(g))
+                }
+                if let c = sense.cefr, !c.isEmpty {
+                    Text(c).font(sans(9, .semibold)).foregroundStyle(Palette.cefrTint(c).opacity(0.8))
+                }
+                Spacer(minLength: 0)
+                if first || hover { KeyHint("⌘\(number)") }
+            }
+            .padding(.horizontal, 7).padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(first ? fill.opacity(0.12) : (hover ? Palette.ink(0.05) : .clear)))
+            .padding(.horizontal, -7)
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("Click to save \u{ab} \(sense.display) \u{bb} (⌘\(number))")
+    }
+}
+
+/// A pane tab: 4/8 pad, radius 6, accent fill at 0.16 when active.
+struct PaneTab: View {
+    let section: Section
+    let active: Bool
+    var busy = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(section.tab).font(sans(10.5, active ? .semibold : .regular))
+                if busy { ProgressView().controlSize(.small).scaleEffect(0.45).frame(width: 9, height: 9) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(active ? section.accent.opacity(0.16) : .clear))
+            .foregroundStyle(active ? section.accentInk : Palette.ink(0.5))
+        }
+        .buttonStyle(.plain)
+        .help("\(section.label) (\(section.shortcut)) — \(section.blurb)")
+    }
+}
+
+/// « Il faut cuire les légumes. » with its translation dimmed underneath,
+/// behind a 2 pt rule in the accent.
 struct ExampleLine: View {
     let fr: String
     let en: String
-    /// A small 🇷🇺 in front of a Russian translation.
     var flag: String? = nil
     var tint: Color = Palette.bleu
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(fr).font(.system(size: 12.5, weight: .regular, design: .rounded))
-                .italic().foregroundStyle(.primary.opacity(0.85))
+            Text(fr).font(serif(13)).italic().foregroundStyle(Palette.ink(0.9))
                 .fixedSize(horizontal: false, vertical: true)
             if !en.isEmpty {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    if let f = flag { Text(f).font(.system(size: 9)) }
-                    Text(en).font(rounded(11, .regular)).foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text((flag.map { $0 + " " } ?? "") + en).font(sans(10.5)).foregroundStyle(Palette.ink(0.4))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.leading, 9)
+        .overlay(alignment: .leading) { Rectangle().fill(tint.opacity(0.3)).frame(width: 2) }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2).fill(tint.opacity(0.35)).frame(width: 3)
-        }
     }
 }
 
-/// A flat button in the action row of the Word card.
-struct ActionButton: View {
-    let icon: String
-    let label: String
-    let active: Bool
-    let busy: Bool
-    var help: String = ""
-    let action: () -> Void
-    @State private var hover = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if busy {
-                    ProgressView().controlSize(.small).scaleEffect(0.55).frame(width: 11, height: 11)
-                } else {
-                    Image(systemName: icon).font(.system(size: 10, weight: .medium))
-                }
-                Text(label).font(rounded(11.5, .medium))
-                if active {
-                    Image(systemName: "chevron.up").font(.system(size: 7, weight: .bold))
-                }
-            }
-            .padding(.horizontal, 9).padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(active ? Palette.bleu.opacity(0.16)
-                                 : Color.primary.opacity(hover ? 0.12 : 0.07))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Palette.bleu.opacity(active ? 0.45 : 0), lineWidth: 1)
-            )
-            .foregroundStyle(active ? Palette.bleu : Color.primary.opacity(0.8))
-        }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .help(help.isEmpty ? label : help)
-    }
-}
-
-/// One expanded section under the senses.
-struct SectionView: View {
-    let section: Section
-    let state: SectionState?
-    @ObservedObject var model: DicoModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(section.label.uppercased())
-                .font(rounded(9.5, .bold)).foregroundStyle(.tertiary).tracking(0.6)
-            content
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    @ViewBuilder private var content: some View {
-        switch state {
-        case .none, .some(.chargement):
-            HStack(spacing: 7) {
-                ProgressView().controlSize(.small).scaleEffect(0.7)
-                Text("loading…").font(rounded(11, .regular)).foregroundStyle(.secondary)
-            }
-        case .some(.erreur(let issue)):
-            VStack(alignment: .leading, spacing: 6) {
-                IssueView(issue: issue, model: model)
-                Button { model.reload(section) } label: {
-                    Text("Try again").font(rounded(10.5, .medium)).foregroundStyle(Palette.bleu)
-                }
-                .buttonStyle(.plain)
-            }
-        case .some(.pret(let payload)):
-            switch payload {
-            case .definition(let d):   DefinitionBody(def: d)
-            case .multitran(let m):    MultitranBody(entry: m)
-            case .examples(let pack):  ExamplesBody(pack: pack, own: model.cardExamples)
-            case .conjugation(let c):  ConjugationView(conj: c, compact: true)
-            }
-        }
-    }
-}
+// MARK: - The panes
 
 struct DefinitionBody: View {
     let def: Definition
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 7) {
-                Text(def.word ?? "").font(rounded(14, .bold))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(def.word ?? "").font(serif(17)).foregroundStyle(Palette.ink)
                 if let p = def.ipa, !p.isEmpty {
-                    Text("[\(p)]").font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                    Text("[\(p)]").font(mono(10)).foregroundStyle(Palette.ink(0.35))
                 }
                 if let p = def.pos, !p.isEmpty {
-                    Text(p).font(rounded(10, .medium)).foregroundStyle(.secondary)
+                    Text(p).font(sans(10.5)).foregroundStyle(Palette.ink(0.45))
                 }
                 if let g = def.gender, !g.isEmpty {
-                    Text(g).font(rounded(10, .bold)).foregroundStyle(Palette.genderTint(g))
+                    Text(g).font(sans(9.5, .semibold)).foregroundStyle(Palette.genderTint(g))
                 }
                 if let c = def.cefr, !c.isEmpty { CEFRPill(level: c) }
                 Spacer(minLength: 0)
             }
             ForEach(Array((def.defs ?? []).enumerated()), id: \.offset) { i, d in
-                HStack(alignment: .top, spacing: 7) {
-                    Text("\(i + 1)").font(rounded(9, .bold))
-                        .frame(width: 15, height: 15)
-                        .background(Circle().fill(Palette.bleu.opacity(0.18)))
-                        .foregroundStyle(Palette.bleu)
-                    Text(d).font(rounded(12, .regular))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(i + 1)").font(mono(9.5)).foregroundStyle(Palette.ink(0.30))
+                    Text(d).font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             if let e = def.etym, !e.isEmpty {
-                Text(e).font(rounded(10.5, .regular)).italic().foregroundStyle(.tertiary)
+                Text(e).font(serif(12)).italic().foregroundStyle(Palette.ink(0.4))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            WordNoteRow(icon: "≈", title: "synonymes", words: def.syn ?? [])
-            WordNoteRow(icon: "♪", title: "homophones", words: def.homo ?? [])
+            WordNoteRow(icon: "≈", title: "syn.", words: def.syn ?? [])
+            WordNoteRow(icon: "♪", title: "homo.", words: def.homo ?? [])
+            if let ru = def.ru, !ru.isEmpty {
+                NoteRow(label: "🇷🇺 ru", content: WiktionaryRuBody.line(ru))
+            }
         }
     }
 }
 
-/// The CEFR level as a pill, greener the earlier a learner meets the word.
+/// The CEFR level — coloured text, no capsule.
 struct CEFRPill: View {
     let level: String
-
-    private var tint: Color {
-        switch level.prefix(1) {
-        case "A": return Palette.vert
-        case "B": return Palette.bleu
-        default:  return Palette.rouge
-        }
-    }
-
     var body: some View {
-        Text(level).font(rounded(10, .bold))
-            .padding(.horizontal, 5).padding(.vertical, 1.5)
-            .background(tint.opacity(0.18), in: Capsule())
-            .foregroundStyle(tint)
+        Text(level).font(sans(9.5, .semibold)).tracking(0.6)
+            .foregroundStyle(Palette.cefrTint(level))
             .help("CEFR level \(level) — when a learner is expected to meet this word (FLELex)")
     }
 }
 
-/// « ≈ synonymes  minet · greffier (familier) » — a label and its words, with
-/// the register tag dimmed after the word it belongs to.
+/// « ≈ SYN.   mijoter · rôtir · bouillir (familier) » — a mono label and a
+/// flowing list, the register notes dimmed after the word they belong to.
 struct WordNoteRow: View {
     let icon: String
     let title: String
@@ -343,25 +343,36 @@ struct WordNoteRow: View {
 
     var body: some View {
         if !words.isEmpty {
-            HStack(alignment: .top, spacing: 6) {
-                Text("\(icon) \(title)").font(rounded(10, .medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 82, alignment: .leading)
-                FlowLayout(spacing: 5) {
-                    ForEach(words, id: \.self) { w in
-                        HStack(spacing: 3) {
-                            Text(w.word ?? "").font(rounded(11, .medium))
-                            if let n = w.note, !n.isEmpty {
-                                Text(n).font(rounded(9, .regular)).foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.05)))
-                    }
-                }
+            NoteRow(label: "\(icon) \(title)", content: WordNoteRow.line(words))
+        }
+    }
+
+    static func line(_ words: [WordNote]) -> Text {
+        var out = Text("")
+        for (i, w) in words.enumerated() {
+            if i > 0 { out = out + Text(" · ").foregroundStyle(Palette.ink(0.3)) }
+            out = out + Text(w.word ?? "").foregroundStyle(Palette.ink(0.85))
+            if let n = w.note, !n.isEmpty {
+                out = out + Text(" \(n)").font(sans(10.5)).foregroundStyle(Palette.ink(0.45))
             }
         }
+        return out
+    }
+}
+
+/// A 44 pt mono label on the left, a wrapping line on the right.
+struct NoteRow: View {
+    let label: String
+    let content: Text
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label.uppercased()).font(mono(9)).foregroundStyle(Palette.ink(0.30))
+                .frame(width: 44, alignment: .leading).lineLimit(1)
+            content.font(sans(12))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 2)
     }
 }
 
@@ -370,18 +381,32 @@ struct WordNoteRow: View {
 struct WiktionaryRuBody: View {
     let terms: [RuTerm]
 
+    static func line(_ terms: [RuTerm]) -> Text {
+        var out = Text("")
+        for (i, t) in terms.enumerated() {
+            if i > 0 { out = out + Text(" · ").foregroundStyle(Palette.ink(0.3)) }
+            out = out + Text(t.word ?? "").foregroundStyle(Palette.ink(0.85))
+            if let tr = t.tr, !tr.isEmpty {
+                out = out + Text(" \(tr)").font(mono(9.5)).foregroundStyle(Palette.ink(0.4))
+            }
+            if let g = t.gender, !g.isEmpty {
+                out = out + Text(" \(g)").font(sans(9.5, .semibold)).foregroundStyle(Palette.genderTint(g))
+            }
+        }
+        return out
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("Wiktionnaire").font(rounded(9.5, .medium)).foregroundStyle(.quaternary)
+        VStack(alignment: .leading, spacing: 6) {
+            Eyebrow("Wiktionnaire", tint: Palette.roseInk)
             ForEach(terms, id: \.self) { t in
-                HStack(spacing: 7) {
-                    Text(t.word ?? "").font(rounded(13, .semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(t.word ?? "").font(serif(15.5)).foregroundStyle(Palette.ink)
                     if let tr = t.tr, !tr.isEmpty {
-                        Text("[\(tr)]").font(.system(size: 10.5, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                        Text("[\(tr)]").font(mono(10)).foregroundStyle(Palette.ink(0.35))
                     }
                     if let g = t.gender, !g.isEmpty {
-                        Text(g).font(rounded(10, .bold)).foregroundStyle(Palette.genderTint(g))
+                        Text(g).font(sans(9.5, .semibold)).foregroundStyle(Palette.genderTint(g))
                     }
                     Spacer(minLength: 0)
                 }
@@ -394,7 +419,7 @@ struct WiktionaryRuBody: View {
 /// sense (number + domain tag on the left, the translations flowing on the
 /// right). Notes are shown right after their translation and NEVER truncated —
 /// they can be whole example sentences. No line caps, no fixed height: the
-/// card scrolls.
+/// pane scrolls.
 struct MultitranBody: View {
     let entry: Multitran
     private var arrow: String { entry.direction == "rufr" ? "ru → fr" : "fr → ru" }
@@ -410,19 +435,13 @@ struct MultitranBody: View {
             let tr = (it.tr ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if tr.isEmpty { continue }
             if !first {
-                out = out + Text(" · ").font(rounded(11.5, .regular))
-                    .foregroundStyle(Color.primary.opacity(0.25))
+                out = out + Text(" · ").font(sans(11.5)).foregroundStyle(Palette.ink(0.25))
             }
             first = false
-            out = out + Text(tr)
-                .font(.system(size: 12, weight: .regular, design: .rounded))
-                .foregroundStyle(Color.primary.opacity(0.88))
+            out = out + Text(tr).font(sans(12)).foregroundStyle(Palette.ink(0.88))
             let note = (it.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !note.isEmpty {
-                out = out + Text(" " + note)
-                    .font(.system(size: 10.5, weight: .regular, design: .rounded))
-                    .italic()
-                    .foregroundStyle(Color.secondary.opacity(0.85))
+                out = out + Text(" " + note).font(sans(10.5)).italic().foregroundStyle(Palette.ink(0.5))
             }
         }
         return out
@@ -455,8 +474,8 @@ struct MultitranBody: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(arrow).font(rounded(9.5, .medium)).foregroundStyle(.quaternary)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(arrow).font(mono(9)).foregroundStyle(Palette.ink(0.30))
             if !entry.usableGroups.isEmpty {
                 ForEach(Array(entry.usableGroups.enumerated()), id: \.offset) { _, g in
                     posGroup(g)
@@ -471,12 +490,8 @@ struct MultitranBody: View {
 
     private func posGroup(_ g: MultitranGroup) -> some View {
         let pos = (g.pos ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return VStack(alignment: .leading, spacing: 5) {
-            if !pos.isEmpty {
-                Text(pos.uppercased())
-                    .font(rounded(9.5, .bold)).tracking(0.8)
-                    .foregroundStyle(Palette.bleu.opacity(0.85))
-            }
+        return VStack(alignment: .leading, spacing: 6) {
+            if !pos.isEmpty { Eyebrow(pos, tint: Palette.roseInk) }
             ForEach(Array((g.senses ?? []).enumerated()), id: \.offset) { _, sense in
                 senseRow(sense)
             }
@@ -487,24 +502,16 @@ struct MultitranBody: View {
     private func senseRow(_ sense: MultitranSense) -> some View {
         let n = (sense.n ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let domain = (sense.domain ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return HStack(alignment: .top, spacing: 7) {
-            VStack(alignment: .trailing, spacing: 2) {
-                if !n.isEmpty {
-                    Text(n).font(rounded(10.5, .bold)).foregroundStyle(.secondary)
-                }
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .trailing, spacing: 1) {
+                if !n.isEmpty { Text(n).font(mono(9.5)).foregroundStyle(Palette.ink(0.30)) }
                 if !domain.isEmpty {
-                    Text(domain)
-                        .font(rounded(9, .medium))
+                    Text(domain).font(mono(9)).foregroundStyle(Palette.ink(0.4))
                         .lineLimit(1).minimumScaleFactor(0.7)
-                        .padding(.horizontal, 4).padding(.vertical, 1.5)
-                        .background(Color.primary.opacity(0.08),
-                                    in: RoundedRectangle(cornerRadius: 4))
-                        .foregroundStyle(.secondary)
                         .help("Multitran domain")
                 }
             }
-            .frame(width: 60, alignment: .trailing)
-
+            .frame(width: 44, alignment: .trailing)
             MultitranBody.translations(sense.items ?? [])
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -513,17 +520,34 @@ struct MultitranBody: View {
 
     /// Only when `groups` is empty: the flat `lines` the CLI also returns.
     private var fallbackLines: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 5) {
             ForEach(Array((entry.lines ?? []).enumerated()), id: \.offset) { _, line in
                 let heading = !line.contains(")") && line.count <= 12
-                Text(line)
-                    .font(rounded(heading ? 11 : 12, heading ? .bold : .regular))
-                    .foregroundStyle(heading ? Color.secondary : Color.primary.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, heading ? 3 : 0)
+                if heading {
+                    Eyebrow(line, tint: Palette.roseInk).padding(.top, 4)
+                } else {
+                    let (head, rest) = MultitranBody.splitLine(line)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(head).font(mono(9)).foregroundStyle(Palette.ink(0.4))
+                            .frame(width: 44, alignment: .trailing).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(rest).font(sans(12)).foregroundStyle(Palette.ink(0.88))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
         }
+    }
+
+    /// « 1) общ. кошка, кот » → ("1 общ.", "кошка, кот").
+    static func splitLine(_ line: String) -> (String, String) {
+        let parts = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard parts.count >= 2, parts[0].hasSuffix(")") else { return ("", line) }
+        let n = String(parts[0].dropLast())
+        if parts.count >= 3, parts[1].hasSuffix(".") {
+            return ("\(n) \(parts[1])", parts.dropFirst(2).joined(separator: " "))
+        }
+        return (n, parts.dropFirst().joined(separator: " "))
     }
 }
 
@@ -561,82 +585,32 @@ struct ExamplesBody: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             if english.isEmpty && russian.isEmpty {
-                Text("No examples found")
-                    .font(rounded(11.5, .regular)).foregroundStyle(.secondary)
+                Text("No examples found").font(sans(11.5)).foregroundStyle(Palette.ink(0.45))
             }
             ForEach(Array(english.enumerated()), id: \.offset) { _, ex in
                 ExampleLine(fr: ex.fr ?? "", en: ex.en ?? "")
             }
             ForEach(Array(russian.enumerated()), id: \.offset) { _, ex in
-                ExampleLine(fr: ex.fr ?? "", en: ex.ru ?? "",
-                            flag: "🇷🇺", tint: Palette.rose)
+                ExampleLine(fr: ex.fr ?? "", en: ex.ru ?? "", flag: "🇷🇺", tint: Palette.rose)
             }
         }
     }
 }
 
-/// One sense: a clickable numbered chip that saves the term.
-struct SenseChip: View {
-    let number: Int
-    let sense: Sense
-    let highlighted: Bool
-    let action: () -> Void
-    @State private var hover = false
-
-    private var tint: Color {
-        let g = sense.gender ?? ""
-        return g.isEmpty ? (highlighted ? Palette.bleu : Color.primary.opacity(0.55))
-                         : Palette.genderTint(g)
-    }
-    private var text: String { sense.display }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text("\(number)")
-                    .font(rounded(9.5, .bold))
-                    .frame(width: 15, height: 15)
-                    .background(Circle().fill(tint.opacity(highlighted ? 0.95 : 0.22)))
-                    .foregroundStyle(highlighted ? Color.white : tint)
-                Text(text).font(rounded(13, highlighted ? .semibold : .medium))
-                let stars = Palette.stars(sense.band)
-                if !stars.isEmpty {
-                    Text(stars).font(.system(size: 8)).foregroundStyle(Palette.jaune)
-                }
-                if let c = sense.cefr, !c.isEmpty {
-                    Text(c).font(rounded(8.5, .bold)).foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(tint.opacity(highlighted ? 0.16 : 0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(tint.opacity(hover ? 0.75 : (highlighted ? 0.45 : 0.14)), lineWidth: 1)
-            )
-            .scaleEffect(hover ? 1.03 : 1)
-        }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.12), value: hover)
-        .help("Click to save \u{ab} \(text) \u{bb} (⌘\(number))")
-    }
-}
-
-/// A wrapping row layout — for the sense chips.
+/// A wrapping row layout — for recents and suggestions.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
+    var lineSpacing: CGFloat? = nil
+    private var rowGap: CGFloat { lineSpacing ?? spacing }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxW = proposal.width ?? 480
         var x: CGFloat = 0, y: CGFloat = 0, lineH: CGFloat = 0
         for v in subviews {
             let s = v.sizeThatFits(.unspecified)
-            if x > 0, x + s.width > maxW { x = 0; y += lineH + spacing; lineH = 0 }
+            if x > 0, x + s.width > maxW { x = 0; y += lineH + rowGap; lineH = 0 }
             x += s.width + spacing
             lineH = max(lineH, s.height)
         }
@@ -647,7 +621,7 @@ struct FlowLayout: Layout {
         var x = bounds.minX, y = bounds.minY, lineH: CGFloat = 0
         for v in subviews {
             let s = v.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + s.width > bounds.maxX { x = bounds.minX; y += lineH + spacing; lineH = 0 }
+            if x > bounds.minX, x + s.width > bounds.maxX { x = bounds.minX; y += lineH + rowGap; lineH = 0 }
             v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
             x += s.width + spacing
             lineH = max(lineH, s.height)
@@ -655,17 +629,18 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - 🔁 Conjugate — a real grid
+// MARK: - 🔁 Conjugate — a ruled grid, endings in blue
 
-/// The je/tu/il/nous/vous/ils × seven-tenses table: full French tense names in
-/// the header, a muted pronoun gutter, alternating row bands, the présent
-/// column on a tinted rounded panel, compound forms with a dimmed auxiliary
-/// and « — » where the impératif has no form.
+/// The je/tu/il/nous/vous/ils × seven-tenses table: a 34 pt pronoun gutter,
+/// seven equal columns, a hairline per row, the présent column ruled in bleu,
+/// the ending of each form in bleu, compound forms with a dimmed auxiliary and
+/// « — » where the impératif has no form.
 ///
-/// Everything is sized from a width budget so the grid never scrolls sideways.
+/// Inside the Word card's pane there is no room for seven columns, so the
+/// compact form stacks the tenses instead.
 struct ConjugationView: View {
     let conj: Conjugation
-    /// Inside a Word-card section the grid gets a little less room.
+    /// Inside a Word-card pane the grid becomes a stack.
     var compact: Bool = false
 
     static let pronouns = ["je", "tu", "il", "nous", "vous", "ils"]
@@ -674,29 +649,24 @@ struct ConjugationView: View {
 
     // MARK: Geometry — the grid must fit the panel without scrolling sideways
 
-    /// The panel is 600 pt wide; the results area keeps 16 pt on each side,
-    /// and a card section eats 20 pt more.
-    static let fullBudget: CGFloat = PanelSize.width - 32          // 568
-    static let compactBudget: CGFloat = PanelSize.width - 32 - 40  // 528
+    /// The content column is 543 pt wide; the grid keeps 16 pt on each side.
+    static let fullBudget: CGFloat = PanelSize.content - 32     // 511
+    /// The Word card's right pane, once its sides are paid.
+    static let compactBudget: CGFloat = PanelSize.paneBody      // 290
 
     private var budget: CGFloat { compact ? ConjugationView.compactBudget : ConjugationView.fullBudget }
-    private var gutter: CGFloat { 32 }
-    private var colSpacing: CGFloat { 2 }
-    private var colPad: CGFloat { 2 }
-    private var rowSpacing: CGFloat { 1.5 }
-    private var rowHeight: CGFloat { compact ? 16.5 : 18 }
-    private var headerHeight: CGFloat { compact ? 22 : 24 }
-    private var bodySize: CGFloat { compact ? 10.5 : 11 }
+    private let gutter: CGFloat = 34
+    private let gap: CGFloat = 5
     private var columnCount: CGFloat { CGFloat(max(1, conj.orderedTenses.count)) }
 
     /// What is left for one tense column once the gutter and the gaps are paid.
     var colWidth: CGFloat {
-        let overhead = (colSpacing + 2 * colPad) * columnCount
-        return max(44, ((budget - gutter - overhead) / columnCount).rounded(.down))
+        if compact { return ((budget - 2 * gutter - 3 * gap) / 2).rounded(.down) }
+        return ((budget - gutter - gap * columnCount) / columnCount).rounded(.down)
     }
     /// The grid's own width — `--selftest` asserts this fits the budget.
     var gridWidth: CGFloat {
-        gutter + (colWidth + 2 * colPad + colSpacing) * columnCount
+        compact ? budget : gutter + (colWidth + gap) * columnCount
     }
 
     // MARK: Text
@@ -732,91 +702,160 @@ struct ConjugationView: View {
         return forms[idx]
     }
 
+    /// What the six forms of a tense share — the rest is the ending, in bleu.
+    /// Compound tenses have no stem: the participle is the same six times.
+    static func stem(_ forms: [String]) -> String {
+        let pairs = forms.map(split)
+        if pairs.contains(where: { $0.0 != nil }) { return "" }
+        let rests = pairs.map(\.1).filter { !$0.isEmpty }
+        guard var p = rests.first else { return "" }
+        for r in rests.dropFirst() {
+            p = String(zip(p, r).prefix { $0 == $1 }.map { $0.0 })
+        }
+        if rests.contains(where: { $0.count <= p.count }) { p = String(p.dropLast()) }
+        return p
+    }
+
+    /// The short mono heading of a tense.
+    static let heads: [String: String] = [
+        "présent": "PRÉSENT", "imparfait": "IMPARF.", "futur simple": "FUTUR", "futur": "FUTUR",
+        "passé composé": "P.COMP.", "conditionnel": "CONDIT.", "conditionnel présent": "CONDIT.",
+        "subjonctif": "SUBJ.", "subjonctif présent": "SUBJ.", "impératif": "IMPÉR.",
+    ]
+    static func head(_ name: String) -> String {
+        heads[name] ?? Conjugation.shortLabels[name]?.uppercased() ?? String(name.prefix(7)).uppercased()
+    }
+
+    /// « 3ᵉ groupe » — from the infinitive and the présent.
+    var group: String? {
+        guard let inf = conj.infinitive, !inf.isEmpty else { return nil }
+        if inf == "aller" { return "3ᵉ groupe" }
+        if inf.hasSuffix("er") { return "1ᵉʳ groupe" }
+        if inf.hasSuffix("ir"), let p = conj.tenses?["présent"], p.count > 3,
+           ConjugationView.strip(p[3]).hasSuffix("issons") { return "2ᵉ groupe" }
+        return "3ᵉ groupe"
+    }
+    /// « avoir » / « être » — from the passé composé.
+    var auxiliary: String? {
+        guard let pc = conj.tenses?["passé composé"]?.first,
+              let aux = ConjugationView.split(pc).0 else { return nil }
+        return ["ai", "as", "a", "avons", "avez", "ont"].contains(aux) ? "avoir" : "être"
+    }
+
     // MARK: Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 6 : 9) {
-            if !compact {
-                HStack(spacing: 7) {
-                    Text("🔁").font(.system(size: 15))
-                    Text(conj.infinitive ?? "").font(rounded(20, .bold))
-                    Spacer(minLength: 0)
-                    Text("hover a column for what the tense is for")
-                        .font(rounded(9.5, .regular)).foregroundStyle(.quaternary)
+        if compact { stacked } else { full }
+    }
+
+    private var full: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(conj.infinitive ?? "").font(serif(26, .medium)).foregroundStyle(Palette.ink)
+                if group != nil || auxiliary != nil {
+                    (Text(group ?? "") + Text(auxiliary != nil ? " · aux. " : "")
+                        + Text(auxiliary ?? "").foregroundStyle(Palette.ink(0.7)))
+                        .font(sans(11)).foregroundStyle(Palette.ink(0.4))
                 }
+                Spacer(minLength: 0)
+                (Text("endings in ") + Text("blue").foregroundStyle(Palette.bleuInk))
+                    .font(sans(10)).foregroundStyle(Palette.ink(0.28))
             }
-            HStack(alignment: .top, spacing: colSpacing) {
-                pronounGutter
-                ForEach(conj.orderedTenses, id: \.0) { name, forms in
-                    column(name: name, forms: forms)
+            VStack(spacing: 0) {
+                HStack(spacing: gap) {
+                    Color.clear.frame(width: gutter, height: 1)
+                    ForEach(conj.orderedTenses, id: \.0) { name, _ in
+                        let present = name == "présent"
+                        Text(ConjugationView.head(name)).font(mono(8.5)).tracking(0.4)
+                            .foregroundStyle(present ? Palette.bleuInk : Palette.ink(0.35))
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .frame(width: colWidth, alignment: .leading)
+                            .help(Conjugation.hints[name] ?? name)
+                    }
+                }
+                .padding(.bottom, 6)
+                ForEach(0..<6, id: \.self) { i in
+                    HStack(spacing: gap) {
+                        Text(ConjugationView.pronouns[i]).font(mono(9.5)).foregroundStyle(Palette.ink(0.30))
+                            .frame(width: gutter, alignment: .leading)
+                            .padding(.vertical, 7)
+                            .overlay(alignment: .top) { Hairline() }
+                            .overlay(alignment: .bottom) { if i == 5 { Hairline() } }
+                        ForEach(conj.orderedTenses, id: \.0) { name, forms in
+                            let present = name == "présent"
+                            cell(name: name, forms: forms, row: i, present: present)
+                                .frame(width: colWidth, alignment: .leading)
+                                .padding(.vertical, 7)
+                                .overlay(alignment: .top) { rule(present) }
+                                .overlay(alignment: .bottom) { if i == 5 { rule(present) } }
+                        }
+                    }
                 }
             }
             .frame(width: gridWidth, alignment: .leading)
+            (Text("Hover a heading for what the tense is for · ")
+                + Text("⌘1").foregroundStyle(Palette.ink(0.5)) + Text(" saves the infinitive."))
+                .font(sans(10.5)).foregroundStyle(Palette.ink(0.30))
         }
     }
 
-    private var pronounGutter: some View {
-        VStack(spacing: rowSpacing) {
-            Color.clear.frame(width: gutter, height: headerHeight)
-            ForEach(0..<6, id: \.self) { i in
-                Text(ConjugationView.pronouns[i])
-                    .font(rounded(10.5, .medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: gutter, height: rowHeight, alignment: .trailing)
-                    .background(band(i))
-            }
-        }
+    private func rule(_ present: Bool) -> some View {
+        Rectangle().fill(present ? Palette.bleu.opacity(0.25) : Palette.hairline).frame(height: 1)
     }
 
-    private func column(name: String, forms: [String]) -> some View {
-        let present = (name == "présent")
-        return VStack(spacing: rowSpacing) {
-            Text(name)
-                .font(rounded(9.5, .bold)).tracking(0.2)
-                .foregroundStyle(present ? Palette.bleu : Color.secondary)
-                .lineLimit(2).minimumScaleFactor(0.68)
-                .multilineTextAlignment(.leading)
-                .frame(width: colWidth, height: headerHeight, alignment: .bottomLeading)
-            ForEach(0..<6, id: \.self) { i in
-                cell(name: name, forms: forms, row: i, present: present)
-            }
-        }
-        .padding(.horizontal, colPad).padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(present ? Palette.bleu.opacity(0.11) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Palette.bleu.opacity(present ? 0.22 : 0), lineWidth: 1)
-        )
-        .help(Conjugation.hints[name] ?? name)
-    }
-
-    @ViewBuilder
     private func cell(name: String, forms: [String], row i: Int, present: Bool) -> some View {
         let raw = ConjugationView.form(name, forms, row: i)
-        Group {
-            if let raw {
-                let (aux, rest) = ConjugationView.split(raw)
-                (aux.map { Text($0 + " ").foregroundStyle(Color.secondary.opacity(0.7)) } ?? Text(""))
-                    + Text(rest).foregroundStyle(Color.primary)
-            } else {
-                Text("—").foregroundStyle(Color.secondary.opacity(0.30))
-            }
-        }
-        .font(.system(size: bodySize, weight: present ? .semibold : .regular, design: .rounded))
-        .lineLimit(1).minimumScaleFactor(0.55)
-        .frame(width: colWidth, height: rowHeight, alignment: .leading)
-        .background(band(i))
-        .help(raw.map { "\(ConjugationView.pronouns[i]) — \(name): \($0)" }
-              ?? (Conjugation.hints[name] ?? name))
+        return ConjugationView.text(raw, stem: ConjugationView.stem(forms.compactMap { $0 }))
+            .font(sans(11.5, present ? .medium : .regular))
+            .lineLimit(1).minimumScaleFactor(0.6)
+            .help(raw.map { "\(ConjugationView.pronouns[i]) — \(name): \($0)" }
+                  ?? (Conjugation.hints[name] ?? name))
     }
 
-    /// The subtle alternating row band, drawn on top of the column tint.
-    private func band(_ i: Int) -> some View {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .fill(i % 2 == 1 ? Color.primary.opacity(0.045) : Color.clear)
+    /// The form with its ending in bleu, its auxiliary dimmed, or « — ».
+    static func text(_ raw: String?, stem: String) -> Text {
+        guard let raw else { return Text("—").foregroundStyle(Palette.ink(0.18)) }
+        let (aux, rest) = split(raw)
+        if let aux {
+            return Text(aux + " ").foregroundStyle(Palette.ink(0.35)) + Text(rest).foregroundStyle(Palette.ink)
+        }
+        if !stem.isEmpty, rest.hasPrefix(stem), rest.count > stem.count {
+            return Text(stem).foregroundStyle(Palette.ink)
+                + Text(String(rest.dropFirst(stem.count))).foregroundStyle(Palette.bleuInk)
+        }
+        return Text(rest).foregroundStyle(Palette.ink)
+    }
+
+    /// The pane version: one block per tense, six forms in two columns.
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(conj.orderedTenses, id: \.0) { name, forms in
+                let present = name == "présent"
+                let stem = ConjugationView.stem(forms)
+                VStack(alignment: .leading, spacing: 4) {
+                    Eyebrow(name, tint: present ? Palette.bleuInk : nil)
+                        .help(Conjugation.hints[name] ?? name)
+                    HStack(alignment: .top, spacing: gap) {
+                        ForEach([0, 3], id: \.self) { start in
+                            VStack(alignment: .leading, spacing: 3) {
+                                ForEach(start..<(start + 3), id: \.self) { i in
+                                    HStack(spacing: gap) {
+                                        Text(ConjugationView.pronouns[i]).font(mono(9.5))
+                                            .foregroundStyle(Palette.ink(0.30))
+                                            .frame(width: gutter, alignment: .leading)
+                                        ConjugationView.text(ConjugationView.form(name, forms, row: i), stem: stem)
+                                            .font(sans(11.5, present ? .medium : .regular))
+                                            .lineLimit(1).minimumScaleFactor(0.6)
+                                            .frame(width: colWidth, alignment: .leading)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(width: gridWidth, alignment: .leading)
     }
 }
 
@@ -848,63 +887,94 @@ struct GrammarView: View {
         return out
     }
 
+    /// « ACCORD », « ORTHO. » — the CLI's phrase for Grammalecte's rule, in
+    /// six mono characters.
+    static func label(_ type: String?) -> String {
+        let t = (type ?? "").lowercased()
+        let table: [(String, String)] = [
+            ("participle", "ACCORD"), ("agreement", "ACCORD"), ("singular", "NOMBRE"),
+            ("conjugation", "CONJ."), ("verb", "VERBE"), ("infinitive", "INFIN."), ("imperative", "IMPÉR."),
+            ("question", "QUEST."), ("confusion", "CONFUS"), ("barbarism", "BARBAR"), ("elision", "ÉLIS."),
+            ("typography", "TYPO."), ("spacing", "ESPACE"), ("non-breaking", "ESPACE"),
+            ("capital", "MAJ."), ("apostrophe", "APOS."), ("phrasing", "STYLE"), ("redundancy", "STYLE"),
+            ("pleonasm", "STYLE"), ("date", "DATE"), ("number", "NOMBRE"), ("punctuation", "PONCT."),
+            ("comma", "VIRG."), ("compound", "MOT"), ("ocr", "OCR"), ("spelling", "ORTHO."),
+        ]
+        for (needle, label) in table where t.contains(needle) { return label }
+        if t.isEmpty { return "RÈGLE" }
+        let word = t.split(separator: " ").first.map(String.init) ?? t
+        return word.count > 6 ? String(word.prefix(5)).uppercased() + "." : word.uppercased()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // The sentence with the faulty spans highlighted.
             segments.reduce(Text("")) { acc, seg in
                 acc + Text(seg.0)
-                    .font(.system(size: 14, weight: .regular, design: .rounded))
-                    .foregroundColor(seg.1 == 0 ? .primary : (seg.1 == 1 ? Palette.rouge : Color.orange))
-                    .underline(seg.1 != 0, color: seg.1 == 1 ? Palette.rouge : Palette.jaune)
+                    .foregroundColor(seg.1 == 0 ? Palette.ink : (seg.1 == 1 ? Palette.rougeInk : Palette.jauneInk))
+                    .underline(seg.1 != 0, color: (seg.1 == 1 ? Palette.rouge : Palette.jaune).opacity(0.6))
             }
+            .font(serif(24)).lineSpacing(6)
             .fixedSize(horizontal: false, vertical: true)
 
             let errs = grammar.errors ?? []
             let sp = grammar.spelling ?? []
             if errs.isEmpty && sp.isEmpty {
-                Label("No mistakes found 🎉", systemImage: "checkmark.seal.fill")
-                    .font(rounded(12, .medium)).foregroundStyle(Palette.vert)
-            }
-            ForEach(Array(errs.enumerated()), id: \.offset) { i, e in
-                issue(number: i + 1, title: e.text ?? "", message: e.message ?? e.type ?? "",
-                      suggestions: e.suggestions ?? [], color: Palette.rouge)
-            }
-            ForEach(Array(sp.enumerated()), id: \.offset) { i, s in
-                issue(number: errs.count + i + 1, title: s.text ?? "", message: "Spelling",
-                      suggestions: s.suggestions ?? [], color: Color.orange)
+                Text("✓ Nothing to correct").font(sans(12.5)).foregroundStyle(Palette.vertInk)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(errs.enumerated()), id: \.offset) { _, e in
+                        note(label: GrammarView.label(e.type), message: e.message ?? e.type ?? "",
+                             suggestions: e.suggestions ?? [], tint: Palette.rougeInk)
+                    }
+                    ForEach(Array(sp.enumerated()), id: \.offset) { _, s in
+                        note(label: "ORTHO.", message: "\u{ab} \(s.text ?? "") \u{bb} is not in the dictionary.",
+                             suggestions: s.suggestions ?? [], tint: Palette.jauneInk)
+                    }
+                }
             }
             if let c = grammar.corrected, !c.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(c).font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Palette.vert)
+                HStack(alignment: .top, spacing: 12) {
+                    Text(c).font(serif(18)).lineSpacing(4).foregroundStyle(Palette.vertInk)
                         .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 4)
-                    CopyButton(text: c, label: "Copy", model: model)
-                        .help("Copy the corrected sentence (⌘⇧C)")
+                    Spacer(minLength: 0)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(c, forType: .string)
+                        model.flash("✓ corrected sentence copied")
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Copy").font(sans(11, .semibold))
+                            Text("⌘⇧C").font(mono(9)).opacity(0.7)
+                        }
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Palette.vert.opacity(0.18), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .foregroundStyle(Palette.vertInk)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy the corrected sentence (⌘⇧C)")
                 }
-                .padding(10)
+                .padding(.horizontal, 14).padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.vert.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                .background(Palette.vert.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Palette.vert.opacity(0.22), lineWidth: 1))
             }
         }
     }
 
-    private func issue(number: Int, title: String, message: String,
-                       suggestions: [String], color: Color) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(number)").font(rounded(9.5, .bold))
-                .frame(width: 16, height: 16)
-                .background(Circle().fill(color.opacity(0.2))).foregroundStyle(color)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(message).font(rounded(11.5, .regular))
+    private func note(label: String, message: String, suggestions: [String], tint: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 11) {
+            Text(label).font(mono(9.5)).foregroundStyle(tint)
+                .frame(width: 52, alignment: .leading).lineLimit(1).minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(message).font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 if !suggestions.isEmpty {
-                    FlowLayout(spacing: 5) {
-                        ForEach(suggestions.prefix(6), id: \.self) { s in
-                            Text(s).font(rounded(11, .medium))
-                                .padding(.horizontal, 7).padding(.vertical, 2.5)
-                                .background(Palette.vert.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Palette.vert)
+                    FlowLayout(spacing: 14, lineSpacing: 2) {
+                        ForEach(Array(suggestions.prefix(6).enumerated()), id: \.offset) { i, s in
+                            Text(s).font(serif(16))
+                                .foregroundStyle(i == 0 ? Palette.vertInk : Palette.ink(0.5))
                         }
                     }
                 }
@@ -918,34 +988,58 @@ struct GrammarView: View {
 struct XrayView: View {
     let tokens: [XrayToken]
 
+    /// Columns 1.1 / 1 / 1.1 / 0.9 / 0.8 / 1 fr of the content width.
+    static let fractions: [CGFloat] = [1.1, 1, 1.1, 0.9, 0.8, 1]
+    static let width: CGFloat = PanelSize.content - 36
+    private func col(_ i: Int) -> CGFloat {
+        (XrayView.fractions[i] / XrayView.fractions.reduce(0, +) * XrayView.width).rounded(.down)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                cell("word", 84, .bold); cell("lemma", 80, .bold); cell("pos", 96, .bold)
-                cell("tense", 104, .bold); cell("role", 88, .bold); cell("meaning", 100, .bold)
-            }
-            .foregroundStyle(.tertiary).padding(.bottom, 3)
-            Divider().opacity(0.4)
-            ForEach(Array(tokens.enumerated()), id: \.offset) { i, t in
-                HStack(spacing: 0) {
-                    Text(t.text ?? "").font(rounded(12, .semibold))
-                        .foregroundStyle(Palette.genderTint(t.gender))
-                        .frame(width: 84, alignment: .leading).lineLimit(1)
-                    cell(t.lemma ?? "", 80); cell(t.pos ?? "", 96)
-                    cell((t.tense ?? "").split(separator: ";").first.map(String.init) ?? "", 104)
-                    cell(t.role ?? "", 88); cell(t.gloss ?? "", 100)
+                ForEach(Array(["word", "lemma", "pos", "tense", "role", "meaning"].enumerated()), id: \.offset) { i, h in
+                    Text(h.uppercased()).font(mono(8.5)).tracking(0.7).foregroundStyle(Palette.ink(0.30))
+                        .frame(width: col(i), alignment: .leading)
                 }
-                .padding(.vertical, 3.5)
-                .background(i % 2 == 1 ? Color.primary.opacity(0.035) : .clear)
             }
+            .padding(.bottom, 7)
+            Hairline(structural: true)
+            ForEach(Array(tokens.enumerated()), id: \.offset) { i, t in
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(t.text ?? "").font(serif(16))
+                        .foregroundStyle((t.gender ?? "").isEmpty ? Palette.ink(0.9) : Palette.genderTint(t.gender))
+                        .frame(width: col(0), alignment: .leading).lineLimit(1)
+                    cell(t.lemma, col(1))
+                    (Text(t.pos ?? "—") + Text((t.gender ?? "").isEmpty ? "" : " \(t.gender ?? "")")
+                        .foregroundStyle(Palette.genderTint(t.gender)))
+                        .font(sans(11)).foregroundStyle(Palette.ink(0.5))
+                        .frame(width: col(2), alignment: .leading).lineLimit(1).truncationMode(.tail)
+                    let tense = (t.tense ?? "").split(separator: ";").first.map(String.init) ?? ""
+                    Text(tense.isEmpty ? "—" : tense).font(sans(11))
+                        .foregroundStyle(tense.hasPrefix("présent") ? Palette.bleuInk : Palette.ink(0.5))
+                        .frame(width: col(3), alignment: .leading).lineLimit(1).truncationMode(.tail)
+                    cell(t.role, col(4))
+                    cell(t.gloss, col(5))
+                }
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { if i < tokens.count - 1 { Rectangle().fill(Palette.ink(0.05)).frame(height: 1) } }
+            }
+            (Text("Gender colours the word: ") + Text("masculin").foregroundStyle(Palette.bleuInk)
+                + Text(" · ") + Text("féminin").foregroundStyle(Palette.roseInk)
+                + Text(". Roles come from spaCy when it is switched on in Settings."))
+                .font(sans(10.5)).foregroundStyle(Palette.ink(0.28))
+                .padding(.top, 12)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(width: XrayView.width, alignment: .leading)
     }
 
-    private func cell(_ s: String, _ w: CGFloat, _ weight: Font.Weight = .regular) -> some View {
-        Text(s).font(.system(size: weight == .bold ? 9 : 10.5, weight: weight, design: .rounded))
-            .foregroundStyle(weight == .bold ? Color.secondary : Color.secondary.opacity(0.95))
+    private func cell(_ s: String?, _ w: CGFloat) -> some View {
+        let t = (s ?? "").isEmpty ? "—" : (s ?? "")
+        return Text(t).font(sans(11)).foregroundStyle(Palette.ink(0.5))
             .frame(width: w, alignment: .leading).lineLimit(1).truncationMode(.tail)
-            .help(s)
+            .help(t)
     }
 }
 
@@ -956,23 +1050,21 @@ struct AnswerView: View {
     var context: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let c = context, !c.isEmpty {
-                Text("about \u{ab} \(c) \u{bb}")
-                    .font(rounded(10.5, .medium)).foregroundStyle(.tertiary)
-            }
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                    HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Text("•").foregroundStyle(Palette.bleu).font(rounded(12, .bold))
-                        markdown(String(line.dropFirst(2)))
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("— ") {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("—").font(sans(12)).foregroundStyle(Palette.roseInk)
+                            markdown(String(line.dropFirst(2)), size: 13)
+                        }
+                    } else if !line.isEmpty {
+                        markdown(line, size: 13.5)
                     }
-                } else if !line.isEmpty {
-                    markdown(line)
                 }
             }
             if let m = answer.model, !m.isEmpty {
-                Text(m).font(rounded(9.5, .regular)).foregroundStyle(.quaternary).padding(.top, 4)
+                Text(m).font(mono(9.5)).foregroundStyle(Palette.ink(0.28)).padding(.top, 2)
             }
         }
     }
@@ -984,11 +1076,11 @@ struct AnswerView: View {
     }
 
     /// Minimal markdown rendering: **bold** and *italic* through AttributedString.
-    private func markdown(_ s: String) -> some View {
+    private func markdown(_ s: String, size: CGFloat) -> some View {
         let attributed = (try? AttributedString(markdown: s,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
         return Text(attributed)
-            .font(.system(size: 12.5, weight: .regular, design: .rounded))
+            .font(sans(size)).lineSpacing(size * 0.4).foregroundStyle(Palette.ink)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

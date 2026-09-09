@@ -1,102 +1,42 @@
 import SwiftUI
 import AppKit
 
-// MARK: - A small "soft tricolore" palette
-
-enum Palette {
-    static let bleu = Color(red: 0.30, green: 0.44, blue: 0.86)     // masculine, accents
-    static let rose = Color(red: 0.89, green: 0.42, blue: 0.60)     // feminine
-    static let rouge = Color(red: 0.85, green: 0.32, blue: 0.34)
-    static let vert = Color(red: 0.25, green: 0.65, blue: 0.44)
-    static let jaune = Color(red: 0.95, green: 0.78, blue: 0.30)
-
-    static func genderTint(_ g: String?) -> Color {
-        switch g {
-        case "m": return bleu
-        case "f": return rose
-        default: return .secondary
-        }
-    }
-    /// ★ according to frequency.
-    static func stars(_ band: String?) -> String {
-        switch band {
-        case "très courant": return "★★★"
-        case "courant": return "★★"
-        case "moyen": return "★"
-        default: return ""
-        }
-    }
-}
-
-/// The content size of the panel. 600 pt fits the seven-tense grid.
-enum PanelSize {
-    static let width: CGFloat = 600
-    static let height: CGFloat = 460
-    static let margin: CGFloat = 12          // room for the native shadow
-}
-
-func rounded(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-    .system(size: size, weight: weight, design: .rounded)
-}
-
-/// The panel's translucent material (light AND dark).
-struct VisualEffect: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.wantsLayer = true
-        v.layer?.cornerRadius = 16
-        v.layer?.cornerCurve = .continuous
-        v.layer?.masksToBounds = true
-        v.material = .hudWindow
-        v.blendingMode = .behindWindow
-        v.state = .active
-        return v
-    }
-    func updateNSView(_ v: NSVisualEffectView, context: Context) {}
-}
-
-/// Copies a shell command to the clipboard.
-struct CopyButton: View {
-    let text: String
-    var label: String = "Copy"
-    var tint: Color = Palette.vert
-    @ObservedObject var model: DicoModel
-
-    var body: some View {
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-            model.flash("✓ copied")
-        } label: {
-            Text(label).font(rounded(10.5, .medium))
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(tint.opacity(0.16), in: Capsule())
-                .foregroundStyle(tint)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - The panel
+// MARK: - The panel: a rail of modes on the left, the query bar, the result
 
 struct PanelView: View {
     @ObservedObject var model: DicoModel
     @FocusState private var focused: Bool
 
+    /// The Word card carries its own footer (🔈 💬 … ⌘D ⌘R ⌘E ⌘J).
+    private var showsFooter: Bool {
+        if case .mot = model.outcome { return false }
+        return true
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider().opacity(0.35)
-            results
-            Divider().opacity(0.35)
-            footer
+        HStack(spacing: 0) {
+            Rail(model: model) { m in
+                model.setMode(m)
+                focused = true
+            }
+            Rectangle().fill(Palette.hairline).frame(width: 1)
+            VStack(spacing: 0) {
+                queryBar
+                Hairline(structural: true)
+                results
+                if showsFooter {
+                    Hairline(structural: true)
+                    footer
+                }
+            }
+            .frame(width: PanelSize.content)
         }
         .frame(width: PanelSize.width, height: PanelSize.height)
-        .background(VisualEffect())
+        .background(Palette.panel)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+                .strokeBorder(Palette.ink(0.10), lineWidth: 1)
         )
         // (shadow: native, through NSPanel.hasShadow — a SwiftUI shadow would be clipped at the window edges)
         .overlay(alignment: .bottom) { toast }
@@ -104,11 +44,12 @@ struct PanelView: View {
             if model.showShortcuts {
                 ZStack {
                     // Click anywhere beside the sheet to put it away.
-                    Color.black.opacity(0.18)
+                    Palette.scrim
                         .contentShape(Rectangle())
                         .onTapGesture { model.showShortcuts = false }
                     ShortcutsSheet { model.showShortcuts = false }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .transition(.opacity)
             }
         }
@@ -118,161 +59,203 @@ struct PanelView: View {
         .opacity(model.shown ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.68), value: model.shown)
         .padding(PanelSize.margin)
+        .tint(model.mode.accentInk)
         .onReceive(NotificationCenter.default.publisher(for: .dicoFocusField)) { _ in
             focused = true
         }
     }
 
-    // MARK: Header: field + mode chips
+    // MARK: Query bar
 
-    private var header: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Text("🇫🇷").font(.system(size: 15))
-                TextField(model.mode.placeholder, text: $model.query)
-                    .textFieldStyle(.plain)
-                    .font(rounded(16, .medium))
-                    .focused($focused)
-                    .onSubmit { model.submit() }
-                    .onChange(of: model.query) { _, _ in model.inputChanged() }
-                    .help("Type and press ⏎. ⌘K clears, ⌘/ lists every shortcut.")
-                if model.busy {
-                    ProgressView().controlSize(.small).scaleEffect(0.7)
-                } else if !model.query.isEmpty {
-                    Button { model.clear(); focused = true } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Clear the field (⌘K)")
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 9)
-            .background(Color.primary.opacity(0.07), in: Capsule())
+    /// 🇷🇺 as soon as the field holds Cyrillic; 🇫🇷 otherwise.
+    private var queryFlag: String {
+        model.query.unicodeScalars.contains { (0x0400...0x04FF).contains($0.value) } ? "🇷🇺" : "🇫🇷"
+    }
 
-            HStack(spacing: 6) {
-                ForEach(Mode.allCases) { m in
-                    Button {
-                        model.mode = m
-                        focused = true
-                        if !model.query.trimmingCharacters(in: .whitespaces).isEmpty { model.submit() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(m.icon).font(.system(size: 10))
-                            Text(m.label).font(rounded(11, .medium))
-                        }
-                        .padding(.horizontal, 9).padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(model.mode == m
-                                           ? Palette.bleu.opacity(0.85)
-                                           : Color.primary.opacity(0.07))
-                        )
-                        .foregroundStyle(model.mode == m ? Color.white : Color.primary.opacity(0.75))
-                    }
-                    .buttonStyle(.plain)
-                    .help("\(m.label) mode \(m.icon) — ⌘⇧\((Mode.allCases.firstIndex(of: m) ?? 0) + 1)")
+    private var queryBar: some View {
+        HStack(spacing: 10) {
+            Text(queryFlag).font(.system(size: 13))
+            TextField("", text: $model.query,
+                      prompt: Text(model.mode.placeholder).font(serif(20)).foregroundColor(Palette.ink(0.28)))
+                .textFieldStyle(.plain)
+                .font(serif(20))
+                .foregroundStyle(Palette.ink)
+                .focused($focused)
+                .onSubmit { model.submit() }
+                .onChange(of: model.query) { _, _ in model.inputChanged() }
+                .help("Type and press ⏎. ⌘K clears, ⌘/ lists every shortcut.")
+            if model.busy {
+                ProgressView().controlSize(.small).scaleEffect(0.7)
+            } else if !model.query.isEmpty {
+                Button { model.clear(); focused = true } label: {
+                    KeyHint("⌘K clear", alpha: 0.25)
                 }
-                Spacer(minLength: 0)
-                if model.mode == .demander, let c = model.askContext, !c.isEmpty {
-                    Button { model.dropAskContext() } label: {
-                        HStack(spacing: 4) {
-                            Text("about \u{ab} \(c) \u{bb}")
-                                .font(rounded(10.5, .medium)).foregroundStyle(Palette.bleu)
-                            Image(systemName: "xmark").font(.system(size: 7, weight: .bold))
-                                .foregroundStyle(Palette.bleu.opacity(0.7))
-                        }
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Palette.bleu.opacity(0.12), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help("The tutor gets this word as context — click to drop it")
-                }
+                .buttonStyle(.plain)
+                .help("Clear the field (⌘K)")
             }
-            .animation(.easeOut(duration: 0.15), value: model.mode)
+            if model.mode == .demander, let c = model.askContext, !c.isEmpty {
+                Button { model.dropAskContext() } label: {
+                    HStack(spacing: 6) {
+                        Text("about \u{ab} \(c) \u{bb}").font(sans(10.5))
+                        Text("✕").font(.system(size: 9)).opacity(0.7)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Palette.rose.opacity(0.14), in: Capsule())
+                    .foregroundStyle(Palette.roseInk)
+                }
+                .buttonStyle(.plain)
+                .help("The tutor gets this word as context — click to drop it")
+            }
         }
-        .padding(.horizontal, 14).padding(.top, 13).padding(.bottom, 11)
+        .padding(.top, 14).padding(.horizontal, 16).padding(.bottom, 12)
     }
 
     // MARK: Results area
 
-    private var results: some View {
-        ScrollViewReader { proxy in
-            resultsBody
-                .onChange(of: model.lastOpened) { _, section in
-                    guard let section else { return }
-                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(section, anchor: .bottom) }
-                }
+    @ViewBuilder private var results: some View {
+        switch model.outcome {
+        case .vide:
+            EmptyStateView(model: model)
+        case .chargement:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(model.mode == .demander ? "thinking…" : "searching…")
+                    .font(sans(12)).foregroundStyle(Palette.ink(0.45))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .mot(let l):
+            WordView(lookup: l, model: model)
+        case .conjugaison(let c):
+            scroll(top: 13) { ConjugationView(conj: c) }
+        case .grammaire(let g, let sentence):
+            scroll(top: 16, side: 18) { GrammarView(grammar: g, sentence: sentence, model: model) }
+        case .rayonsX(let toks):
+            scroll(top: 14, side: 18) { XrayView(tokens: toks) }
+        case .reponse(let a):
+            scroll(top: 16, side: 18) { AnswerView(answer: a, context: model.askContext) }
+        case .erreur(let issue):
+            scroll(top: 20, side: 18) { IssueView(issue: issue, model: model) }
         }
     }
 
-    private var resultsBody: some View {
+    private func scroll<V: View>(top: CGFloat, side: CGFloat = 16,
+                                 @ViewBuilder _ content: () -> V) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                switch model.outcome {
-                case .vide:
-                    EmptyStateView(model: model)
-                case .chargement:
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text(model.mode == .demander ? "thinking…" : "searching…")
-                            .font(rounded(12, .regular)).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center).padding(.top, 40)
-                case .mot(let l):
-                    WordView(lookup: l, model: model)
-                case .conjugaison(let c):
-                    ConjugationView(conj: c)
-                case .grammaire(let g, let sentence):
-                    GrammarView(grammar: g, sentence: sentence, model: model)
-                case .rayonsX(let toks):
-                    XrayView(tokens: toks)
-                case .reponse(let a):
-                    AnswerView(answer: a, context: model.askContext)
-                case .erreur(let issue):
-                    IssueView(issue: issue, model: model)
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 13)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            content()
+                .padding(.top, top).padding(.horizontal, side).padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// One line, always: how to see the rest, how to get out, how to get in.
     private var footer: some View {
-        HStack(spacing: 0) {
-            Button { model.showShortcuts = true } label: {
-                Text("⌘/ shortcuts").font(rounded(10, .medium)).foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .help("Show every keyboard shortcut (⌘/)")
-            Text(" · Esc clear/close · \(model.hotkeyLabel) anywhere")
-                .font(rounded(10, .regular)).foregroundStyle(.tertiary)
+        HStack(spacing: 14) {
+            Button { model.showShortcuts = true } label: { Text("⌘/ shortcuts") }
+                .buttonStyle(.plain)
+                .help("Show every keyboard shortcut (⌘/)")
+            Text("Esc clear")
+            Text("\(model.hotkeyLabel) anywhere")
                 .help("\(model.hotkeyLabel) opens the panel from any app — change it in Settings (⌘,)")
-            Spacer()
-            Button { NotificationCenter.default.post(name: .dicoOpenSettings, object: nil) } label: {
-                Text("⚙︎").font(rounded(11, .medium)).foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .help("Settings (⌘,)")
-            Text(" dico").font(rounded(10, .medium)).foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14).padding(.vertical, 7)
+        .font(mono(9.5)).foregroundStyle(Palette.ink(0.28))
+        .padding(.top, 10).padding(.horizontal, 16).padding(.bottom, 12)
     }
 
     @ViewBuilder private var toast: some View {
         if let t = model.toast {
-            Text(t)
-                .font(rounded(12, .medium))
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(.ultraThickMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Palette.vert.opacity(0.5), lineWidth: 1))
-                .shadow(radius: 8, y: 3)
-                .padding(.bottom, 34)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            let check = t.hasPrefix("✓ ")
+            HStack(spacing: 8) {
+                if check { Text("✓").font(sans(12)).foregroundStyle(Palette.toastCheck) }
+                Text(check ? String(t.dropFirst(2)) : t).font(sans(12)).lineLimit(1)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(Palette.ink, in: Capsule())
+            .foregroundStyle(Palette.panel)
+            .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+            .padding(.leading, PanelSize.rail)       // centred over the content, not the rail
+            .padding(.bottom, 56)                    // clears the action row
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 }
 
-// MARK: - Empty state + recent queries
+// MARK: - The rail
+
+/// The five modes, stacked; the « é » on top, ⚙︎ at the bottom.
+struct Rail: View {
+    @ObservedObject var model: DicoModel
+    let pick: (Mode) -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("é").font(serif(20))
+                .foregroundStyle(LinearGradient(colors: [Palette.bleu, Palette.rose],
+                                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(.bottom, 10)
+            ForEach(Mode.allCases) { m in
+                RailItem(mode: m, active: model.mode == m) { pick(m) }
+            }
+            Spacer(minLength: 0)
+            Button { NotificationCenter.default.post(name: .dicoOpenSettings, object: nil) } label: {
+                Text("⚙︎").font(sans(12)).foregroundStyle(Palette.ink).opacity(0.4)
+            }
+            .buttonStyle(.plain)
+            .help("Settings (⌘,)")
+        }
+        .padding(.top, 14).padding(.bottom, 12)
+        .frame(width: PanelSize.rail).frame(maxHeight: .infinity)
+        .background(Palette.rail)
+    }
+}
+
+struct RailItem: View {
+    let mode: Mode
+    let active: Bool
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Text(mode.icon).font(.system(size: 14))
+                Text(mode.short).font(sans(8.5, active ? .semibold : .regular))
+                    .foregroundStyle(active ? mode.accentInk : Palette.ink)
+            }
+            .frame(width: 44)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(active ? mode.accent.opacity(0.18) : (hover ? Palette.ink(0.05) : .clear)))
+            .opacity(active || hover ? 1 : 0.45)
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("\(mode.label) mode \(mode.icon) — ⌘⇧\((Mode.allCases.firstIndex(of: mode) ?? 0) + 1)")
+    }
+}
+
+/// Copies text to the clipboard — « Copy », in the accent, no capsule.
+struct CopyButton: View {
+    let text: String
+    var label: String = "Copy"
+    var tint: Color = Palette.bleuInk
+    @ObservedObject var model: DicoModel
+
+    var body: some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            model.flash("✓ copied")
+        } label: {
+            Text(label).font(sans(10.5, .semibold)).foregroundStyle(tint)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Empty state: something to press, and the recent queries
 
 struct EmptyStateView: View {
     @ObservedObject var model: DicoModel
@@ -281,74 +264,50 @@ struct EmptyStateView: View {
     static let examples: [(query: String, what: String, mode: Mode)] = [
         ("cook", "a word", .mot),
         ("maison", "a French word", .mot),
-        ("elle est parti hier", "a sentence to correct", .mot),
         ("aller", "a verb to conjugate", .conjuguer),
+        ("elle est parti", "to correct", .grammaire),
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(spacing: 8) {
-                Text("é")
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .foregroundStyle(LinearGradient(
-                        colors: [Palette.bleu, Palette.rose],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                Text("Type a word, a French sentence, or a question.")
-                    .font(rounded(13, .medium)).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, model.recent.isEmpty ? 26 : 18)
-
-            // Nothing looked up yet: someone who has just installed this needs
-            // something to press, not an empty box and a blinking cursor.
-            if model.recent.isEmpty {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("TRY ONE").font(rounded(9.5, .bold))
-                        .foregroundStyle(.tertiary).tracking(0.6)
-                    FlowLayout(spacing: 6) {
-                        ForEach(EmptyStateView.examples, id: \.query) { ex in
-                            Button { model.run(ex.query, mode: ex.mode) } label: {
-                                HStack(spacing: 5) {
-                                    Text(ex.query).font(rounded(12, .medium))
-                                    Text(ex.what).font(rounded(10, .regular))
-                                        .foregroundStyle(.tertiary)
-                                }
-                                .padding(.horizontal, 8).padding(.vertical, 5)
-                                .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(Palette.bleu.opacity(0.09)))
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 9) {
+                Eyebrow("try one")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                          spacing: 8) {
+                    ForEach(EmptyStateView.examples, id: \.query) { ex in
+                        Button { model.run(ex.query, mode: ex.mode) } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                                Text(ex.query).font(serif(17)).foregroundStyle(Palette.ink)
+                                Text(ex.what).font(sans(10.5)).foregroundStyle(Palette.ink(0.35))
+                                Spacer(minLength: 0)
                             }
-                            .buttonStyle(.plain)
-                            .help("Run \u{ab} \(ex.query) \u{bb}")
+                            .padding(.horizontal, 11).padding(.vertical, 9)
+                            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         }
+                        .buttonStyle(.plain)
+                        .help("Run \u{ab} \(ex.query) \u{bb}")
                     }
-                    Text("\(model.hotkeyLabel) opens this from any app · ⌘/ shows every shortcut")
-                        .font(rounded(10, .regular)).foregroundStyle(.quaternary)
-                        .padding(.top, 2)
                 }
             }
 
             if !model.recent.isEmpty {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack {
-                        Text("RECENT").font(rounded(9.5, .bold))
-                            .foregroundStyle(.tertiary).tracking(0.6)
-                        Spacer()
-                        Button { model.forgetRecent() } label: {
-                            Text("Clear").font(rounded(10, .medium)).foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Forget the recent queries")
-                    }
-                    FlowLayout(spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Eyebrow("recent", trailing: AnyView(
+                        LinkButton(label: "Clear", tint: Palette.ink(0.30), size: 10.5,
+                                   help: "Forget the recent queries") { model.forgetRecent() }))
+                    FlowLayout(spacing: 18, lineSpacing: 2) {
                         ForEach(model.recent, id: \.self) { q in
                             RecentChip(text: q) { model.run(q, mode: model.mode) }
                         }
                     }
                 }
-                .padding(.top, 6)
+            } else {
+                Text("\(model.hotkeyLabel) opens this from any app · ⌘/ shows every shortcut")
+                    .font(sans(10.5)).foregroundStyle(Palette.ink(0.30))
             }
         }
+        .padding(.top, 20).padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -360,14 +319,8 @@ struct RecentChip: View {
     var body: some View {
         Button(action: action) {
             Text(text.count > 34 ? String(text.prefix(33)) + "…" : text)
-                .font(rounded(12, .medium))
-                .lineLimit(1)
-                .padding(.horizontal, 9).padding(.vertical, 4.5)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.primary.opacity(hover ? 0.13 : 0.07))
-                )
-                .foregroundStyle(.secondary)
+                .font(serif(16)).lineLimit(1)
+                .foregroundStyle(Palette.ink(hover ? 1 : 0.75))
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
@@ -384,49 +337,57 @@ struct IssueView: View {
     var body: some View {
         switch issue {
         case .notInstalled:
-            recipe(emoji: "📦", title: "dico is not installed",
-                   body: "The panel drives the `dico` command line tool. Install it, then build the offline data:",
+            recipe(title: "dico is not installed",
+                   body: "The panel drives the dico command line tool. Install it, then build the offline data.",
                    commands: ["uv tool install git+https://github.com/mechanicpanic/dico", "dico --setup"])
         case .setupNeeded:
-            recipe(emoji: "🧱", title: "Offline data not built",
+            recipe(title: "Offline data not built",
                    body: "The conjugations, Lexique and Grammalecte databases have not been downloaded yet.",
                    commands: ["dico --setup"])
         case .plain(let msg):
-            HStack(alignment: .top, spacing: 9) {
-                Text("😕").font(.system(size: 20))
-                Text(msg).font(rounded(12, .regular)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 9) {
+                Eyebrow("problem", tint: Palette.rougeInk)
+                Text(msg).font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink(0.85))
                     .fixedSize(horizontal: false, vertical: true)
+                Text("Esc clears · ⌘/ lists every shortcut")
+                    .font(mono(9.5)).foregroundStyle(Palette.ink(0.28))
             }
-            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.rouge.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
-    private func recipe(emoji: String, title: String, body: String, commands: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 8) {
-                Text(emoji).font(.system(size: 18))
-                Text(title).font(rounded(14, .bold))
+    private func recipe(title: String, body: String, commands: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(serif(24)).foregroundStyle(Palette.ink)
+                Text(body).font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink(0.5))
+                    .frame(maxWidth: 400, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(body).font(rounded(11.5, .regular)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(commands, id: \.self) { cmd in
-                HStack(spacing: 8) {
-                    Text(cmd).font(.system(size: 11, design: .monospaced))
-                        .textSelection(.enabled)
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.07),
-                                    in: RoundedRectangle(cornerRadius: 6))
-                    Spacer(minLength: 0)
-                    CopyButton(text: cmd, tint: Palette.bleu, model: model)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(commands, id: \.self) { cmd in
+                    HStack(spacing: 10) {
+                        Text(cmd).font(mono(11)).foregroundStyle(Palette.ink(0.85))
+                            .textSelection(.enabled)
+                            .lineLimit(1).truncationMode(.tail)
+                        Spacer(minLength: 0)
+                        CopyButton(text: cmd, model: model)
+                    }
+                    .padding(.horizontal, 11).padding(.vertical, 9)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Palette.ink(0.06), lineWidth: 1))
                 }
             }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Eyebrow("also", rule: false)
+                Text("Multitran is optional — the Russian pane falls back to the Wiktionnaire without it.")
+                    .font(sans(11.5)).foregroundStyle(Palette.ink(0.4))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 4)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.jaune.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

@@ -26,6 +26,24 @@ release is the one you can hand to a person.
 The first release: a French dictionary for a Russian/English speaker, as a CLI
 and a macOS popup.
 
+### Atelier — the popup, designed
+- The panel follows the **Atelier** design (Claude Design, « Dico — 1b
+  Atelier » + spec): a rail of modes on the left, the query in a serif, and a
+  Word card in **two panes** — headword, senses and example on the left; one
+  pane on the right (Definitions, Russian, Examples, Conj.) switched by tabs
+  or ⌘D ⌘R ⌘E ⌘J. Nothing pushes: the card's height never changes.
+- Three faces: serif (New York) for the French being learned, sans (SF Pro)
+  for the interface, mono (SF Mono) for IPA, keys, eyebrows and CLI output.
+  Hairlines, not boxes; one accent per screen (bleu, vert for Grammar, rose
+  for Russian and Ask); dark and light palettes.
+- The conjugation grid is ruled, the **endings in blue**, the auxiliary
+  dimmed; ⌘1 saves the infinitive. Grammar notes carry a mono rule label
+  (ACCORD, ORTHO.…), the correction sits in a green card with ⌘⇧C. X-ray is a
+  six-column table. The ⌘/ sheet and the five Settings tabs got the same
+  language.
+- `Dico --shots DIR` renders every screen, dark and light, to PNG — off
+  screen, for design review.
+
 ### Looking things up
 - A real **dictionary card**: senses grouped by part of speech and numbered,
   article and gender on every noun, frequency in ★, back-translations, and a
