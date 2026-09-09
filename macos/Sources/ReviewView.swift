@@ -30,6 +30,10 @@ struct ReviewView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Hairline(structural: true)
+            if let p = r.pushed {
+                Text(p).font(sans(11.5)).foregroundStyle(p.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
+                    .padding(.top, 10).padding(.horizontal, 18)
+            }
             Group {
                 if r.loading && r.cards.isEmpty {
                     HStack(spacing: 8) {
@@ -59,6 +63,12 @@ struct ReviewView: View {
             Spacer(minLength: 0)
             if r.counts.total > 0 || r.graded > 0 {
                 Text(countsLine).font(mono(9.5)).foregroundStyle(Palette.ink(0.35))
+            }
+            if !r.unreachable {
+                LinkButton(label: r.pushing ? "pushing…" : "↑ push saved words", tint: Palette.jauneInk, size: 10.5,
+                           help: "Every word dico saved that the deck does not have yet becomes a card") {
+                    model.pushToAnki()
+                }
             }
         }
         .padding(.top, 14).padding(.horizontal, 16).padding(.bottom, 12)
@@ -141,27 +151,13 @@ struct ReviewView: View {
             Text(r.graded > 0 ? "Done for now." : "Nothing due.").font(serif(24)).foregroundStyle(Palette.ink)
             Text(r.graded > 0
                  ? "\(r.graded) card\(r.graded == 1 ? "" : "s") graded — Anki has the schedule."
-                 : "Anki has no card waiting in this deck. New words you look up can join it below.")
+                 : "Anki has no card waiting in this deck. « push saved words » above adds what you looked up.")
                 .font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink(0.5))
                 .frame(maxWidth: 400, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            pushRow
             LinkButton(label: "Check again", tint: Palette.ink(0.4)) { model.startReview() }
         }
         .padding(.top, 20).padding(.horizontal, 18)
-    }
-
-    private var pushRow: some View {
-        HStack(spacing: 10) {
-            TintButton(label: r.pushing ? "Pushing…" : "Push saved words to Anki",
-                       help: "Every word dico saved that the deck does not have yet", busy: r.pushing) {
-                model.pushToAnki()
-            }
-            if let p = r.pushed {
-                Text(p).font(sans(11.5)).foregroundStyle(p.hasPrefix("✓") ? Palette.vertInk : Palette.rougeInk)
-            }
-            Spacer(minLength: 0)
-        }
     }
 
     private var unreachable: some View {
