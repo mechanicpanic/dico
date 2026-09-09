@@ -298,6 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch chars {
         case "k": model.clear(); return nil
+        case "s": return model.saveCurrent() ? nil : event
         case "d": return model.toggleSectionShortcut(.definitions) ? nil : event
         case "r": return model.toggleSectionShortcut(.russe) ? nil : event
         case "e": return model.toggleSectionShortcut(.exemples) ? nil : event

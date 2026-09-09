@@ -505,8 +505,9 @@ enum DicoClient {
         return a
     }
 
-    static func save(term: String, sens: String, example: [String] = []) throws -> SaveResult {
+    static func save(term: String, sens: String, example: [String] = [], tier: String = "") throws -> SaveResult {
         var args = ["--json", "--save-term", term, "--sens", sens]
+        if !tier.isEmpty { args += ["--tier", tier] }
         if example.count >= 1, !example[0].isEmpty { args += ["--example", example[0]] }
         if example.count >= 2, !example[1].isEmpty { args += ["--example-en", example[1]] }
         return try call(SaveResult.self, args)

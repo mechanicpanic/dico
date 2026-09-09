@@ -1348,7 +1348,9 @@ def _card_back(entry):
     gloss = (entry.get("gloss") or "").strip()
     lemma = (entry.get("lemma") or "").strip()
     typed_is_french = entry.get("src_lang") == "fr" or (sens and _deaccent(sens) == _deaccent(lemma))
-    if gloss and sens and not typed_is_french and _deaccent(sens) != _deaccent(gloss):
+    if entry.get("tier") == "tutor":
+        first = sens
+    elif gloss and sens and not typed_is_french and _deaccent(sens) != _deaccent(gloss):
         first = f"{sens} · {gloss}"
     else:
         first = gloss or ("" if typed_is_french else sens)
@@ -1404,6 +1406,10 @@ def enrich_entry(e, network=True):
     lemma = e.get("lemma") or e.get("front") or ""
     if not lemma:
         return changed
+    tier = e.get("tier") or ""
+    # A tutor note keeps its answer as the back; a sentence has no example of itself.
+    wants_gloss = tier != "tutor"
+    wants_example = tier not in ("tutor", "sentence")
     g = _short_gender(e.get("gender", ""))
     if g != (e.get("gender") or ""):
         e["gender"] = g
@@ -1420,7 +1426,7 @@ def enrich_entry(e, network=True):
             e["pos"] = lex["pos"]; changed.append("pos")
     sens = (e.get("sens") or "").strip()
     typed_is_french = e.get("src_lang") == "fr" or (sens and _deaccent(sens) == _deaccent(lemma))
-    if not e.get("gloss"):
+    if not e.get("gloss") and wants_gloss:
         if e.get("src_lang") == "en" and sens and not typed_is_french:
             e["gloss"] = sens; changed.append("gloss")
         elif network:
@@ -1430,7 +1436,7 @@ def enrich_entry(e, network=True):
     # A conjugation stub is not an example.
     if (e.get("example") or "").startswith("prés. :"):
         e["example"] = ""; changed.append("example")
-    if not e.get("example") and network:
+    if not e.get("example") and network and wants_example:
         fr, en = _example_for(lemma)
         if fr:
             e["example"], e["example_en"] = fr, en
@@ -3290,6 +3296,8 @@ def main():
                    help="meaning (original word / translation) for --save-term")
     p.add_argument("--example", metavar="TEXT", default="", help="with --save-term: an example sentence")
     p.add_argument("--example-en", metavar="TEXT", default="", help="with --save-term: its translation")
+    p.add_argument("--tier", metavar="KIND", default="",
+                   help="with --save-term: what the card is — word (default), phrase, sentence, tutor")
     p.add_argument("--enrich", action="store_true",
                    help="backfill every saved word: English gloss, example, IPA, CEFR, gender")
     p.add_argument("--context", metavar="TEXT", default="",
@@ -3337,10 +3345,12 @@ def main():
         lang = "fr" if _deaccent(args.sens or "") == _deaccent(args.save_term) else detect_lang(args.sens or "en")
         if args.json:
             front, status, cnt = _save_term(args.save_term, args.sens, lang, quiet=True,
-                                            example=args.example, example_en=args.example_en)
+                                            example=args.example, example_en=args.example_en,
+                                            tier=args.tier or "google")
             return print(json.dumps({"saved": front, "status": status, "count": cnt,
                                      "sens": args.sens}, ensure_ascii=False))
-        return _save_term(args.save_term, args.sens, lang, example=args.example, example_en=args.example_en)
+        return _save_term(args.save_term, args.sens, lang, example=args.example, example_en=args.example_en,
+                          tier=args.tier or "google")
     if args.context:
         _LAST["word"] = args.context
     if args.examples and not args.json:

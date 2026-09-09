@@ -57,6 +57,12 @@ and a macOS popup.
   there), then a real example sentence and its translation — the card's own
   when the lookup had one, Tatoeba otherwise. `dico --enrich` backfills all
   of this on the words saved before.
+- **Anything can become a card.** ⌘S saves what is on screen: the phrase
+  in the field, the corrected sentence in Grammar, the tutor's answer in
+  Ask (front: the word it was about, back: the answer), sense 1 of a Word
+  card. « save » appears on hover on every Examples sentence and every
+  X-ray word. `--save-term` takes `--tier phrase|sentence|tutor` so the
+  enrichment knows what not to fetch.
 - Learning steps come first, then reviews due today, then up to twenty of
   the newest words. « Look it up » opens the Word card for the card on screen.
 - **Anki, optionally.** Settings ▸ Vocabulary ▸ Cards can review an Anki

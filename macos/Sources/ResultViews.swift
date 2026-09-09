@@ -185,7 +185,8 @@ struct WordView: View {
                 switch payload {
                 case .definition(let d):   DefinitionBody(def: d)
                 case .multitran(let m):    MultitranBody(entry: m)
-                case .examples(let pack):  ExamplesBody(pack: pack, own: model.cardExamples)
+                case .examples(let pack):
+                    ExamplesBody(pack: pack, own: model.cardExamples) { fr, tr in model.saveExample(fr: fr, translation: tr) }
                 case .conjugation(let c):  ConjugationView(conj: c, compact: true)
                 }
             }
@@ -267,11 +268,19 @@ struct ExampleLine: View {
     let en: String
     var flag: String? = nil
     var tint: Color = Palette.bleu
+    /// When set, « save » appears on hover and makes the sentence a card.
+    var onSave: (() -> Void)? = nil
+    @State private var hover = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(fr).font(serif(13)).italic().foregroundStyle(Palette.ink(0.9))
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(fr).font(serif(13)).italic().foregroundStyle(Palette.ink(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let onSave, hover {
+                    LinkButton(label: "save", tint: Palette.ink(0.4), size: 10, help: "Make this sentence a card", action: onSave)
+                }
+            }
             if !en.isEmpty {
                 Text((flag.map { $0 + " " } ?? "") + en).font(sans(10.5)).foregroundStyle(Palette.ink(0.4))
                     .fixedSize(horizontal: false, vertical: true)
@@ -280,6 +289,8 @@ struct ExampleLine: View {
         .padding(.leading, 9)
         .overlay(alignment: .leading) { Rectangle().fill(tint.opacity(0.3)).frame(width: 2) }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
     }
 }
 
@@ -556,6 +567,8 @@ struct ExamplesBody: View {
     /// The example the card itself came with — kept first when Tatoeba
     /// does not already have it.
     var own: [[String]] = []
+    /// Makes a sentence a card: (French, translation).
+    var onSave: ((String, String) -> Void)? = nil
 
     /// A French sentence, folded for the duplicate check.
     private static func key(_ s: String) -> String {
@@ -590,10 +603,12 @@ struct ExamplesBody: View {
                 Text("No examples found").font(sans(11.5)).foregroundStyle(Palette.ink(0.45))
             }
             ForEach(Array(english.enumerated()), id: \.offset) { _, ex in
-                ExampleLine(fr: ex.fr ?? "", en: ex.en ?? "")
+                ExampleLine(fr: ex.fr ?? "", en: ex.en ?? "",
+                            onSave: onSave.map { f in { f(ex.fr ?? "", ex.en ?? "") } })
             }
             ForEach(Array(russian.enumerated()), id: \.offset) { _, ex in
-                ExampleLine(fr: ex.fr ?? "", en: ex.ru ?? "", flag: "🇷🇺", tint: Palette.rose)
+                ExampleLine(fr: ex.fr ?? "", en: ex.ru ?? "", flag: "🇷🇺", tint: Palette.rose,
+                            onSave: onSave.map { f in { f(ex.fr ?? "", ex.ru ?? "") } })
             }
         }
     }
@@ -938,6 +953,16 @@ struct GrammarView: View {
                     Text(c).font(serif(18)).lineSpacing(4).foregroundStyle(Palette.vertInk)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
+                    Button { model.saveCorrection(grammar) } label: {
+                        HStack(spacing: 6) {
+                            Text("Save").font(sans(11, .semibold))
+                            Text("⌘S").font(mono(9)).opacity(0.7)
+                        }
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .foregroundStyle(Palette.vertInk)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Make the corrected sentence a card (⌘S)")
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(c, forType: .string)
@@ -987,6 +1012,8 @@ struct GrammarView: View {
 
 struct XrayView: View {
     let tokens: [XrayToken]
+    var onSave: ((XrayToken) -> Void)? = nil
+    @State private var hoverRow: Int? = nil
 
     /// Columns 1.1 / 1 / 1.1 / 0.9 / 0.8 / 1 fr of the content width.
     static let fractions: [CGFloat] = [1.1, 1, 1.1, 0.9, 0.8, 1]
@@ -1020,9 +1047,20 @@ struct XrayView: View {
                         .foregroundStyle(tense.hasPrefix("présent") ? Palette.bleuInk : Palette.ink(0.5))
                         .frame(width: col(3), alignment: .leading).lineLimit(1).truncationMode(.tail)
                     cell(t.role, col(4))
-                    cell(t.gloss, col(5))
+                    if let onSave, hoverRow == i {
+                        HStack(spacing: 6) {
+                            cell(t.gloss, col(5) - 40)
+                            LinkButton(label: "save", tint: Palette.ink(0.4), size: 10,
+                                       help: "Make \u{ab} \(t.lemma ?? t.text ?? "") \u{bb} a card") { onSave(t) }
+                        }
+                        .frame(width: col(5), alignment: .leading)
+                    } else {
+                        cell(t.gloss, col(5))
+                    }
                 }
                 .padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .onHover { hoverRow = $0 ? i : (hoverRow == i ? nil : hoverRow) }
                 .overlay(alignment: .bottom) { if i < tokens.count - 1 { Rectangle().fill(Palette.ink(0.05)).frame(height: 1) } }
             }
             (Text("Gender colours the word: ") + Text("masculin").foregroundStyle(Palette.bleuInk)
@@ -1048,6 +1086,7 @@ struct XrayView: View {
 struct AnswerView: View {
     let answer: Answer
     var context: String? = nil
+    var onSave: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1063,9 +1102,18 @@ struct AnswerView: View {
                     }
                 }
             }
-            if let m = answer.model, !m.isEmpty {
-                Text(m).font(mono(9.5)).foregroundStyle(Palette.ink(0.28)).padding(.top, 2)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                if let m = answer.model, !m.isEmpty {
+                    Text(m).font(mono(9.5)).foregroundStyle(Palette.ink(0.28))
+                }
+                Spacer(minLength: 0)
+                if let onSave {
+                    TintButton(label: "Save as card", keys: "⌘S", tint: Palette.rose, ink: Palette.roseInk,
+                               help: "Front: \u{ab} \((context ?? "").isEmpty ? "the question" : (context ?? "")) \u{bb} · back: this answer",
+                               action: onSave)
+                }
             }
+            .padding(.top, 2)
         }
     }
 

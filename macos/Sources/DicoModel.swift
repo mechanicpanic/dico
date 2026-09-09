@@ -439,11 +439,63 @@ final class DicoModel: ObservableObject {
         saveTerm(term, sens: sens, shown: sense.front ?? term, example: cardExamples.first ?? [])
     }
 
-    private func saveTerm(_ term: String, sens: String, shown: String, example: [String] = []) {
+    /// ⌘S — save whatever is on screen: the field as a phrase, the corrected
+    /// sentence, the tutor's answer, or sense 1 of a Word card.
+    @discardableResult
+    func saveCurrent() -> Bool {
+        switch outcome {
+        case .mot: saveSense(number: 1); return true
+        case .grammaire(let g, _): return saveCorrection(g)
+        case .reponse(let a): return saveAnswer(a)
+        case .conjugaison(let c):
+            guard let inf = c.infinitive, !inf.isEmpty else { return false }
+            saveTerm(inf, sens: inf, shown: inf); return true
+        default:
+            let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !q.isEmpty, mode != .cartes else { return false }
+            let words = q.split(separator: " ").count
+            saveTerm(q, sens: "", shown: q, tier: words > 5 ? "sentence" : (words > 1 ? "phrase" : ""))
+            return true
+        }
+    }
+
+    /// The corrected sentence becomes a card — your own mistake, fixed.
+    @discardableResult
+    func saveCorrection(_ g: Grammar) -> Bool {
+        guard let c = g.corrected, !c.isEmpty else { return false }
+        saveTerm(c, sens: "", shown: c, tier: "sentence")
+        return true
+    }
+
+    /// The tutor's answer becomes the back of a card whose front is the word
+    /// it was about — or the question.
+    @discardableResult
+    func saveAnswer(_ a: Answer) -> Bool {
+        let text = (a.answer ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return false }
+        let front = (askContext ?? "").isEmpty ? query.trimmingCharacters(in: .whitespacesAndNewlines) : (askContext ?? "")
+        guard !front.isEmpty else { return false }
+        saveTerm(front, sens: text, shown: front, tier: "tutor")
+        return true
+    }
+
+    /// An example sentence, front French, back its translation.
+    func saveExample(fr: String, translation: String) {
+        saveTerm(fr, sens: translation, shown: fr, tier: "sentence")
+    }
+
+    /// A word of the X-ray table: its lemma, with the gloss the table shows.
+    func saveToken(_ t: XrayToken) {
+        let term = (t.lemma ?? t.text ?? "").trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return }
+        saveTerm(term, sens: t.gloss ?? "", shown: term)
+    }
+
+    private func saveTerm(_ term: String, sens: String, shown: String, example: [String] = [], tier: String = "") {
         Task.detached(priority: .userInitiated) {
             let msg: String
             do {
-                let r = try DicoClient.save(term: term, sens: sens, example: example)
+                let r = try DicoClient.save(term: term, sens: sens, example: example, tier: tier)
                 let status = r.status ?? "added"
                 msg = "✓ \u{ab} \(r.saved ?? shown) \u{bb} \(status)"
             } catch {

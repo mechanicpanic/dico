@@ -25,6 +25,7 @@ enum Shortcuts {
             .init(keys: "⌘V · ⌘C · ⌘A", what: "Paste, copy, select all", group: "Panel"),
             .init(keys: "Esc", what: "Clear — again to close", group: "Panel"),
             .init(keys: "⌘K", what: "Clear the field", group: "Panel"),
+            .init(keys: "⌘S", what: "Save as a card — the field, a correction, an answer", group: "Panel"),
             .init(keys: "⌘,", what: "Settings", group: "Panel"),
             .init(keys: "⌘/", what: "This list", group: "Panel"),
             .init(keys: "⌘W", what: "Close the panel", group: "Panel"),
