@@ -525,7 +525,7 @@ final class DicoModel: ObservableObject {
 
     // MARK: What the keyboard shortcuts drive
 
-    /// ⌘⇧1…⌘⇧6 — switch mode, and re-run the current query in it.
+    /// ⌘⌥1…⌘⌥6 — switch mode, and re-run the current query in it.
     func setMode(_ m: Mode) {
         guard mode != m else { return }
         mode = m

@@ -238,7 +238,7 @@ struct RailItem: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help("\(mode.label) mode \(mode.icon) — ⌘⇧\((Mode.allCases.firstIndex(of: mode) ?? 0) + 1)")
+        .help("\(mode.label) mode \(mode.icon) — ⌘⌥\((Mode.allCases.firstIndex(of: mode) ?? 0) + 1)")
     }
 }
 
@@ -334,7 +334,7 @@ struct EmptyStateView: View {
                     (Text("\(waiting) card\(waiting == 1 ? "" : "s") to review").foregroundStyle(Palette.ink)
                         + Text(" — \(c.due) due · \(c.learning) learning · \(c.new) new").foregroundStyle(Palette.ink(0.4)))
                         .font(sans(12.5))
-                    TintButton(label: "Review", keys: "⌘⇧6", tint: Palette.jaune, ink: Palette.jauneInk,
+                    TintButton(label: "Review", keys: "⌘⌥6", tint: Palette.jaune, ink: Palette.jauneInk,
                                help: "Open the Cards mode") { model.setMode(.cartes) }
                 } else if d != nil {
                     Text("Nothing to review. Every word you look up becomes a card.")
