@@ -6,21 +6,6 @@ import AppKit
 // Anki keeps the schedule; the panel only shows the card that is due and
 // sends the grade back. Nothing is written to the collection file directly.
 
-struct AnkiCard: Identifiable, Hashable {
-    let id: Int
-    let front: String
-    let back: String            // HTML, as Anki stores it
-    let queue: Int              // 0 new · 1/3 learning · 2 review
-    let interval: Int
-    let reps: Int
-    let deck: String
-
-    /// The back, without its HTML: the meaning first, then the example(s).
-    var backLines: [String] { AnkiClient.lines(fromHTML: back) }
-    var isNew: Bool { queue == 0 }
-    var isLearning: Bool { queue == 1 || queue == 3 }
-}
-
 struct AnkiCounts: Hashable {
     var new = 0, learning = 0, due = 0
     var total: Int { new + learning + due }
@@ -95,23 +80,23 @@ enum AnkiClient {
 
     /// What is worth showing now: learning first, then the reviews that are
     /// due, then up to `newLimit` new cards — the order Anki itself uses.
-    static func queue(deck: String, newLimit: Int = 20) throws -> [AnkiCard] {
+    static func queue(deck: String, newLimit: Int = 20) throws -> [ReviewCard] {
         let ids = (try invoke("findCards", ["query": "deck:\"\(deck)\" (is:due OR is:new)"]) as? [Int]) ?? []
         guard !ids.isEmpty else { return [] }
         let infos = (try invoke("cardsInfo", ["cards": Array(ids.prefix(400))]) as? [[String: Any]]) ?? []
-        var learning: [(Int, AnkiCard)] = [], review: [(Int, AnkiCard)] = [], fresh: [(Int, AnkiCard)] = []
+        var learning: [(Int, ReviewCard)] = [], review: [(Int, ReviewCard)] = [], fresh: [(Int, ReviewCard)] = []
         for i in infos {
             guard let card = card(from: i) else { continue }
             let due = i["due"] as? Int ?? 0
             if card.isLearning { learning.append((due, card)) }
-            else if card.queue == 2 { review.append((due, card)) }
-            else if card.queue == 0 { fresh.append((due, card)) }
+            else if card.isNew { fresh.append((due, card)) }
+            else { review.append((due, card)) }
         }
-        let sorted = { (a: [(Int, AnkiCard)]) in a.sorted { $0.0 < $1.0 }.map { $0.1 } }
+        let sorted = { (a: [(Int, ReviewCard)]) in a.sorted { $0.0 < $1.0 }.map { $0.1 } }
         return sorted(learning) + sorted(review) + Array(sorted(fresh).prefix(newLimit))
     }
 
-    static func card(from i: [String: Any]) -> AnkiCard? {
+    static func card(from i: [String: Any]) -> ReviewCard? {
         guard let id = i["cardId"] as? Int else { return nil }
         // Fields by order, whatever they are called (Front/Back, Recto/Verso…).
         let fields = (i["fields"] as? [String: [String: Any]] ?? [:])
@@ -119,16 +104,18 @@ enum AnkiClient {
             .map { $0.value["value"] as? String ?? "" }
         let front = fields.first.map(plain) ?? plain(i["question"] as? String ?? "")
         let back = fields.count > 1 ? fields[1] : (i["answer"] as? String ?? "")
-        return AnkiCard(id: id, front: front, back: back,
-                        queue: i["queue"] as? Int ?? 0, interval: i["interval"] as? Int ?? 0,
-                        reps: i["reps"] as? Int ?? 0, deck: i["deckName"] as? String ?? "")
+        let queue = i["queue"] as? Int ?? 0
+        let state = queue == 0 ? "new" : (queue == 1 || queue == 3 ? "learning" : "review")
+        return ReviewCard(key: "anki:\(id)", ankiId: id, front: front, backLines: lines(fromHTML: back),
+                          state: state, interval: i["interval"] as? Int ?? 0, reps: i["reps"] as? Int ?? 0)
     }
 
     // MARK: Writing
 
     /// 1 again · 2 hard · 3 good · 4 easy.
-    static func answer(_ card: AnkiCard, ease: Int) throws {
-        let r = try invoke("answerCards", ["answers": [["cardId": card.id, "ease": ease]]])
+    static func answer(_ card: ReviewCard, ease: Int) throws {
+        guard let id = card.ankiId else { throw AnkiError.api("not an Anki card") }
+        let r = try invoke("answerCards", ["answers": [["cardId": id, "ease": ease]]])
         guard let ok = (r as? [Bool])?.first, ok else { throw AnkiError.api("the card was not graded") }
     }
 

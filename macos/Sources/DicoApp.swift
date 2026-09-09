@@ -942,8 +942,8 @@ func runSelfTest() -> Int32 {
         }
         let model = DicoModel(recentKey: testKey)
         model.mode = .cartes
-        model.review.cards = [AnkiCard(id: 1, front: "bonjour", back: "hello<br><i>Bonjour !</i>",
-                                       queue: 0, interval: 0, reps: 0, deck: "x")]
+        model.review.cards = [ReviewCard(key: "bonjour", ankiId: nil, front: "bonjour", backLines: ["hello", "Bonjour !"],
+                                         state: "new", interval: 0, reps: 0)]
         model.review.counts = AnkiCounts(new: 1)
         let hidden = render(model)
         model.reveal()
@@ -953,7 +953,32 @@ func runSelfTest() -> Int32 {
         }
         return "\(lines.count) lines | question \(hidden) → answer \(shown) | keys ✓"
     }
-    line("cards: AnkiConnect") {
+    line("cards: dico's own deck — --due / --grade") {
+        let dir = NSTemporaryDirectory() + "dico-selftest-srs-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir); unsetenv("DICO_STORE") }
+        let store = dir + "/store.json"
+        let seed: [String: Any] = ["version": 1, "entries": [
+            ["key": "chat", "front": "un chat", "lemma": "chat", "sens": "cat", "example": "Je vois un chat."],
+            ["key": "cuire", "front": "cuire", "lemma": "cuire", "sens": "to cook"]]]
+        try JSONSerialization.data(withJSONObject: seed).write(to: URL(fileURLWithPath: store))
+        setenv("DICO_STORE", store, 1)
+        let d = try DicoClient.due()
+        guard d.ankiCounts.new == 2, (d.cards ?? []).count == 2 else { throw Failed(why: "queue \(d.ankiCounts)") }
+        try DicoClient.grade("chat", ease: 3)                 // → learning, due in 10 min
+        try DicoClient.grade("cuire", ease: 4)                // → review in 4 days
+        let after = try DicoClient.due()
+        guard after.ankiCounts.new == 0, (after.cards ?? []).isEmpty else {
+            throw Failed(why: "after grading: \(after.ankiCounts), \((after.cards ?? []).count) card(s)")
+        }
+        let model = DicoModel(recentKey: testKey)
+        model.review.cards = (d.cards ?? []).map(\.card)
+        guard model.review.current?.backLines == ["cat", "Je vois un chat."] else {
+            throw Failed(why: "back lines: \(model.review.current?.backLines ?? [])")
+        }
+        return "2 new → Good + Easy → nothing due | back = meaning + example ✓"
+    }
+    line("cards: AnkiConnect (optional)") {
         guard AnkiClient.reachable() else { throw Failed(why: "Anki is not running") }
         let deck = AnkiClient.deck
         let c = try AnkiClient.counts(deck: deck)
@@ -1132,13 +1157,13 @@ func renderShots(into dir: String) -> Int32 {
     }
     do {
         let m = model(mode: .cartes)
-        m.review.cards = [AnkiCard(id: 1, front: "cuire", back: "to cook<br><i>Il faut cuire les légumes à feu doux.</i>",
-                                   queue: 2, interval: 4, reps: 3, deck: "x"),
-                          AnkiCard(id: 2, front: "un chat", back: "cat", queue: 0, interval: 0, reps: 0, deck: "x")]
+        m.review.cards = [ReviewCard(key: "cuire", ankiId: nil, front: "cuire", backLines: ["to cook", "Il faut cuire les légumes à feu doux."],
+                                     state: "review", interval: 4, reps: 3),
+                          ReviewCard(key: "chat", ankiId: nil, front: "un chat", backLines: ["cat"], state: "new", interval: 0, reps: 0)]
         m.review.counts = AnkiCounts(new: 42, learning: 0, due: 12)
         panel("55-cards-question", m)
         m.reveal(); panel("56-cards-answer", m)
-        let m2 = model(mode: .cartes); m2.review.unreachable = true; panel("57-cards-closed", m2)
+        let m2 = model(mode: .cartes); m2.review.unreachable = true; m2.review.source = .anki; panel("57-cards-closed", m2)
         let m3 = model(mode: .cartes); m3.review.graded = 14; panel("58-cards-done", m3)
     }
     do {

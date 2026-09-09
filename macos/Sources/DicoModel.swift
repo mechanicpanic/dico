@@ -468,17 +468,25 @@ final class DicoModel: ObservableObject {
     func startReview() {
         ankiDeck = AnkiClient.deck
         let deck = ankiDeck
+        let raw = ConfigStore.readRaw(at: ConfigPath.current)
+        let source = ReviewSource(rawValue: raw[ReviewSource.configKey] as? String ?? "") ?? .dico
+        review.source = source
         reviewGeneration += 1
         let gen = reviewGeneration
         review.loading = true
         review.error = nil
         review.unreachable = false
         Task.detached(priority: .userInitiated) {
-            let outcome: Result<([AnkiCard], AnkiCounts), Error>
+            let outcome: Result<([ReviewCard], AnkiCounts), Error>
             do {
-                let cards = try AnkiClient.queue(deck: deck)
-                let counts = try AnkiClient.counts(deck: deck)
-                outcome = .success((cards, counts))
+                if source == .anki {
+                    let cards = try AnkiClient.queue(deck: deck)
+                    let counts = try AnkiClient.counts(deck: deck)
+                    outcome = .success((cards, counts))
+                } else {
+                    let d = try DicoClient.due()
+                    outcome = .success(((d.cards ?? []).map(\.card), d.ankiCounts))
+                }
             } catch {
                 outcome = .failure(error)
             }
@@ -512,8 +520,10 @@ final class DicoModel: ObservableObject {
         review.error = nil
         Task.detached(priority: .userInitiated) {
             var problem: String? = nil
-            do { try AnkiClient.answer(card, ease: ease) }
-            catch { problem = (error as? LocalizedError)?.errorDescription ?? "\(error)" }
+            do {
+                if card.ankiId != nil { try AnkiClient.answer(card, ease: ease) }
+                else { try DicoClient.grade(card.key, ease: ease) }
+            } catch { problem = (error as? LocalizedError)?.errorDescription ?? "\(error)" }
             let failed = problem
             await MainActor.run { [weak self] in
                 guard let self else { return }

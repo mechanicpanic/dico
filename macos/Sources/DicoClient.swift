@@ -355,6 +355,27 @@ enum DicoClient {
         return nil
     }
 
+    /// The built-in deck: dico's store, scheduled by the CLI (SM-2).
+    struct Deck: Decodable {
+        struct Card: Decodable {
+            var key: String; var front: String?; var back: [String]?
+            var state: String?; var ivl: Int?; var reps: Int?
+            var card: ReviewCard {
+                ReviewCard(key: key, ankiId: nil, front: front ?? "", backLines: back ?? [],
+                           state: state ?? "new", interval: ivl ?? 0, reps: reps ?? 0)
+            }
+        }
+        struct Counts: Decodable { var learning: Int?; var due: Int?; var new: Int? }
+        var cards: [Card]?; var counts: Counts?
+        var ankiCounts: AnkiCounts { AnkiCounts(new: counts?.new ?? 0, learning: counts?.learning ?? 0, due: counts?.due ?? 0) }
+    }
+    static func due() throws -> Deck { try call(Deck.self, ["--json", "--due"]) }
+    private struct Graded: Decodable { var card: Deck.Card?; var error: String? }
+    static func grade(_ key: String, ease: Int) throws {
+        let g = try call(Graded.self, ["--json", "--grade", key, "--ease", String(ease)])
+        if let e = g.error, !e.isEmpty { throw DicoError.cli(e) }
+    }
+
     /// Where the CLI keeps things — the store is what the Anki push reads.
     struct Paths: Decodable { var config: String; var vocab: String; var store: String; var data: String }
     static func paths() throws -> Paths { try call(Paths.self, ["--json", "--paths"]) }

@@ -53,7 +53,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     import readline  # ↑ arrow = recall the previous command (interactive mode)
@@ -1253,6 +1253,178 @@ def store_upsert(record):
     store_save(data)
     store_render()
     return "added", 1
+
+
+# ---------------------------------------------------------------------------
+# Spaced repetition — the store IS the deck.
+#
+# An Anki-style SM-2: new → learning (1 min, 10 min) → review, the interval
+# multiplied by an ease that Again/Hard/Easy nudge. Each entry keeps its own
+# state under "srs"; nothing else changes. Anki stays an optional export.
+# ---------------------------------------------------------------------------
+
+SRS_STEPS = (60, 600)                 # learning steps, seconds
+SRS_NEW_PER_DAY = 20
+SRS_AGAIN, SRS_HARD, SRS_GOOD, SRS_EASY = 1, 2, 3, 4
+
+
+def _srs_now():
+    return datetime.now().replace(microsecond=0)
+
+
+def _srs_parse(iso):
+    try:
+        return datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return None
+
+
+def srs_state(entry):
+    """The scheduling record of an entry, with defaults for a fresh word."""
+    s = entry.get("srs") or {}
+    return {"state": s.get("state", "new"), "due": s.get("due", ""),
+            "ivl": int(s.get("ivl", 0)), "ease": int(s.get("ease", 2500)),
+            "reps": int(s.get("reps", 0)), "lapses": int(s.get("lapses", 0)),
+            "step": int(s.get("step", 0))}
+
+
+def srs_grade(state, ease, now=None):
+    """Apply a grade (1 again · 2 hard · 3 good · 4 easy). Returns the new state."""
+    now = now or _srs_now()
+    st = dict(state)
+    st["reps"] += 1
+    day = 86400
+
+    def due_in(seconds):
+        return (now + timedelta(seconds=seconds)).isoformat(timespec="seconds")
+
+    def graduate(days, easy=False):
+        st.update(state="review", step=0, ivl=max(1, int(days)))
+        if easy:
+            st["ease"] = st["ease"] + 150
+        st["due"] = (now + timedelta(days=st["ivl"])).isoformat(timespec="seconds")
+
+    if st["state"] in ("new", "learning", "relearning"):
+        if ease == SRS_EASY:
+            graduate(4, easy=True)
+        elif ease == SRS_AGAIN:
+            st.update(state="learning" if st["state"] == "new" else st["state"],
+                      step=0, due=due_in(SRS_STEPS[0]))
+        elif ease == SRS_HARD:
+            st.update(state="learning" if st["state"] == "new" else st["state"],
+                      due=due_in(SRS_STEPS[min(st["step"], len(SRS_STEPS) - 1)]))
+        else:                                              # good: next step, or out
+            nxt = st["step"] + 1
+            if st["state"] == "relearning" or nxt >= len(SRS_STEPS):
+                graduate(1 if st["state"] != "relearning" else max(1, st["ivl"]))
+            else:
+                st.update(state="learning", step=nxt, due=due_in(SRS_STEPS[nxt]))
+        return st
+
+    # review
+    if ease == SRS_AGAIN:
+        st["lapses"] += 1
+        st["ease"] = max(1300, st["ease"] - 200)
+        st.update(state="relearning", step=0, ivl=max(1, st["ivl"] // 2),
+                  due=due_in(SRS_STEPS[-1]))
+        return st
+    if ease == SRS_HARD:
+        st["ease"] = max(1300, st["ease"] - 150)
+        st["ivl"] = max(st["ivl"] + 1, int(st["ivl"] * 1.2))
+    elif ease == SRS_GOOD:
+        st["ivl"] = max(st["ivl"] + 1, int(st["ivl"] * st["ease"] / 1000))
+    else:
+        st["ease"] += 150
+        st["ivl"] = max(st["ivl"] + 2, int(st["ivl"] * st["ease"] / 1000 * 1.3))
+    st["due"] = (now + timedelta(days=st["ivl"])).isoformat(timespec="seconds")
+    return st
+
+
+def _srs_card(entry):
+    st = srs_state(entry)
+    back = [entry.get("sens", "")]
+    if entry.get("example"):
+        back.append(entry["example"])
+    return {"key": entry.get("key", ""), "front": entry.get("front") or entry.get("lemma", ""),
+            "back": [b for b in back if b], "state": st["state"], "ivl": st["ivl"],
+            "reps": st["reps"], "due": st["due"], "gender": entry.get("gender", ""),
+            "pos": entry.get("pos", ""), "cefr": entry.get("cefr", ""), "ipa": entry.get("ipa", "")}
+
+
+def srs_queue(new_limit=SRS_NEW_PER_DAY, now=None):
+    """What to review now: learning steps that are due, reviews due today,
+    then the newest words never seen (at most `new_limit`). Plus the counts."""
+    now = now or _srs_now()
+    end_of_day = now.replace(hour=23, minute=59, second=59)
+    learning, review, new = [], [], []
+    for e in store_load()["entries"]:
+        if not (e.get("front") or e.get("lemma")):
+            continue
+        st = srs_state(e)
+        due = _srs_parse(st["due"])
+        if st["state"] == "new":
+            new.append(e)
+        elif st["state"] in ("learning", "relearning"):
+            if due is None or due <= now:
+                learning.append((due or now, e))
+        elif due is None or due <= end_of_day:
+            review.append((due or now, e))
+    learning.sort(key=lambda t: t[0])
+    review.sort(key=lambda t: t[0])
+    new.sort(key=lambda e: e.get("last_seen", ""), reverse=True)
+    cards = [_srs_card(e) for _, e in learning] + [_srs_card(e) for _, e in review] \
+        + [_srs_card(e) for e in new[:new_limit]]
+    counts = {"learning": len(learning), "due": len(review), "new": len(new)}
+    return cards, counts
+
+
+def srs_answer(key, ease):
+    """Grade one word. Returns its card, rescheduled — or None if unknown."""
+    if ease not in (SRS_AGAIN, SRS_HARD, SRS_GOOD, SRS_EASY):
+        raise ValueError("ease must be 1, 2, 3 or 4")
+    data = store_load()
+    for e in data["entries"]:
+        if e.get("key") == key:
+            e["srs"] = srs_grade(srs_state(e), ease)
+            store_save(data)
+            return _srs_card(e)
+    return None
+
+
+def run_review():
+    """dico --review: the deck in the terminal. Space/⏎ shows, 1–4 grades, q quits."""
+    cards, counts = srs_queue()
+    if not cards:
+        print(f"{GREEN}✓ Nothing due.{RESET} {DIM}Look words up — they become cards.{RESET}")
+        return
+    print(f"\n{BOLD}🎴 {len(cards)} card(s){RESET}  {DIM}{counts['due']} due · "
+          f"{counts['learning']} learning · {counts['new']} new{RESET}\n")
+    done = 0
+    i = 0
+    while i < len(cards):
+        c = cards[i]
+        print(f"{BOLD}{c['front']}{RESET}  {DIM}{c['state']}{RESET}")
+        try:
+            input(f"   {DIM}⏎ to show{RESET} ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        for line in c["back"]:
+            print(f"   {line}")
+        try:
+            ans = input(f"   {DIM}1 again · 2 hard · 3 good · 4 easy · q{RESET} ").strip() or "3"
+        except (EOFError, KeyboardInterrupt):
+            break
+        if ans.lower().startswith("q"):
+            break
+        if ans not in "1234" or len(ans) != 1:
+            continue
+        srs_answer(c["key"], int(ans))
+        done += 1
+        if ans == "1":
+            cards.append(c)
+        i += 1
+        print()
+    print(f"{GREEN}✓ {done} graded.{RESET}")
 
 
 def store_forget(word):
@@ -2979,6 +3151,13 @@ def main():
     p.add_argument("--no-llm", action="store_true", help="with --setup: skip the tutor step")
     p.add_argument("--tour", action="store_true", help="a 2-minute guided tour")
     p.add_argument("--version", action="version", version=f"dico {__version__}")
+    p.add_argument("--review", action="store_true",
+                   help="review the saved words (spaced repetition, in the terminal)")
+    p.add_argument("--due", action="store_true",
+                   help="with --json: the cards to review now, and the counts")
+    p.add_argument("--grade", metavar="KEY", help="with --ease N and --json: grade one card")
+    p.add_argument("--ease", type=int, default=3, choices=(1, 2, 3, 4),
+                   help="1 again · 2 hard · 3 good · 4 easy (with --grade)")
     p.add_argument("--paths", action="store_true",
                    help="where the config, the vocabulary, the store and the data live (JSON with --json)")
     p.add_argument("--say", action="store_true",
@@ -3000,6 +3179,16 @@ def main():
                         "pronouns, conjunctions, auxiliaries) — the grammatical scaffolding")
     args = p.parse_args()
 
+    if args.review:
+        return run_review()
+    if args.due:
+        cards, counts = srs_queue()
+        return print(json.dumps({"deck": "dico", "cards": cards, "counts": counts}, ensure_ascii=False))
+    if args.grade:
+        card = srs_answer(args.grade, args.ease)
+        if card is None:
+            return print(json.dumps({"error": f"no card « {args.grade} »"}, ensure_ascii=False))
+        return print(json.dumps({"card": card}, ensure_ascii=False))
     if args.paths:
         paths = {"config": CONFIG_PATH, "vocab": VOCAB, "store": STORE, "data": DATA_DIR,
                  "home": DICO_HOME}

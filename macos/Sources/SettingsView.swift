@@ -366,10 +366,17 @@ struct VocabularyTab: View {
                     .onChange(of: store.autosave) { _, _ in store.save() }
                 }
 
-                SettingsCard(title: "Anki",
-                             caption: "The 🎴 Cards mode reviews this deck through Anki (with the AnkiConnect add-on, 2055492159) and can push every saved word into it.") {
+                SettingsCard(title: "Cards",
+                             caption: store.reviewSource == .dico
+                                ? "Every saved word is a card, scheduled by dico itself (spaced repetition) — no other app needed. « push to Anki » exports them."
+                                : "Reviews this Anki deck through the AnkiConnect add-on (2055492159); Anki must be open.") {
                     HStack(spacing: 6) {
-                        Text("Deck").font(sans(12, .medium)).frame(width: 78, alignment: .leading)
+                        Text("Review with").font(sans(12, .medium)).frame(width: 78, alignment: .leading)
+                        ChipRow(items: ReviewSource.allCases.map { ($0, $0.label) }, selection: $store.reviewSource)
+                            .onChange(of: store.reviewSource) { _, _ in store.save() }
+                    }
+                    HStack(spacing: 6) {
+                        Text("Anki deck").font(sans(12, .medium)).frame(width: 78, alignment: .leading)
                         TextField(AnkiClient.defaultDeck, text: $store.ankiDeck)
                             .modifier(WellField())
                             .onChange(of: store.ankiDeck) { _, _ in store.scheduleSave() }

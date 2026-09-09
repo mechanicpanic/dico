@@ -121,6 +121,7 @@ final class ConfigStore: ObservableObject {
     @Published var appearance: String = "system"
     /// The Anki deck the Cards mode reviews (AnkiConnect).
     @Published var ankiDeck: String = ""
+    @Published var reviewSource: ReviewSource = .dico
 
     init(path: String = ConfigPath.current) {
         self.path = path
@@ -145,6 +146,7 @@ final class ConfigStore: ObservableObject {
         selection = bool(Selection.configKey) ?? true
         appearance = string(Appearance.configKey) ?? "system"
         ankiDeck = string(AnkiClient.configKey) ?? ""
+        reviewSource = ReviewSource(rawValue: string(ReviewSource.configKey) ?? "") ?? .dico
     }
 
     private func string(_ k: String) -> String? { raw[k] as? String }
@@ -190,6 +192,7 @@ final class ConfigStore: ObservableObject {
         put(Selection.configKey, selection)
         put(Appearance.configKey, appearance == "system" ? nil : appearance)
         put(AnkiClient.configKey, ankiDeck.trimmingCharacters(in: .whitespaces).isEmpty ? nil : ankiDeck)
+        put(ReviewSource.configKey, reviewSource == .dico ? nil : reviewSource.rawValue)
         put("vocab_path", vocabPath.isEmpty ? nil : vocabPath)
         put("store_path", storePath.isEmpty ? nil : storePath)
 

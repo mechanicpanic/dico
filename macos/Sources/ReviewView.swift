@@ -3,9 +3,30 @@ import AppKit
 
 // MARK: - 🎴 Cards — the Anki deck, reviewed in the panel
 
+/// One card, whichever deck it comes from.
+struct ReviewCard: Identifiable, Hashable {
+    let key: String             // dico's store key, or "anki:<id>"
+    let ankiId: Int?
+    let front: String
+    let backLines: [String]     // the meaning first, then the example(s)
+    let state: String           // new · learning · relearning · review
+    let interval: Int
+    let reps: Int
+    var id: String { key }
+    var isNew: Bool { state == "new" }
+    var isLearning: Bool { state == "learning" || state == "relearning" }
+}
+
+/// Where the Cards mode reads and grades: dico's own store, or Anki.
+enum ReviewSource: String, CaseIterable {
+    case dico, anki
+    static let configKey = "review_source"
+    var label: String { self == .dico ? "dico (built in)" : "Anki" }
+}
+
 /// What the Cards mode is showing.
 struct ReviewState {
-    var cards: [AnkiCard] = []
+    var cards: [ReviewCard] = []
     var index = 0
     var revealed = false
     var loading = false
@@ -17,7 +38,8 @@ struct ReviewState {
     var pushed: String? = nil
     var launching = false
 
-    var current: AnkiCard? { index < cards.count ? cards[index] : nil }
+    var source: ReviewSource = .dico
+    var current: ReviewCard? { index < cards.count ? cards[index] : nil }
     var remaining: Int { max(0, cards.count - index) }
 }
 
@@ -58,15 +80,15 @@ struct ReviewView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("🎴").font(.system(size: 13))
-            Text(model.ankiDeck).font(serif(20)).foregroundStyle(Palette.ink)
+            Text(r.source == .anki ? model.ankiDeck : "Saved words").font(serif(20)).foregroundStyle(Palette.ink)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Spacer(minLength: 0)
             if r.counts.total > 0 || r.graded > 0 {
                 Text(countsLine).font(mono(9.5)).foregroundStyle(Palette.ink(0.35))
             }
             if !r.unreachable {
-                LinkButton(label: r.pushing ? "pushing…" : "↑ push saved words", tint: Palette.jauneInk, size: 10.5,
-                           help: "Every word dico saved that the deck does not have yet becomes a card") {
+                LinkButton(label: r.pushing ? "pushing…" : "↑ push to Anki", tint: Palette.jauneInk, size: 10.5,
+                           help: "Export: every saved word the Anki deck does not have yet becomes a card there") {
                     model.pushToAnki()
                 }
             }
@@ -85,7 +107,7 @@ struct ReviewView: View {
 
     // MARK: One card
 
-    private func card(_ c: AnkiCard) -> some View {
+    private func card(_ c: ReviewCard) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(c.isNew ? "new" : (c.isLearning ? "learning" : "review · \(c.interval) d"))
@@ -127,7 +149,7 @@ struct ReviewView: View {
                     TintButton(label: "Easy", keys: "4", tint: Palette.bleu, ink: Palette.bleuInk,
                                help: "Easy (4)") { model.grade(4) }
                     Spacer(minLength: 0)
-                    KeyHint("in Anki, on the spot", alpha: 0.25)
+                    KeyHint(r.source == .anki ? "graded in Anki" : "graded in dico's store", alpha: 0.25)
                 }
             } else {
                 HStack(spacing: 10) {
@@ -150,8 +172,9 @@ struct ReviewView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(r.graded > 0 ? "Done for now." : "Nothing due.").font(serif(24)).foregroundStyle(Palette.ink)
             Text(r.graded > 0
-                 ? "\(r.graded) card\(r.graded == 1 ? "" : "s") graded — Anki has the schedule."
-                 : "Anki has no card waiting in this deck. « push saved words » above adds what you looked up.")
+                 ? "\(r.graded) card\(r.graded == 1 ? "" : "s") graded. Come back tomorrow."
+                 : (r.source == .anki ? "Anki has no card waiting in this deck."
+                                      : "No saved word is due. Look words up — each one becomes a card."))
                 .font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink(0.5))
                 .frame(maxWidth: 400, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
