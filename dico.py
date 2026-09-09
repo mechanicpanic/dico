@@ -3271,6 +3271,7 @@ def main():
     p.add_argument("--due", action="store_true",
                    help="with --json: the cards to review now, and the counts")
     p.add_argument("--grade", metavar="KEY", help="with --ease N and --json: grade one card")
+    p.add_argument("--card", metavar="KEY", help="with --json: one card, filled in (gloss, example, IPA…) if it was bare")
     p.add_argument("--ease", type=int, default=3, choices=(1, 2, 3, 4),
                    help="1 again · 2 hard · 3 good · 4 easy (with --grade)")
     p.add_argument("--paths", action="store_true",
@@ -3303,6 +3304,14 @@ def main():
     if args.due:
         cards, counts = srs_queue()
         return print(json.dumps({"deck": "dico", "cards": cards, "counts": counts}, ensure_ascii=False))
+    if args.card:
+        data = store_load()
+        for e in data["entries"]:
+            if e.get("key") == args.card:
+                if enrich_entry(e):
+                    store_save(data)
+                return print(json.dumps({"card": _srs_card(e)}, ensure_ascii=False))
+        return print(json.dumps({"error": f"no card « {args.card} »"}, ensure_ascii=False))
     if args.grade:
         card = srs_answer(args.grade, args.ease)
         if card is None:

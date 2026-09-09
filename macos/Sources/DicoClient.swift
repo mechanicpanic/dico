@@ -373,6 +373,13 @@ enum DicoClient {
     }
     static func due() throws -> Deck { try call(Deck.self, ["--json", "--due"]) }
     private struct Graded: Decodable { var card: Deck.Card?; var error: String? }
+    /// One card, filled in by the CLI if it was bare (gloss, example, IPA…).
+    static func card(_ key: String) throws -> ReviewCard {
+        let g = try call(Graded.self, ["--json", "--card", key])
+        if let e = g.error, !e.isEmpty { throw DicoError.cli(e) }
+        guard let c = g.card else { throw DicoError.cli("no card") }
+        return c.card
+    }
     static func grade(_ key: String, ease: Int) throws {
         let g = try call(Graded.self, ["--json", "--grade", key, "--ease", String(ease)])
         if let e = g.error, !e.isEmpty { throw DicoError.cli(e) }

@@ -15,6 +15,8 @@ struct ReviewCard: Identifiable, Hashable {
     var gender = "", pos = "", cefr = "", ipa = ""
     var id: String { key }
     var isNew: Bool { state == "new" }
+    /// Saved before cards carried a gloss — worth a second look by the CLI.
+    var isBare: Bool { ankiId == nil && backLines.isEmpty }
     var isLearning: Bool { state == "learning" || state == "relearning" }
 }
 

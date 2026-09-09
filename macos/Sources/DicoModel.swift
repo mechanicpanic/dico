@@ -504,6 +504,7 @@ final class DicoModel: ObservableObject {
                     self.review.index = 0
                     self.review.revealed = false
                     self.review.unreachable = false
+                    self.fillCurrentCard()
                 case .failure(let e):
                     if case AnkiError.unreachable = e { self.review.unreachable = true }
                     else { self.review.error = (e as? LocalizedError)?.errorDescription ?? "\(e)" }
@@ -515,6 +516,20 @@ final class DicoModel: ObservableObject {
     func reveal() {
         guard review.current != nil else { return }
         review.revealed = true
+    }
+
+    /// A card saved before the store carried glosses shows up bare: have the
+    /// CLI fill it in (gloss, example, IPA, CEFR) and swap it in place.
+    private func fillCurrentCard() {
+        guard let card = review.current, card.isBare else { return }
+        let index = review.index
+        Task.detached(priority: .userInitiated) {
+            guard let filled = try? DicoClient.card(card.key) else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.review.index == index, self.review.current?.key == card.key else { return }
+                self.review.cards[index] = filled
+            }
+        }
     }
 
     /// 1 again · 2 hard · 3 good · 4 easy — sent to Anki, then the next card.
@@ -538,6 +553,7 @@ final class DicoModel: ObservableObject {
                 self.review.index += 1
                 self.review.revealed = false
                 if self.review.current == nil { self.startReview() }   // learning steps may be due again
+                else { self.fillCurrentCard() }
             }
         }
     }
