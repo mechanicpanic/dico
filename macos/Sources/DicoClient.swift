@@ -360,9 +360,11 @@ enum DicoClient {
         struct Card: Decodable {
             var key: String; var front: String?; var back: [String]?
             var state: String?; var ivl: Int?; var reps: Int?
+            var gender: String?; var pos: String?; var cefr: String?; var ipa: String?
             var card: ReviewCard {
                 ReviewCard(key: key, ankiId: nil, front: front ?? "", backLines: back ?? [],
-                           state: state ?? "new", interval: ivl ?? 0, reps: reps ?? 0)
+                           state: state ?? "new", interval: ivl ?? 0, reps: reps ?? 0,
+                           gender: gender ?? "", pos: pos ?? "", cefr: cefr ?? "", ipa: ipa ?? "")
             }
         }
         struct Counts: Decodable { var learning: Int?; var due: Int?; var new: Int? }
@@ -496,8 +498,11 @@ enum DicoClient {
         return a
     }
 
-    static func save(term: String, sens: String) throws -> SaveResult {
-        try call(SaveResult.self, ["--json", "--save-term", term, "--sens", sens])
+    static func save(term: String, sens: String, example: [String] = []) throws -> SaveResult {
+        var args = ["--json", "--save-term", term, "--sens", sens]
+        if example.count >= 1, !example[0].isEmpty { args += ["--example", example[0]] }
+        if example.count >= 2, !example[1].isEmpty { args += ["--example-en", example[1]] }
+        return try call(SaveResult.self, args)
     }
 
     // MARK: The word-card sections

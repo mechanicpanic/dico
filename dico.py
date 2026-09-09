@@ -1229,8 +1229,8 @@ def store_save(data):
         print(f"  {YELLOW}💾 store not writable:{RESET} {e}")
 
 
-_STORE_FIELDS = ("front", "lemma", "sens", "pos", "gender", "example",
-                 "src_word", "src_lang", "tier")
+_STORE_FIELDS = ("front", "lemma", "sens", "gloss", "pos", "gender", "example", "example_en",
+                 "src_word", "src_lang", "tier", "cefr", "ipa")
 
 
 def store_upsert(record):
@@ -1340,15 +1340,126 @@ def srs_grade(state, ease, now=None):
     return st
 
 
+def _card_back(entry):
+    """The lines behind a card: the meaning (English gloss, plus the Russian
+    you typed when that is how you got there), then the example and its
+    translation."""
+    sens = (entry.get("sens") or "").strip()
+    gloss = (entry.get("gloss") or "").strip()
+    lemma = (entry.get("lemma") or "").strip()
+    typed_is_french = entry.get("src_lang") == "fr" or (sens and _deaccent(sens) == _deaccent(lemma))
+    if gloss and sens and not typed_is_french and _deaccent(sens) != _deaccent(gloss):
+        first = f"{sens} · {gloss}"
+    else:
+        first = gloss or ("" if typed_is_french else sens)
+    lines = [first]
+    if entry.get("example"):
+        lines.append(entry["example"])
+        if entry.get("example_en"):
+            lines.append(entry["example_en"])
+    return [l for l in lines if l]
+
+
 def _srs_card(entry):
     st = srs_state(entry)
-    back = [entry.get("sens", "")]
-    if entry.get("example"):
-        back.append(entry["example"])
     return {"key": entry.get("key", ""), "front": entry.get("front") or entry.get("lemma", ""),
-            "back": [b for b in back if b], "state": st["state"], "ivl": st["ivl"],
-            "reps": st["reps"], "due": st["due"], "gender": entry.get("gender", ""),
+            "back": _card_back(entry), "state": st["state"], "ivl": st["ivl"],
+            "reps": st["reps"], "due": st["due"], "gender": _short_gender(entry.get("gender", "")),
             "pos": entry.get("pos", ""), "cefr": entry.get("cefr", ""), "ipa": entry.get("ipa", "")}
+
+
+def _short_gender(g):
+    g = (g or "").lower()
+    if g in ("m", "f"):
+        return g
+    if "fémin" in g or "femin" in g:
+        return "f"
+    if "mascul" in g:
+        return "m"
+    return ""
+
+
+def _gloss_en(lemma):
+    """An English gloss of a French lemma — Google, cached, or nothing."""
+    try:
+        data = _google_query(lemma, tl="en", sl="fr")        # sl=auto mistakes « ligne » for English
+        tr = "".join(seg[0] for seg in data[0] if seg and seg[0]).strip()
+        return tr                                            # a cognate (« orientation ») is a fine gloss
+    except Exception:
+        return ""
+
+
+def _example_for(lemma):
+    """A real sentence with the word, and its English — Tatoeba, cached."""
+    try:
+        ex = _tatoeba(lemma, "eng", limit=1)
+    except Exception:
+        ex = []
+    return (ex[0][0], ex[0][1]) if ex else ("", "")
+
+
+def enrich_entry(e, network=True):
+    """Fill what a card needs and the entry lacks. Returns what changed."""
+    changed = []
+    lemma = e.get("lemma") or e.get("front") or ""
+    if not lemma:
+        return changed
+    g = _short_gender(e.get("gender", ""))
+    if g != (e.get("gender") or ""):
+        e["gender"] = g
+        changed.append("gender")
+    lex = lexique_lookup(lemma) if (not e.get("cefr") or not e.get("ipa")) else None
+    if lex:
+        if not e.get("cefr") and lex.get("cefr"):
+            e["cefr"] = lex["cefr"]; changed.append("cefr")
+        if not e.get("ipa") and lex.get("ipa"):
+            e["ipa"] = lex["ipa"]; changed.append("ipa")
+        if not e.get("gender") and lex.get("genre"):
+            e["gender"] = lex["genre"]; changed.append("gender")
+        if not e.get("pos") and lex.get("pos"):
+            e["pos"] = lex["pos"]; changed.append("pos")
+    sens = (e.get("sens") or "").strip()
+    typed_is_french = e.get("src_lang") == "fr" or (sens and _deaccent(sens) == _deaccent(lemma))
+    if not e.get("gloss"):
+        if e.get("src_lang") == "en" and sens and not typed_is_french:
+            e["gloss"] = sens; changed.append("gloss")
+        elif network:
+            gl = _gloss_en(lemma)
+            if gl:
+                e["gloss"] = gl; changed.append("gloss")
+    # A conjugation stub is not an example.
+    if (e.get("example") or "").startswith("prés. :"):
+        e["example"] = ""; changed.append("example")
+    if not e.get("example") and network:
+        fr, en = _example_for(lemma)
+        if fr:
+            e["example"], e["example_en"] = fr, en
+            changed.append("example")
+    return changed
+
+
+def run_enrich(as_json=False):
+    """dico --enrich: backfill gloss, example, IPA, CEFR, gender on every saved word."""
+    data = store_load()
+    entries = data["entries"]
+    touched = 0
+    for i, e in enumerate(entries, 1):
+        changed = enrich_entry(e)
+        if changed:
+            touched += 1
+            store_save(data)                          # resumable: every change sticks
+            if not as_json:
+                print(f"  {GREEN}✓{RESET} {e.get('front') or e.get('lemma')}  "
+                      f"{DIM}{', '.join(changed)}{RESET}")
+        elif not as_json:
+            print(f"  {DIM}· {e.get('front') or e.get('lemma')}{RESET}")
+        if i % 10 == 0:
+            time.sleep(0.4)                           # be gentle with Google and Tatoeba
+    store_render()
+    if as_json:
+        print(json.dumps({"entries": len(entries), "enriched": touched}, ensure_ascii=False))
+    else:
+        print(f"{BOLD}✓ {touched} of {len(entries)} entries enriched.{RESET}")
 
 
 def srs_queue(new_limit=SRS_NEW_PER_DAY, now=None):
@@ -2697,15 +2808,19 @@ def _load_history():
     readline.set_history_length(1000)
 
 
-def _save_term(french, sens, src_lang="en", tier="google", quiet=False):
-    """Save a French term (front with its article if a noun), "sens" on the back."""
+def _save_term(french, sens, src_lang="en", tier="google", quiet=False,
+               example="", example_en=""):
+    """Save a French term (front with its article if a noun); the back gets an
+    English gloss, the word you typed when it was Russian, and an example."""
     front, lex = _fr_head(french)
     lemma = (lex["lemma"] if lex else french)
-    rec = {"key": store_key(lemma), "front": front, "lemma": lemma, "sens": sens,
+    rec = {"key": store_key(lemma), "front": front, "lemma": lemma, "sens": sens, "gloss": "",
            "pos": (lex["pos"] if lex else ""), "gender": (lex["genre"] if lex else "") or "",
-           "example": "", "src_word": sens, "src_lang": src_lang, "tier": tier,
+           "example": example or "", "example_en": example_en or "",
+           "src_word": sens, "src_lang": src_lang, "tier": tier,
            # Offline extras, so a card carries them into Anki/Obsidian too.
            "cefr": (lex or {}).get("cefr") or "", "ipa": (lex or {}).get("ipa") or ""}
+    enrich_entry(rec)                                 # gloss + example, cached lookups
     status, cnt = store_upsert(rec)
     if quiet:
         return front, status, cnt
@@ -3172,6 +3287,10 @@ def main():
                    help="save this French term (with --sens: the meaning on the back)")
     p.add_argument("--sens", metavar="TEXT", default="",
                    help="meaning (original word / translation) for --save-term")
+    p.add_argument("--example", metavar="TEXT", default="", help="with --save-term: an example sentence")
+    p.add_argument("--example-en", metavar="TEXT", default="", help="with --save-term: its translation")
+    p.add_argument("--enrich", action="store_true",
+                   help="backfill every saved word: English gloss, example, IPA, CEFR, gender")
     p.add_argument("--context", metavar="TEXT", default="",
                    help="context for a question (-a): last word / last sentence")
     p.add_argument("--mots-outils", nargs="?", const=120, type=int, metavar="N",
@@ -3203,13 +3322,16 @@ def main():
         return setup_llm()
     if args.tour:
         return run_tour()
+    if args.enrich:
+        return run_enrich(as_json=args.json)
     if args.save_term:
+        lang = "fr" if _deaccent(args.sens or "") == _deaccent(args.save_term) else detect_lang(args.sens or "en")
         if args.json:
-            front, status, cnt = _save_term(args.save_term, args.sens,
-                                            detect_lang(args.sens or "en"), quiet=True)
+            front, status, cnt = _save_term(args.save_term, args.sens, lang, quiet=True,
+                                            example=args.example, example_en=args.example_en)
             return print(json.dumps({"saved": front, "status": status, "count": cnt,
                                      "sens": args.sens}, ensure_ascii=False))
-        return _save_term(args.save_term, args.sens, detect_lang(args.sens or "en"))
+        return _save_term(args.save_term, args.sens, lang, example=args.example, example_en=args.example_en)
     if args.context:
         _LAST["word"] = args.context
     if args.examples and not args.json:

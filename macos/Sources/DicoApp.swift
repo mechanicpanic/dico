@@ -1158,8 +1158,8 @@ func renderShots(into dir: String) -> Int32 {
     do {
         let m = model(mode: .cartes)
         m.review.cards = [ReviewCard(key: "cuire", ankiId: nil, front: "cuire", backLines: ["to cook", "Il faut cuire les légumes à feu doux."],
-                                     state: "review", interval: 4, reps: 3),
-                          ReviewCard(key: "chat", ankiId: nil, front: "un chat", backLines: ["cat"], state: "new", interval: 0, reps: 0)]
+                                     state: "review", interval: 4, reps: 3, gender: "", pos: "verbe", cefr: "A2", ipa: "kɥiʁ"),
+                          ReviewCard(key: "chat", ankiId: nil, front: "un chat", backLines: ["кошка · cat", "Je vois un chat.", "I see a cat."], state: "new", interval: 0, reps: 0, gender: "m", pos: "nom", cefr: "A1", ipa: "ʃa")]
         m.review.counts = AnkiCounts(new: 42, learning: 0, due: 12)
         panel("55-cards-question", m)
         m.reveal(); panel("56-cards-answer", m)

@@ -51,6 +51,12 @@ and a macOS popup.
   ease that Again/Hard/Easy nudge), and keeps the state in its own store —
   no other app needed. `dico --review` does the same in the terminal;
   `--json --due` and `--json --grade KEY --ease N` are what the panel uses.
+- **What a card holds.** Front: the word with its article, gender, IPA,
+  CEFR level and part of speech. Back: an English gloss (fetched when what
+  you typed was French, kept beside the Russian when that is how you got
+  there), then a real example sentence and its translation — the card's own
+  when the lookup had one, Tatoeba otherwise. `dico --enrich` backfills all
+  of this on the words saved before.
 - Learning steps come first, then reviews due today, then up to twenty of
   the newest words. « Look it up » opens the Word card for the card on screen.
 - **Anki, optionally.** Settings ▸ Vocabulary ▸ Cards can review an Anki

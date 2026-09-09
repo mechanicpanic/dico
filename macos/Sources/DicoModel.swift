@@ -432,15 +432,18 @@ final class DicoModel: ObservableObject {
         // For a French card, the entry to save is the head ("une maison").
         let term = sense.saveTerm ?? lookup.head ?? lookup.query ?? ""
         guard !term.isEmpty else { return }
-        let sens = currentSource.isEmpty ? (lookup.query ?? term) : currentSource
-        saveTerm(term, sens: sens, shown: sense.front ?? term)
+        // A French card: the sense you clicked is the English gloss — that is
+        // the back. A translation card: the word you typed is.
+        let sens = lookup.direction == "fr" ? sense.display
+                 : (currentSource.isEmpty ? (lookup.query ?? term) : currentSource)
+        saveTerm(term, sens: sens, shown: sense.front ?? term, example: cardExamples.first ?? [])
     }
 
-    private func saveTerm(_ term: String, sens: String, shown: String) {
+    private func saveTerm(_ term: String, sens: String, shown: String, example: [String] = []) {
         Task.detached(priority: .userInitiated) {
             let msg: String
             do {
-                let r = try DicoClient.save(term: term, sens: sens)
+                let r = try DicoClient.save(term: term, sens: sens, example: example)
                 let status = r.status ?? "added"
                 msg = "✓ \u{ab} \(r.saved ?? shown) \u{bb} \(status)"
             } catch {

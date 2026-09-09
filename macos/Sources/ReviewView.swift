@@ -12,6 +12,7 @@ struct ReviewCard: Identifiable, Hashable {
     let state: String           // new · learning · relearning · review
     let interval: Int
     let reps: Int
+    var gender = "", pos = "", cefr = "", ipa = ""
     var id: String { key }
     var isNew: Bool { state == "new" }
     var isLearning: Bool { state == "learning" || state == "relearning" }
@@ -115,9 +116,22 @@ struct ReviewView: View {
                 Hairline()
                 Text("\(r.index + 1) / \(r.cards.count)").font(mono(9.5)).foregroundStyle(Palette.ink(0.30))
             }
-            Text(c.front).font(serif(34, .medium)).foregroundStyle(Palette.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 6)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(c.front).font(serif(34, .medium)).foregroundStyle(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !c.gender.isEmpty {
+                    Text(c.gender).font(sans(12, .semibold)).foregroundStyle(Palette.genderTint(c.gender))
+                }
+            }
+            .padding(.top, 6)
+            if !c.ipa.isEmpty || !c.cefr.isEmpty || !c.pos.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if !c.ipa.isEmpty { Text("/\(c.ipa)/").font(mono(10.5)).foregroundStyle(Palette.ink(0.35)) }
+                    if !c.cefr.isEmpty { CEFRPill(level: c.cefr) }
+                    if !c.pos.isEmpty { Text(c.pos).font(sans(10.5)).foregroundStyle(Palette.ink(0.45)) }
+                }
+                .padding(.top, -8)
+            }
             if r.revealed {
                 Hairline()
                 let lines = c.backLines
@@ -126,9 +140,15 @@ struct ReviewView: View {
                         Text(first).font(sans(15)).foregroundStyle(Palette.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    ForEach(Array(lines.dropFirst().enumerated()), id: \.offset) { _, l in
-                        Text(l).font(serif(13)).italic().foregroundStyle(Palette.ink(0.6))
-                            .fixedSize(horizontal: false, vertical: true)
+                    // The example in serif italic, its translation dimmed in sans.
+                    ForEach(Array(lines.dropFirst().enumerated()), id: \.offset) { i, l in
+                        if i == 0 {
+                            Text(l).font(serif(13)).italic().foregroundStyle(Palette.ink(0.85))
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text(l).font(sans(10.5)).foregroundStyle(Palette.ink(0.4))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
                 .transition(.opacity)
