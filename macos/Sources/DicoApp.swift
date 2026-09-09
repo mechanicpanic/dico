@@ -435,8 +435,14 @@ func runSelfTest() -> Int32 {
         return "\(n) mistake(s) → \u{ab} \(g.corrected ?? "?") \u{bb} | \(render(.grammaire(g, "elle est parti")))"
     }
     line("x-ray je vais au marché") {
-        let t = try DicoClient.xray("je vais au marché demain")
-        return "\(t.count) words — \(t.map { $0.lemma ?? "?" }.joined(separator: "/")) | \(render(.rayonsX(t)))"
+        let x = try DicoClient.xray("je vais au marché demain")
+        let t = x.tokens
+        // English in: translated first, then dissected.
+        let en = try DicoClient.xray("i have to go")
+        guard let tr = en.translated, !tr.isEmpty, en.source == "i have to go" else {
+            throw Failed(why: "« i have to go » was not translated before the x-ray")
+        }
+        return "\(t.count) words — \(t.map { $0.lemma ?? "?" }.joined(separator: "/")) | \(render(.rayonsX(x))) | en → \u{ab} \(tr) \u{bb}"
     }
     line("definition -f cuisiner") {
         let d = try DicoClient.definition("cuisiner")
@@ -511,12 +517,12 @@ func runSelfTest() -> Int32 {
     line("clear on erase") {
         let model = DicoModel(recentKey: testKey)
         model.query = "cook"
-        model.outcome = .rayonsX([XrayToken(text: "je")])
+        model.outcome = .rayonsX(Xray(tokens: [XrayToken(text: "je")]))
         model.query = ""
         model.inputChanged()
         guard case .vide = model.outcome else { throw Failed(why: "the results survived an empty field") }
         model.query = "chat"
-        model.outcome = .rayonsX([XrayToken(text: "je")])
+        model.outcome = .rayonsX(Xray(tokens: [XrayToken(text: "je")]))
         guard model.escape() else { throw Failed(why: "Esc did not clear") }
         guard model.query.isEmpty, model.escape() == false else {
             throw Failed(why: "the second Esc should fall through to hiding the panel")
@@ -1154,15 +1160,11 @@ func renderShots(into dir: String) -> Int32 {
         let m = model("elle est parti hier avec ces amis", mode: .grammaire)
         m.outcome = .grammaire(g, "elle est parti hier avec ces amis"); panel("30-grammar", m)
     }
-    if let t = try? DicoClient.xray("le chat noir dort sur la table") {
-        let m = model("le chat noir dort sur la table", mode: .rayonsX); m.outcome = .rayonsX(t); panel("40-xray", m)
-        // The detail block, with the second word selected.
-        let host = NSHostingView(rootView: XrayView(tokens: t, onSave: { _ in }, onLookup: { _ in })
-            .padding(18).background(Palette.panel))
-        host.frame = NSRect(x: 0, y: 0, width: PanelSize.content, height: 300)
-        host.appearance = NSAppearance(named: .darkAqua)
-        host.layoutSubtreeIfNeeded()
-        print("   x-ray tiles: \(t.map { XrayView.tag($0) }.joined(separator: " | "))")
+    if let x = try? DicoClient.xray("le chat noir dort sur la table") {
+        let m = model("le chat noir dort sur la table", mode: .rayonsX); m.outcome = .rayonsX(x); panel("40-xray", m)
+    }
+    if let x = try? DicoClient.xray("i have to go") {
+        let m = model("i have to go", mode: .rayonsX); m.outcome = .rayonsX(x); panel("41-xray-english", m)
     }
     do {
         let m = model("quand employer le subjonctif ?", mode: .demander)

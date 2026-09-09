@@ -72,7 +72,7 @@ enum Outcome {
     case mot(Lookup)
     case conjugaison(Conjugation)
     case grammaire(Grammar, String)     // + the queried sentence (for the offsets)
-    case rayonsX([XrayToken])
+    case rayonsX(Xray)
     case reponse(Answer)
     case erreur(Issue)
 }

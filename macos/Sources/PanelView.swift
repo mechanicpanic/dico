@@ -138,10 +138,18 @@ struct PanelView: View {
         case .conjugaison(let c):
             scroll(top: 13) { ConjugationView(conj: c) }
         case .grammaire(let g, let sentence):
-            scroll(top: 16, side: 18) { GrammarView(grammar: g, sentence: sentence, model: model) }
-        case .rayonsX(let toks):
             scroll(top: 16, side: 18) {
-                XrayView(tokens: toks, onSave: { model.saveToken($0) }, onLookup: { model.run($0, mode: .mot) })
+                VStack(alignment: .leading, spacing: 14) {
+                    if let src = g.source, let tr = g.translated { TranslatedLine(source: src, translated: tr) }
+                    GrammarView(grammar: g, sentence: g.sentence ?? sentence, model: model)
+                }
+            }
+        case .rayonsX(let x):
+            scroll(top: 16, side: 18) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let src = x.source, let tr = x.translated { TranslatedLine(source: src, translated: tr) }
+                    XrayView(tokens: x.tokens, onSave: { model.saveToken($0) }, onLookup: { model.run($0, mode: .mot) })
+                }
             }
         case .reponse(let a):
             scroll(top: 16, side: 18) {
@@ -192,6 +200,27 @@ struct PanelView: View {
             .padding(.bottom, 56)                    // clears the action row
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+    }
+}
+
+/// « 🇬🇧 i have to go → 🇫🇷 je dois partir » — what was typed, and the French
+/// the analysis ran on.
+struct TranslatedLine: View {
+    let source: String
+    let translated: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(WordView.flag(forQuery: source, srcLang: nil)).font(.system(size: 11))
+                Text(source).font(sans(11.5)).foregroundStyle(Palette.ink(0.45)).lineLimit(1)
+                Text("→").font(sans(11)).foregroundStyle(Palette.ink(0.3))
+                Text("🇫🇷").font(.system(size: 11))
+            }
+            Text(translated).font(serif(20)).foregroundStyle(Palette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("translated first — the analysis reads French").font(mono(9)).foregroundStyle(Palette.ink(0.28))
+        }
+        .padding(.bottom, 2)
     }
 }
 

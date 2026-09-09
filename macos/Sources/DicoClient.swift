@@ -98,8 +98,14 @@ struct Grammar: Decodable {
     var errors: [GrammarError]?
     var spelling: [SpellingError]?
     var corrected: String?
+    /// The sentence that was analysed — the translation, when the input was not French.
+    var sentence: String?
+    var source: String?
+    var translated: String?
 }
-private struct GrammarEnvelope: Decodable { var grammar: Grammar? }
+private struct GrammarEnvelope: Decodable {
+    var grammar: Grammar?; var sentence: String?; var source: String?; var translated: String?
+}
 
 struct XrayToken: Decodable, Hashable {
     var text: String?
@@ -111,7 +117,13 @@ struct XrayToken: Decodable, Hashable {
     var role: String?
     var gloss: String?
 }
-private struct XrayEnvelope: Decodable { var xray: [XrayToken]? }
+/// The x-ray of a sentence: its words, and the translation it went through.
+struct Xray {
+    var tokens: [XrayToken]
+    var source: String? = nil
+    var translated: String? = nil
+}
+private struct XrayEnvelope: Decodable { var xray: [XrayToken]?; var source: String?; var translated: String? }
 
 /// One Tatoeba example: the French sentence plus one translation.
 struct ExampleSentence: Decodable, Hashable {
@@ -504,14 +516,15 @@ enum DicoClient {
 
     static func grammar(_ sentence: String) throws -> Grammar {
         let env = try call(GrammarEnvelope.self, ["--json", "-g", sentence])
-        guard let g = env.grammar else { throw DicoError.cli("No grammar analysis") }
+        guard var g = env.grammar else { throw DicoError.cli("No grammar analysis") }
+        g.sentence = env.sentence; g.source = env.source; g.translated = env.translated
         return g
     }
 
-    static func xray(_ sentence: String) throws -> [XrayToken] {
+    static func xray(_ sentence: String) throws -> Xray {
         let env = try call(XrayEnvelope.self, ["--json", "-x", sentence])
         guard let x = env.xray, !x.isEmpty else { throw DicoError.cli("Nothing to dissect") }
-        return x
+        return Xray(tokens: x, source: env.source, translated: env.translated)
     }
 
     static func ask(_ question: String, context: String?) throws -> Answer {

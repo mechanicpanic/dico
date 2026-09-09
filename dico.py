@@ -2635,6 +2635,22 @@ _EN_MARKERS = {
 }
 
 
+def _sentence_lang(text):
+    """« fr », « en » or « ru » — what the grammar checker and the x-ray are
+    being handed. Lexique knows too many English-looking strings (« go » is a
+    noun) for coverage alone to decide, so plain English markers weigh in."""
+    if re.search(r"[\u0400-\u04FF]", text):
+        return "ru"
+    toks = [t for t in re.findall(r"[\w'’-]+", text) if not t.isdigit()]
+    if not toks:
+        return "fr"
+    en = sum(1 for t in toks if t.lower() in _EN_MARKERS) / len(toks)
+    hits = sum(1 for t in toks if lexique_lookup(t.strip("'’")) is not None) / len(toks)
+    if en >= 0.34:
+        return "en"
+    return "fr" if hits >= 0.5 else "en"
+
+
 def _looks_french_sentence(text):
     """>= 3 words, no Cyrillic, most of the words known to Lexique — and not
     plainly English (Lexique knows too many English-looking strings)."""
@@ -3239,6 +3255,18 @@ def _as_json(text, args):
         ans, err = (ai_ask(q, args.profond) if q else ai_explain(text, deep=args.profond))
         out.update({"answer": ans, "error": err, "model": _llm_label()})
         return out
+    if args.grammaire or args.xray:
+        # English or Russian in: translate first, analyse the French.
+        lang = _sentence_lang(text)
+        if lang != "fr":
+            try:
+                tr = translate(text, "fr")[0].strip()
+            except Exception:
+                tr = ""
+            if tr:
+                out.update({"source": text, "source_lang": lang, "translated": tr})
+                text = tr
+        out["sentence"] = text
     if args.grammaire:
         gc = _grammalecte()
         gram, spell = gc.getParagraphErrors(text, bSpellSugg=True) if gc else ([], [])

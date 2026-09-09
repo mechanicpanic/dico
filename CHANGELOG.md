@@ -41,7 +41,8 @@ and a macOS popup.
   (ACCORD, ORTHO.…), the correction sits in a green card with ⌘⇧C. X-ray lays
   the sentence out interlinear — a tile per word with its part of speech,
   gender and gloss underneath; click one for lemma, tense and role, « Look
-  up » and « save ». The ⌘/ sheet and the five Settings tabs got the same
+  up » and « save ». English or Russian typed into Grammar or X-ray is
+  translated first and the French is analysed, with both shown. The ⌘/ sheet and the five Settings tabs got the same
   language.
 - `Dico --shots DIR` renders every screen, dark and light, to PNG — off
   screen, for design review.
