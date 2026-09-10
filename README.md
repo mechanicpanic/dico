@@ -14,7 +14,7 @@ brew install --cask mechanicpanic/dico/dico          # add --no-quarantine to sk
 ```
 
 **Or the DMG — nothing to install.** Download `Dico-<version>.dmg` from the
-[releases](https://github.com/mechanicpanic/dico-releases/releases), drag Dico
+[releases](https://github.com/mechanicpanic/dico/releases), drag Dico
 to Applications, and press **⌥D** anywhere. The dictionary, the conjugations and
 the grammar checker are *inside the app*: no Python, no `uv`, no Terminal, no
 setup step, and it works offline.

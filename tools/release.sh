@@ -81,24 +81,9 @@ scroll to *Security*, and click **Open Anyway**. Once. (macOS 14 and older:
 right-click ▸ Open.)"
 echo "✓ published: $(gh release view "$TAG" --json url -q .url)"
 
-# 6. The public lane: the binaries go to dico-releases (public), and the
-#    Homebrew tap gets a cask pointing at them —
+# 6. Homebrew: the tap gets a cask pointing at this release's zip —
 #    brew install --cask mechanicpanic/dico/dico
-RELEASES_REPO="mechanicpanic/dico-releases"
 TAP_DIR="${TAP_DIR:-$(cd .. && pwd)/homebrew-dico}"
-echo "==> $RELEASES_REPO"
-gh release create "$TAG" "$DMG" "$ZIP" --repo "$RELEASES_REPO" --target main \
-  --title "dico $VERSION" --notes "$NOTES
-
-## Install
-
-\`\`\`sh
-brew install --cask mechanicpanic/dico/dico
-\`\`\`
-
-or download \`Dico-$VERSION.dmg\` and drag Dico to Applications. Source: https://github.com/mechanicpanic/dico (private)."
-echo "✓ https://github.com/$RELEASES_REPO/releases/tag/$TAG"
-
 if [ -d "$TAP_DIR/.git" ]; then
   echo "==> tap $TAP_DIR"
   SHA="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
@@ -108,10 +93,10 @@ cask "dico" do
   version "$VERSION"
   sha256 "$SHA"
 
-  url "https://github.com/$RELEASES_REPO/releases/download/v#{version}/Dico-#{version}.zip"
+  url "https://github.com/mechanicpanic/dico/releases/download/v#{version}/Dico-#{version}.zip"
   name "Dico"
   desc "French dictionary popup for Russian and English speakers — offline, with flashcards"
-  homepage "https://github.com/$RELEASES_REPO"
+  homepage "https://github.com/mechanicpanic/dico"
 
   livecheck do
     url :url

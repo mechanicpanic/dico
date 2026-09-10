@@ -3,10 +3,9 @@
 ## 1.0.2 — 2026-09-10
 
 - **Homebrew.** `brew install --cask mechanicpanic/dico/dico` installs the app
-  and the `dico` command; `brew upgrade` keeps them current. The binaries
-  are published to the public `dico-releases` repository (the source stays
-  private); the tap is `mechanicpanic/homebrew-dico`, updated by the release
-  script.
+  and the `dico` command; `brew upgrade` keeps them current. The tap is
+  `mechanicpanic/homebrew-dico`, updated by the release script; the cask
+  points at the release zip on this repository.
 - The CLI ships inside the app (`Dico.app/Contents/Resources/bin/dico`) and
   uses the data the app unpacks.
 
