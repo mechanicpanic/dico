@@ -64,6 +64,20 @@ cp build/Dico.icns "$RES/Dico.icns"
 # works by being dragged to /Applications — no uv, no Python to install, no
 # Terminal, no setup step. (~20 MB of data; Multitran stays bring-your-own.)
 cp ../dico.py "$RES/dico.py"
+# The command line, from the same bundle: Homebrew links it as `dico`.
+mkdir -p "$RES/bin"
+cat > "$RES/bin/dico" <<'SH'
+#!/bin/sh
+# dico — the CLI inside Dico.app. The data the app unpacks (~/.dico/data) is shared.
+here="$(cd "$(dirname "$0")/.." && pwd)"
+export DICO_DATA="${DICO_DATA:-$HOME/.dico/data}"
+export DICO_HOME="${DICO_HOME:-$HOME/.dico}"
+if [ ! -f "$DICO_DATA/lexique.db" ] && [ -d "$here/data" ]; then
+  mkdir -p "$DICO_DATA" && cp -R "$here/data/." "$DICO_DATA/"      # first run: seed, like the app does
+fi
+exec /usr/bin/python3 "$here/dico.py" "$@"
+SH
+chmod +x "$RES/bin/dico"
 DATA_SRC="${DICO_DATA:-../data}"
 if [ "${SKIP_DATA:-}" != "1" ] && [ -f "$DATA_SRC/lexique.db" ]; then
   mkdir -p "$RES/data"

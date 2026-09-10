@@ -6,9 +6,16 @@ zero-dependency Python CLI (`dico`) and a native **macOS popup** (`macos/`,
 
 ## Getting started
 
-**The app — nothing to install.** Download `Dico-<version>.dmg` from the
-[releases](https://github.com/mechanicpanic/dico/releases), drag Dico to
-Applications, and press **⌥D** anywhere. The dictionary, the conjugations and
+**With Homebrew** — the app and the `dico` command, and `brew upgrade` keeps
+them current:
+
+```sh
+brew install --cask mechanicpanic/dico/dico          # add --no-quarantine to skip the Gatekeeper prompt
+```
+
+**Or the DMG — nothing to install.** Download `Dico-<version>.dmg` from the
+[releases](https://github.com/mechanicpanic/dico-releases/releases), drag Dico
+to Applications, and press **⌥D** anywhere. The dictionary, the conjugations and
 the grammar checker are *inside the app*: no Python, no `uv`, no Terminal, no
 setup step, and it works offline.
 

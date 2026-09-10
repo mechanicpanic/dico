@@ -37,7 +37,7 @@ Translation and Wiktionary need internet; Multitran and the conjugations work
 offline (databases in data/). The -a option uses the Anthropic API if
 ANTHROPIC_API_KEY is set (fast, ~1-2 s), otherwise the `claude` command.
 """
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import argparse
 import html

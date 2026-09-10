@@ -80,3 +80,65 @@ blocks the first double-click. Open **System Settings ▸ Privacy & Security**,
 scroll to *Security*, and click **Open Anyway**. Once. (macOS 14 and older:
 right-click ▸ Open.)"
 echo "✓ published: $(gh release view "$TAG" --json url -q .url)"
+
+# 6. The public lane: the binaries go to dico-releases (public), and the
+#    Homebrew tap gets a cask pointing at them —
+#    brew install --cask mechanicpanic/dico/dico
+RELEASES_REPO="mechanicpanic/dico-releases"
+TAP_DIR="${TAP_DIR:-$(cd .. && pwd)/homebrew-dico}"
+echo "==> $RELEASES_REPO"
+gh release create "$TAG" "$DMG" "$ZIP" --repo "$RELEASES_REPO" --target main \
+  --title "dico $VERSION" --notes "$NOTES
+
+## Install
+
+\`\`\`sh
+brew install --cask mechanicpanic/dico/dico
+\`\`\`
+
+or download \`Dico-$VERSION.dmg\` and drag Dico to Applications. Source: https://github.com/mechanicpanic/dico (private)."
+echo "✓ https://github.com/$RELEASES_REPO/releases/tag/$TAG"
+
+if [ -d "$TAP_DIR/.git" ]; then
+  echo "==> tap $TAP_DIR"
+  SHA="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
+  mkdir -p "$TAP_DIR/Casks"
+  cat > "$TAP_DIR/Casks/dico.rb" <<RUBY
+cask "dico" do
+  version "$VERSION"
+  sha256 "$SHA"
+
+  url "https://github.com/$RELEASES_REPO/releases/download/v#{version}/Dico-#{version}.zip"
+  name "Dico"
+  desc "French dictionary popup for Russian and English speakers — offline, with flashcards"
+  homepage "https://github.com/$RELEASES_REPO"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :sonoma"
+
+  app "Dico.app"
+  binary "#{appdir}/Dico.app/Contents/Resources/bin/dico"
+
+  caveats <<~EOS
+    The app is signed ad-hoc: the first launch is blocked by Gatekeeper once.
+    Either install with --no-quarantine, or open System Settings ▸ Privacy &
+    Security and click « Open Anyway » after the first double-click.
+    Press ⌥D anywhere to open the panel.
+  EOS
+
+  zap trash: [
+    "~/.dico",
+    "~/.dico_config.json",
+    "~/Library/Preferences/fr.dico.popup.plist",
+  ]
+end
+RUBY
+  ( cd "$TAP_DIR" && git add -A && git -c commit.gpgsign=false commit -qm "dico $VERSION" && git push -q )
+  echo "✓ cask: brew install --cask mechanicpanic/dico/dico  ($VERSION)"
+else
+  echo "⚠ no tap clone at $TAP_DIR — skipped the cask (git clone https://github.com/mechanicpanic/homebrew-dico $TAP_DIR)"
+fi
