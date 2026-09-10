@@ -108,10 +108,15 @@ cask "dico" do
   app "Dico.app"
   binary "#{appdir}/Dico.app/Contents/Resources/bin/dico"
 
+  # Signed ad-hoc (no Developer ID): clear the quarantine flag Homebrew set on
+  # the download, so the first launch is not blocked by Gatekeeper.
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", "#{appdir}/Dico.app"],
+                   sudo: false
+  end
+
   caveats <<~EOS
-    The app is signed ad-hoc: the first launch is blocked by Gatekeeper once.
-    Either install with --no-quarantine, or open System Settings ▸ Privacy &
-    Security and click « Open Anyway » after the first double-click.
     Press ⌥D anywhere to open the panel.
   EOS
 
