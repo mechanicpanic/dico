@@ -146,34 +146,57 @@ enum Appearance {
 
 // MARK: - Geometry
 
+/// The panel's size — 600 × 460 pt at the default zoom — and its type scale
+/// together: a big display gets a bigger panel with bigger type, not a blurry
+/// bitmap. Paddings stay in points; they read fine either way.
+enum Zoom {
+    static let configKey = "popup_zoom"
+    static let choices: [(CGFloat, String)] = [(0.9, "Small"), (1.0, "Default"), (1.2, "Large"), (1.4, "Larger")]
+    static let range: ClosedRange<CGFloat> = 0.8...1.6
+    nonisolated(unsafe) static var factor: CGFloat = 1
+    static func load(_ raw: [String: Any]) {
+        if let v = raw[configKey] as? Double { factor = clamp(CGFloat(v)) }
+        else if let s = raw[configKey] as? String, let v = Double(s) { factor = clamp(CGFloat(v)) }
+        else { factor = 1 }
+    }
+    static func clamp(_ v: CGFloat) -> CGFloat { min(max(v, range.lowerBound), range.upperBound) }
+    static var label: String {
+        choices.min { abs($0.0 - factor) < abs($1.0 - factor) }?.1 ?? "\(Int(factor * 100)) %"
+    }
+}
+
 /// The content size of the panel. 600 pt fits the seven-tense grid.
 enum PanelSize {
-    static let width: CGFloat = 600
-    static let height: CGFloat = 460
+    static var width: CGFloat { (600 * Zoom.factor).rounded() }
+    static var height: CGFloat { (460 * Zoom.factor).rounded() }
     static let margin: CGFloat = 12          // room for the native shadow
-    static let rail: CGFloat = 56
+    static var rail: CGFloat { (56 * Zoom.factor).rounded() }
     /// Everything right of the rail (and its hairline).
-    static let content: CGFloat = width - rail - 1          // 543
-    static let leftPane: CGFloat = 224
-    static let rightPane: CGFloat = content - leftPane - 1  // 318
+    static var content: CGFloat { width - rail - 1 }
+    static var leftPane: CGFloat { (224 * Zoom.factor).rounded() }
+    static var rightPane: CGFloat { content - leftPane - 1 }
     /// The right pane's body, once its 14 pt sides are paid.
-    static let paneBody: CGFloat = rightPane - 28           // 290
+    static var paneBody: CGFloat { rightPane - 28 }
+    /// The ⌘/ sheet.
+    static var sheet: CGSize { CGSize(width: (548 * Zoom.factor).rounded(), height: (400 * Zoom.factor).rounded()) }
 }
 
 // MARK: - Type
 
 /// Serif — the French: headwords, senses, examples, recents, sheet titles.
 func serif(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    .system(size: size, weight: weight, design: .serif)
+    .system(size: size * Zoom.factor, weight: weight, design: .serif)
 }
 /// Sans — the chrome: labels, body copy, buttons, settings, tutor answers.
 func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    .system(size: size, weight: weight, design: .default)
+    .system(size: size * Zoom.factor, weight: weight, design: .default)
 }
 /// Mono — the machine: IPA, shortcut keys, eyebrows, domains, paths, CLI output.
 func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    .system(size: size, weight: weight, design: .monospaced)
+    .system(size: size * Zoom.factor, weight: weight, design: .monospaced)
 }
+/// Emoji and the odd glyph, sized with the rest.
+func glyph(_ size: CGFloat) -> Font { .system(size: size * Zoom.factor) }
 
 // MARK: - Small shared pieces
 

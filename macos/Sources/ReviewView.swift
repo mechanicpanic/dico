@@ -82,7 +82,7 @@ struct ReviewView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("🎴").font(.system(size: 13))
+            Text("🎴").font(glyph(13))
             Text(r.source == .anki ? model.ankiDeck : "Saved words").font(serif(20)).foregroundStyle(Palette.ink)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Spacer(minLength: 0)

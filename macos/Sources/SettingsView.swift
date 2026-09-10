@@ -573,6 +573,14 @@ struct GeneralTab: View {
                         }
                 }
 
+                SettingsCard(title: "Size",
+                             caption: "The panel and its type, together — for a big display. ⌘+ and ⌘− in the panel do the same.") {
+                    ChipRow(items: Zoom.choices.map { ($0.0, $0.1) },
+                            selection: Binding(get: { Zoom.choices.min { abs($0.0 - store.zoom) < abs($1.0 - store.zoom) }?.0 ?? 1 },
+                                               set: { v in store.zoom = v; store.save()
+                                                      NotificationCenter.default.post(name: .dicoApplyZoom, object: nil) }))
+                }
+
                 SettingsCard(title: "Global hotkey",
                              caption: "Opens and closes the panel from any app. Registered with Carbon — no Accessibility permission is asked for.") {
                     ChipRow(items: HotkeyChoice.all.map { ($0.id, $0.display) },

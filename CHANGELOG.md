@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 — unreleased
+
+- **Size.** Settings ▸ General ▸ Size (Small · Default · Large · Larger), or
+  ⌘+ / ⌘− / ⌘0 in the panel: the panel and its type scale together, so a big
+  display gets a bigger panel with bigger type — crisp, not a stretched bitmap.
+  Stored as `popup_zoom`.
+
 ## 1.0.0 — 2026-09-10
 
 The first release: a French dictionary for a Russian/English speaker, as a CLI

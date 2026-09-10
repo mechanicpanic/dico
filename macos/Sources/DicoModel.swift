@@ -157,6 +157,21 @@ final class DicoModel: ObservableObject {
     @Published private(set) var lastOpened: Section? = nil
     /// The word the tutor is being asked about (set by the card's "Ask ?" button).
     @Published private(set) var askContext: String? = nil
+    /// The panel's size — the views rebuild when it changes.
+    @Published private(set) var zoom: CGFloat = Zoom.factor
+
+    func setZoom(_ v: CGFloat, save: Bool = true) {
+        Zoom.factor = Zoom.clamp((v * 100).rounded() / 100)
+        zoom = Zoom.factor
+        if save {
+            var raw = ConfigStore.readRaw(at: ConfigPath.current)
+            if Zoom.factor == 1 { raw.removeValue(forKey: Zoom.configKey) } else { raw[Zoom.configKey] = Double(Zoom.factor) }
+            _ = ConfigStore.writeRaw(raw, to: ConfigPath.current)
+        }
+        NotificationCenter.default.post(name: .dicoZoomChanged, object: nil)
+        flash("size \(Int(Zoom.factor * 100)) %")
+    }
+
     /// Git backup of the cards: after a save, 20 s later, coalesced.
     private var backupTask: Task<Void, Never>?
     @Published private(set) var backupNote: String? = nil

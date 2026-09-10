@@ -119,6 +119,7 @@ final class ConfigStore: ObservableObject {
     @Published var selection: Bool = true
     /// « system », « dark » or « light » — the panel and Settings follow it.
     @Published var appearance: String = "system"
+    @Published var zoom: CGFloat = 1
     /// The Anki deck the Cards mode reviews (AnkiConnect).
     @Published var ankiDeck: String = ""
     @Published var reviewSource: ReviewSource = .dico
@@ -147,6 +148,7 @@ final class ConfigStore: ObservableObject {
         hotkey = HotkeyChoice.from(string("popup_hotkey"))
         selection = bool(Selection.configKey) ?? true
         appearance = string(Appearance.configKey) ?? "system"
+        zoom = CGFloat((raw[Zoom.configKey] as? Double) ?? Double((raw[Zoom.configKey] as? String) ?? "") ?? 1)
         ankiDeck = string(AnkiClient.configKey) ?? ""
         reviewSource = ReviewSource(rawValue: string(ReviewSource.configKey) ?? "") ?? .dico
         cardsAutosync = bool("cards_autosync") ?? true
@@ -194,6 +196,7 @@ final class ConfigStore: ObservableObject {
         put("popup_hotkey", hotkey.id)
         put(Selection.configKey, selection)
         put(Appearance.configKey, appearance == "system" ? nil : appearance)
+        put(Zoom.configKey, zoom == 1 ? nil : Double(zoom))
         put(AnkiClient.configKey, ankiDeck.trimmingCharacters(in: .whitespaces).isEmpty ? nil : ankiDeck)
         put(ReviewSource.configKey, reviewSource == .dico ? nil : reviewSource.rawValue)
         put("cards_autosync", cardsAutosync)

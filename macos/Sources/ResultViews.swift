@@ -87,7 +87,7 @@ struct WordView: View {
                         if let c = lookup.lexique?.cefr, !c.isEmpty { CEFRPill(level: c) }
                         let stars = Palette.stars(lookup.lexique?.band)
                         if !stars.isEmpty {
-                            Text(stars).font(.system(size: 9.5)).foregroundStyle(Palette.jauneInk)
+                            Text(stars).font(glyph(9.5)).foregroundStyle(Palette.jauneInk)
                                 .help(lookup.lexique?.band ?? "")
                         }
                     }
@@ -146,13 +146,13 @@ struct WordView: View {
                     if model.speaking {
                         ProgressView().controlSize(.small).scaleEffect(0.55).frame(width: 14, height: 14)
                     } else {
-                        Text("🔈").font(.system(size: 12))
+                        Text("🔈").font(glyph(12))
                     }
                 }
                 .buttonStyle(.plain)
                 .help("Hear \u{ab} \(model.cardTerm) \u{bb} said by a native speaker (⌘P)")
                 Button { model.askAbout(model.cardTerm) } label: {
-                    Text("💬").font(.system(size: 12))
+                    Text("💬").font(glyph(12))
                 }
                 .buttonStyle(.plain)
                 .help("Ask the tutor about \u{ab} \(model.cardTerm) \u{bb} (⌘L)")
@@ -665,9 +665,9 @@ struct ConjugationView: View {
     // MARK: Geometry — the grid must fit the panel without scrolling sideways
 
     /// The content column is 543 pt wide; the grid keeps 16 pt on each side.
-    static let fullBudget: CGFloat = PanelSize.content - 32     // 511
+    static var fullBudget: CGFloat { PanelSize.content - 32 }   // 511 at the default zoom
     /// The Word card's right pane, once its sides are paid.
-    static let compactBudget: CGFloat = PanelSize.paneBody      // 290
+    static var compactBudget: CGFloat { PanelSize.paneBody }    // 290
 
     private var budget: CGFloat { compact ? ConjugationView.compactBudget : ConjugationView.fullBudget }
     private let gutter: CGFloat = 34
@@ -1019,7 +1019,7 @@ struct XrayView: View {
     var onLookup: ((String) -> Void)? = nil
     @State private var selected: Int? = nil
 
-    static let width: CGFloat = PanelSize.content - 36
+    static var width: CGFloat { PanelSize.content - 36 }
 
     /// « nom », « verbe · présent », « adj. », « prép. »…
     static func tag(_ t: XrayToken) -> String {

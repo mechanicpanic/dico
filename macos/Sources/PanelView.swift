@@ -63,6 +63,7 @@ struct PanelView: View {
         .opacity(model.shown ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.68), value: model.shown)
         .padding(PanelSize.margin)
+        .id(model.zoom)                            // rebuild every size on a zoom change
         .tint(model.mode.accentInk)
         .onReceive(NotificationCenter.default.publisher(for: .dicoFocusField)) { _ in
             focused = true
@@ -84,7 +85,7 @@ struct PanelView: View {
 
     private var queryBar: some View {
         HStack(spacing: 10) {
-            Text(queryFlag).font(.system(size: 13))
+            Text(queryFlag).font(glyph(13))
             TextField("", text: $model.query,
                       prompt: Text(model.mode.placeholder).font(serif(20)).foregroundColor(Palette.ink(0.28)))
                 .textFieldStyle(.plain)
@@ -107,7 +108,7 @@ struct PanelView: View {
                 Button { model.dropAskContext() } label: {
                     HStack(spacing: 6) {
                         Text("about \u{ab} \(c) \u{bb}").font(sans(10.5))
-                        Text("✕").font(.system(size: 9)).opacity(0.7)
+                        Text("✕").font(glyph(9)).opacity(0.7)
                     }
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Palette.rose.opacity(0.14), in: Capsule())
@@ -211,10 +212,10 @@ struct TranslatedLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(WordView.flag(forQuery: source, srcLang: nil)).font(.system(size: 11))
+                Text(WordView.flag(forQuery: source, srcLang: nil)).font(glyph(11))
                 Text(source).font(sans(11.5)).foregroundStyle(Palette.ink(0.45)).lineLimit(1)
                 Text("→").font(sans(11)).foregroundStyle(Palette.ink(0.3))
-                Text("🇫🇷").font(.system(size: 11))
+                Text("🇫🇷").font(glyph(11))
             }
             Text(translated).font(serif(20)).foregroundStyle(Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -262,7 +263,7 @@ struct RailItem: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Text(mode.icon).font(.system(size: 14))
+                Text(mode.icon).font(glyph(14))
                 Text(mode.short).font(sans(8.5, active ? .semibold : .regular))
                     .foregroundStyle(active ? mode.accentInk : Palette.ink)
             }
@@ -487,4 +488,8 @@ extension Notification.Name {
     /// Posted by the ⚙︎ button; the delegate opens the window (and wires the
     /// hotkey callback, which only it can honour).
     static let dicoOpenSettings = Notification.Name("dicoOpenSettings")
+    /// The panel's size changed — the window must follow.
+    static let dicoZoomChanged = Notification.Name("dicoZoomChanged")
+    /// Settings picked a size — the model applies it (and the window follows).
+    static let dicoApplyZoom = Notification.Name("dicoApplyZoom")
 }

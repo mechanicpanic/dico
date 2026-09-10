@@ -26,6 +26,7 @@ enum Shortcuts {
             .init(keys: "Esc", what: "Clear — again to close", group: "Panel"),
             .init(keys: "⌘K", what: "Clear the field", group: "Panel"),
             .init(keys: "⌘S", what: "Save as a card — the field, a correction, an answer", group: "Panel"),
+            .init(keys: "⌘+ ⌘− ⌘0", what: "Bigger · smaller · default size", group: "Panel"),
             .init(keys: "⌘,", what: "Settings", group: "Panel"),
             .init(keys: "⌘/", what: "This list", group: "Panel"),
             .init(keys: "⌘W", what: "Close the panel", group: "Panel"),
@@ -97,7 +98,7 @@ struct ShortcutsSheet: View {
                 .font(sans(11)).foregroundStyle(Palette.ink(0.30))
         }
         .padding(.horizontal, 20).padding(.vertical, 18)
-        .frame(width: 548, height: 400)
+        .frame(width: PanelSize.sheet.width, height: PanelSize.sheet.height)
         .background(Palette.sheet, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

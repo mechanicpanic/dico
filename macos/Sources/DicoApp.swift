@@ -17,7 +17,7 @@ final class FloatingPanel: NSPanel {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let model = DicoModel()
+    let model = DicoModel()
     private var panel: FloatingPanel!
     private var statusItem: NSStatusItem!
     private var hotKeyRef: EventHotKeyRef?
@@ -29,6 +29,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         DicoClient.seedDataIfNeeded()               // first run: unpack the bundled data
         Appearance.apply(ConfigStore.readRaw(at: ConfigPath.current))
+        Zoom.load(ConfigStore.readRaw(at: ConfigPath.current))
+        NotificationCenter.default.addObserver(
+            forName: .dicoApplyZoom, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    let raw = ConfigStore.readRaw(at: ConfigPath.current)
+                    Zoom.load(raw)
+                    (NSApp.delegate as? AppDelegate)?.model.setZoom(Zoom.factor, save: false)
+                }
+            }
+        NotificationCenter.default.addObserver(
+            forName: .dicoZoomChanged, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.resizePanel() }
+            }
         model.backupCards(pullOnly: true)           // what another machine may have written
         NSApp.mainMenu = AppDelegate.editingMenu()   // ⌘C ⌘V ⌘A ⌘Z reach the text field
         buildStatusItem()
@@ -166,6 +179,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentView = host
     }
 
+    /// After a zoom change: the window takes the panel's new size, where it was.
+    func resizePanel() {
+        let size = NSSize(width: PanelSize.width + 2 * PanelSize.margin,
+                          height: PanelSize.height + 2 * PanelSize.margin)
+        let old = panel.frame
+        panel.setFrame(NSRect(x: old.midX - size.width / 2, y: old.midY - size.height / 2,
+                              width: size.width, height: size.height), display: true)
+        panel.contentView?.frame = NSRect(origin: .zero, size: size)
+        DispatchQueue.main.async { [weak self] in self?.panel.invalidateShadow() }
+    }
+
     private func center() {
         guard let screen = NSScreen.main else { return }
         let f = screen.visibleFrame
@@ -293,6 +317,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if chars == "/" { model.showShortcuts.toggle(); return nil }
         if chars == "w" { hidePanel(); return nil }
+        // ⌘+ ⌘- ⌘0: the panel's size.
+        if chars == "=" || chars == "+" { model.setZoom(Zoom.factor + 0.1); return nil }
+        if chars == "-" { model.setZoom(Zoom.factor - 0.1); return nil }
+        if chars == "0" && !shift { model.setZoom(1); return nil }
 
         // ⌘1…⌘9 save a sense.
         if let n = AppDelegate.digitCodes[event.keyCode], !shift {
@@ -1193,6 +1221,14 @@ func renderShots(into dir: String) -> Int32 {
     do {
         let m = model("chat"); m.toast = "✓ \u{ab} un chat \u{bb} added"; panel("80-toast", m)
     }
+
+    // The same card, at the « Larger » size.
+    Zoom.factor = 1.4
+    card("15-card-larger", "cook", section: .definitions) { .definition(try DicoClient.definition($0)) }
+    if let c = try? DicoClient.conjugate("dire") {
+        let m = model("dire", mode: .conjuguer); m.outcome = .conjugaison(c); panel("21-conjugate-larger", m)
+    }
+    Zoom.factor = 1
 
     // Settings, every tab.
     let dir2 = NSTemporaryDirectory() + "dico-shots-\(UUID().uuidString)"
