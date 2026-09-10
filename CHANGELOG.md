@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.1 — unreleased
+## 1.0.1 — 2026-09-10
 
 - **Size.** Settings ▸ General ▸ Size (Small · Default · Large · Larger), or
   ⌘+ / ⌘− / ⌘0 in the panel: the panel and its type scale together, so a big

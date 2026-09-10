@@ -137,7 +137,7 @@ struct ShortcutsList: View {
                     ForEach(items) { s in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(s.keys).font(mono(keySize)).foregroundStyle(Palette.ink(0.85))
-                                .frame(width: keyWidth, alignment: .leading)
+                                .frame(width: keyWidth * Zoom.factor, alignment: .leading)
                                 .lineLimit(1).minimumScaleFactor(0.7)
                             Text(s.what).font(sans(whatSize)).foregroundStyle(Palette.ink(0.55))
                                 .fixedSize(horizontal: false, vertical: true)

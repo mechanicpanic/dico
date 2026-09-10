@@ -267,7 +267,7 @@ struct RailItem: View {
                 Text(mode.short).font(sans(8.5, active ? .semibold : .regular))
                     .foregroundStyle(active ? mode.accentInk : Palette.ink)
             }
-            .frame(width: 44)
+            .frame(width: (44 * Zoom.factor).rounded())
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)

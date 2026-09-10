@@ -378,7 +378,7 @@ struct NoteRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label.uppercased()).font(mono(9)).foregroundStyle(Palette.ink(0.30))
-                .frame(width: 44, alignment: .leading).lineLimit(1)
+                .frame(width: 48 * Zoom.factor, alignment: .leading).lineLimit(1)
             content.font(sans(12))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -522,7 +522,7 @@ struct MultitranBody: View {
                         .help("Multitran domain")
                 }
             }
-            .frame(width: 44, alignment: .trailing)
+            .frame(width: 44 * Zoom.factor, alignment: .trailing)
             MultitranBody.translations(sense.items ?? [])
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -670,7 +670,7 @@ struct ConjugationView: View {
     static var compactBudget: CGFloat { PanelSize.paneBody }    // 290
 
     private var budget: CGFloat { compact ? ConjugationView.compactBudget : ConjugationView.fullBudget }
-    private let gutter: CGFloat = 34
+    private var gutter: CGFloat { (34 * Zoom.factor).rounded() }
     private let gap: CGFloat = 5
     private var columnCount: CGFloat { CGFloat(max(1, conj.orderedTenses.count)) }
 
@@ -991,7 +991,7 @@ struct GrammarView: View {
     private func note(label: String, message: String, suggestions: [String], tint: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 11) {
             Text(label).font(mono(9.5)).foregroundStyle(tint)
-                .frame(width: 52, alignment: .leading).lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: 52 * Zoom.factor, alignment: .leading).lineLimit(1).minimumScaleFactor(0.8)
             VStack(alignment: .leading, spacing: 5) {
                 Text(message).font(sans(12.5)).lineSpacing(3).foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1118,7 +1118,7 @@ struct XrayView: View {
             ForEach(rows, id: \.0) { k, v in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(k.uppercased()).font(mono(9)).tracking(0.9).foregroundStyle(Palette.ink(0.30))
-                        .frame(width: 70, alignment: .leading)
+                        .frame(width: 70 * Zoom.factor, alignment: .leading)
                     Text(v).font(k == "lemma" ? serif(15) : sans(12.5)).foregroundStyle(Palette.ink(0.85))
                         .fixedSize(horizontal: false, vertical: true)
                 }
