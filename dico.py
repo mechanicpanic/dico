@@ -55,6 +55,15 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 
+# Windows consoles default to a legacy code page that cannot show « → » or « é »:
+# speak UTF-8 regardless (the Windows build is run without a terminal anyway).
+if sys.platform == "win32":
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
 try:
     import readline  # ↑ arrow = recall the previous command (interactive mode)
 except ImportError:
