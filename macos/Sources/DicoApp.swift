@@ -190,8 +190,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in self?.panel.invalidateShadow() }
     }
 
+    /// The panel opens on the screen the mouse is on — that is where you are
+    /// looking — not on the one that happens to hold the active window.
     private func center() {
-        guard let screen = NSScreen.main else { return }
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+        guard let screen else { return }
         let f = screen.visibleFrame
         let s = panel.frame.size
         panel.setFrameOrigin(NSPoint(x: f.midX - s.width / 2,
