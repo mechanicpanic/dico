@@ -40,6 +40,7 @@ ANTHROPIC_API_KEY is set (fast, ~1-2 s), otherwise the `claude` command.
 __version__ = "1.0.6"
 
 import argparse
+import contextlib
 import html
 import json
 import os
@@ -3704,7 +3705,7 @@ def run_setup(ask_llm=True):
         print(f"\n{DIM}Try « dico --tour » for a 2-minute walkthrough.{RESET}")
 
 
-def main():
+def _build_parser():
     p = argparse.ArgumentParser(
         prog="dico", add_help=True,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3772,6 +3773,8 @@ def main():
                    help="synonyms and homophones (Wiktionnaire)")
     p.add_argument("--examples", action="store_true",
                    help="example sentences for a French word (Tatoeba, EN + RU); with --json for GUIs")
+    p.add_argument("--serve", action="store_true",
+                   help="long-lived: one JSON request per stdin line, one JSON response per stdout line")
     p.add_argument("--json", action="store_true",
                    help="JSON output (for a graphical front-end / Raycast / etc.)")
     p.add_argument("--save-term", metavar="TERM",
@@ -3789,11 +3792,13 @@ def main():
     p.add_argument("--mots-outils", nargs="?", const=120, type=int, metavar="N",
                    help="show the CORE function words (articles, prepositions, "
                         "pronouns, conjunctions, auxiliaries) — the grammatical scaffolding")
-    args = p.parse_args()
-    session = Session()
+    return p
 
-    if args.review:
-        return run_review()
+
+def command_result(args):
+    """The store / SRS / paths commands the apps call with --json (--due, --card,
+    --grade, --paths, --save-term) → their dict, exactly as printed today; None
+    when the flags ask for a lookup instead."""
     if args.due:
         cards, counts = srs_queue()
         entries = store_load()["entries"]
@@ -3801,29 +3806,109 @@ def main():
                         key=lambda e: e.get("last_seen", ""), reverse=True)[:6]
         recent = [{"front": e.get("front") or e.get("lemma"), "gloss": (e.get("gloss") or e.get("sens") or "")}
                   for e in latest]
-        return print(json.dumps({"deck": "dico", "cards": cards, "counts": counts,
-                                 "total": len(entries), "recent": recent}, ensure_ascii=False))
+        return {"deck": "dico", "cards": cards, "counts": counts, "total": len(entries),
+                "recent": recent, "_kind": "deck"}
     if args.card:
         data = store_load()
         for e in data["entries"]:
             if e.get("key") == args.card:
                 if enrich_entry(e):
                     store_save(data)
-                return print(json.dumps({"card": _srs_card(e)}, ensure_ascii=False))
-        return print(json.dumps({"error": f"no card « {args.card} »"}, ensure_ascii=False))
+                return {"card": _srs_card(e), "_kind": "card"}
+        return {"error": f"no card « {args.card} »", "_kind": "error"}
     if args.grade:
         card = srs_answer(args.grade, args.ease)
         if card is None:
-            return print(json.dumps({"error": f"no card « {args.grade} »"}, ensure_ascii=False))
-        return print(json.dumps({"card": card}, ensure_ascii=False))
+            return {"error": f"no card « {args.grade} »", "_kind": "error"}
+        return {"card": card, "_kind": "card"}
+    if args.paths:
+        return {"config": CONFIG_PATH, "vocab": VOCAB, "store": STORE, "data": DATA_DIR,
+                "home": DICO_HOME, "cards_repo": cards_repo() or "",
+                "cards_autosync": cards_autosync(), "_kind": "paths"}
+    if args.save_term:
+        lang = "fr" if _deaccent(args.sens or "") == _deaccent(args.save_term) else detect_lang(args.sens or "en")
+        front, status, cnt = _save_term(args.save_term, args.sens, lang, quiet=True,
+                                        example=args.example, example_en=args.example_en,
+                                        tier=args.tier or "google")
+        return {"saved": front, "status": status, "count": cnt, "sens": args.sens, "_kind": "saved"}
+    return None
+
+
+def serve(session, parser, stdin=None, stdout=None):
+    """dico --serve: one JSON request per stdin line → one JSON response per
+    stdout line, over ONE Session (state persists; the interpreter, Lexique,
+    Grammalecte and the spaCy sidecar load once).
+
+      {"id": …, "line": "save 2"}                  the REPL's language
+      {"id": …, "args": ["--json", "-c", "dire"]}  argv-style, the apps' flags as today
+      {"id": …, "op": "ping"}                      → {"id": …, "ok": true, "version": …}
+      →  {"id": …, "kind": <_kind>, "result": <the --json dict>}
+      →  {"id": …, "error": "…"}   (a bad line has no id; nothing ever kills the loop)
+
+    Stdout carries only responses (anything a lookup prints goes to stderr);
+    the cache is flushed after every request. EOF ends it."""
+    stdin = stdin or sys.stdin
+    out = stdout or sys.stdout
+    parser.exit = lambda status=0, message=None: (_ for _ in ()).throw(SystemExit(message or status))
+
+    def reply(obj):
+        out.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        out.flush()
+
+    for raw in stdin:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            req = json.loads(raw)
+        except ValueError as e:
+            reply({"error": f"invalid JSON: {e}"})
+            continue
+        if not isinstance(req, dict):
+            reply({"error": "a request is a JSON object: {\"id\", \"line\" | \"args\" | \"op\": \"ping\"}"})
+            continue
+        rid = req.get("id")
+        try:
+            with contextlib.redirect_stdout(sys.stderr):   # only responses on stdout
+                if req.get("op") == "ping":
+                    reply({"id": rid, "ok": True, "version": __version__})
+                    continue
+                if "line" in req:
+                    r = session.handle(str(req["line"]))
+                elif "args" in req:
+                    args = parser.parse_args([str(a) for a in req["args"]])
+                    if args.context:
+                        session.last["word"] = args.context
+                    r = command_result(args)
+                    if r is None:
+                        r = session.handle_args(args)
+                else:
+                    raise ValueError('a request needs "line", "args" or "op": "ping"')
+                cache_flush()
+            reply({"id": rid, "kind": r.get("_kind", ""), "result": _public(r)})
+        except SystemExit as e:                 # argparse refused the flags
+            reply({"id": rid, "error": f"bad args: {e}"})
+        except Exception as e:
+            reply({"id": rid, "error": f"{type(e).__name__}: {e}"})
+
+
+def main():
+    p = _build_parser()
+    args = p.parse_args()
+    session = Session()
+    if args.serve:
+        return serve(session, p)
+
+    if args.review:
+        return run_review()
+    if args.due or args.card or args.grade:      # always JSON: the apps' deck
+        return print(json.dumps(_public(command_result(args)), ensure_ascii=False))
     if args.backup_init is not None:
         return run_backup_init(args.backup_init, as_json=args.json)
     if args.backup or args.pull:
         return run_backup(as_json=args.json, pull_only=args.pull)
     if args.paths:
-        paths = {"config": CONFIG_PATH, "vocab": VOCAB, "store": STORE, "data": DATA_DIR,
-                 "home": DICO_HOME, "cards_repo": cards_repo() or "",
-                 "cards_autosync": cards_autosync()}
+        paths = _public(command_result(args))
         if args.json:
             return print(json.dumps(paths, ensure_ascii=False))
         for k, v in paths.items():
@@ -3838,13 +3923,9 @@ def main():
     if args.enrich:
         return run_enrich(as_json=args.json)
     if args.save_term:
-        lang = "fr" if _deaccent(args.sens or "") == _deaccent(args.save_term) else detect_lang(args.sens or "en")
         if args.json:
-            front, status, cnt = _save_term(args.save_term, args.sens, lang, quiet=True,
-                                            example=args.example, example_en=args.example_en,
-                                            tier=args.tier or "google")
-            return print(json.dumps({"saved": front, "status": status, "count": cnt,
-                                     "sens": args.sens}, ensure_ascii=False))
+            return print(json.dumps(_public(command_result(args)), ensure_ascii=False))
+        lang = "fr" if _deaccent(args.sens or "") == _deaccent(args.save_term) else detect_lang(args.sens or "en")
         return _save_term(args.save_term, args.sens, lang, example=args.example, example_en=args.example_en,
                           tier=args.tier or "google")
     if args.context:

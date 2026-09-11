@@ -118,17 +118,21 @@ def _normalise_txt(text, name, tmp):
     return text
 
 
-def run(argv, tmp, as_json=True):
+def scratch_env(tmp):
+    """HOME → the scratch dir: ~/.dico_config.json is not read (autosave off,
+    no LLM), ~/.dico is scratch too. uv keeps its real caches (spaCy sidecar)."""
     home = os.path.expanduser("~")
-    # HOME → the scratch dir: ~/.dico_config.json is not read (autosave off,
-    # no LLM), ~/.dico is scratch too. uv keeps its real caches (spaCy sidecar).
-    env = dict(os.environ, HOME=tmp,
-               UV_CACHE_DIR=os.environ.get("UV_CACHE_DIR") or os.path.join(home, ".cache", "uv"),
-               UV_PYTHON_INSTALL_DIR=os.environ.get("UV_PYTHON_INSTALL_DIR")
-               or os.path.join(home, ".local", "share", "uv", "python"),
-               DICO_STORE=os.path.join(tmp, "dico_vocab.json"),
-               DICO_VOCAB=os.path.join(tmp, "vocabulaire.md"),
-               NO_COLOR="1", PYTHONIOENCODING="utf-8")
+    return dict(os.environ, HOME=tmp,
+                UV_CACHE_DIR=os.environ.get("UV_CACHE_DIR") or os.path.join(home, ".cache", "uv"),
+                UV_PYTHON_INSTALL_DIR=os.environ.get("UV_PYTHON_INSTALL_DIR")
+                or os.path.join(home, ".local", "share", "uv", "python"),
+                DICO_STORE=os.path.join(tmp, "dico_vocab.json"),
+                DICO_VOCAB=os.path.join(tmp, "vocabulaire.md"),
+                NO_COLOR="1", PYTHONIOENCODING="utf-8")
+
+
+def run(argv, tmp, as_json=True):
+    env = scratch_env(tmp)
     r = subprocess.run([sys.executable, DICO, *(["--json"] if as_json else []), *argv],
                        capture_output=True, text=True, env=env, timeout=300, cwd=REPO)
     if r.returncode:
