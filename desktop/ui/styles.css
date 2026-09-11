@@ -7,9 +7,11 @@
   --panel:#1b1c21; --sheet:#232429; --rail:rgba(0,0,0,.22); --surface:rgba(255,255,255,.045);
   --hair:rgba(255,255,255,.07); --rule:rgba(255,255,255,.09); --well:rgba(0,0,0,.25);
   --ink:#f2f1ee; --ink-r:242,241,238; --scrim:rgba(0,0,0,.45);
-  --serif:"New York","Iowan Old Style","Charter","Georgia",serif;
-  --sans:-apple-system,"Segoe UI Variable","Segoe UI",system-ui,sans-serif;
-  --mono:"SF Mono","Cascadia Mono","Consolas",ui-monospace,monospace;
+  /* ui-serif / ui-monospace are how WebKit exposes New York and SF Mono; the
+     names themselves are not CSS families. Windows falls through to Segoe. */
+  --serif:ui-serif,"New York","Iowan Old Style","Charter","Georgia",serif;
+  --sans:-apple-system,system-ui,"Segoe UI Variable","Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Consolas",monospace;
   --z:1;
 }
 html[data-theme="light"] {
@@ -25,7 +27,7 @@ html[data-theme="light"] {
 html, body { margin:0; height:100%; background:transparent; overflow:hidden; }
 /* 32 px of margin all round: room for the shadow, which is ours on every platform. */
 body { padding:32px; }
-body { font-family:var(--sans); color:var(--ink); font-size:calc(13px * var(--z)); -webkit-font-smoothing:antialiased; }
+body { font-family:var(--sans); color:var(--ink); font-size:calc(13px * var(--z)); }
 button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:default; }
 button:focus { outline:none; }
 .ink-85{color:rgba(var(--ink-r),.85)} .ink-55{color:rgba(var(--ink-r),.55)} .ink-45{color:rgba(var(--ink-r),.45)}

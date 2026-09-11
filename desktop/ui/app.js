@@ -126,7 +126,7 @@ async function openPane(p) {
   const gen = state.gen; const term = state.term;
   try {
     let data;
-    if (p === 'definitions') { const r = await cli(['--json', '-f', term]); if (!r.definition || !(r.definition.defs || []).length) throw new Error(`No Wiktionary entry for « ${term} » (needs the internet).`); data = r.definition; }
+    if (p === 'definitions') { const r = await cli(['--json', '-f', term]); if (!r.definition || !(r.definition.defs || []).length) throw new Error(r.definition_error ? `Wiktionary: ${r.definition_error}` : `No Wiktionary entry for « ${term} » (needs the internet).`); data = r.definition; }
     else if (p === 'russe') { const r = await cli(['--json', '-m', term]); data = r.multitran || {}; if (data.error && !(data.groups || []).length && !(data.lines || []).length && !(data.wiktionary_ru || []).length) throw new Error(data.error); }
     else if (p === 'exemples') { const r = await cli(['--json', '--examples', term]); data = r.examples || { en: [], ru: [] }; }
     else { const r = await cli(['--json', '-c', term]); data = r.conjugation; if (!data || data.error) throw new Error(data?.error || 'no conjugation'); }

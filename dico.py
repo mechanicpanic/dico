@@ -3332,8 +3332,8 @@ def _as_json(text, args):
         e = None
         try:
             e = wiktionary(target)
-        except Exception:
-            pass
+        except Exception as exc:                  # say why: the panel shows it
+            out["definition_error"] = f"{type(exc).__name__}: {exc}"
         if e:
             known = {_deaccent(h["word"]) for h in (e.get("homo") or [])}
             homo = (e.get("homo") or []) + [{"word": w, "note": ""}
