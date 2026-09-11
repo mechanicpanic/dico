@@ -1,15 +1,45 @@
 name: desktop
 
-# Builds the Tauri panel for Windows (and Linux) and attaches the installers
-# to the GitHub release of the tag. The Windows build carries the CLI as a
-# PyInstaller bundle, so the person installing it needs no Python.
+# The Tauri panel for Windows (and Linux). The offline data is built once, on
+# Linux (it is plain SQLite + Python, the same everywhere), then each platform
+# freezes the CLI with PyInstaller, builds its installer and attaches it to the
+# release of the tag. The person installing it needs nothing else.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+
 jobs:
+  data:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5        # the conjugations are built with verbecc, through uv
+      - name: Offline data (Lexique, conjugations, Grammalecte)
+        run: |
+          python dico.py --setup --no-llm
+          test -f data/lexique.db && test -f data/conjugations.db && test -d data/grammalecte
+          du -sh data
+        env:
+          DICO_DATA: ${{ github.workspace }}/data
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data
+          path: |
+            data/lexique.db
+            data/conjugations.db
+            data/grammalecte
+          retention-days: 3
+
   build:
+    needs: data
     strategy:
       fail-fast: false
       matrix:
@@ -21,28 +51,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: data
+          path: data
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v5        # the conjugations are built with verbecc, through uv
-
-      - name: Offline data (Lexique, conjugations, Grammalecte)
-        run: |
-          python dico.py --setup --no-llm
-          test -f data/lexique.db && test -f data/conjugations.db && test -d data/grammalecte
-        env:
-          DICO_DATA: ${{ github.workspace }}/data
-          PYTHONUTF8: "1"
-          PYTHONIOENCODING: utf-8
 
       - name: Freeze the CLI (PyInstaller)
+        shell: bash
         run: |
           pip install pyinstaller
           pyinstaller --onedir --name dico --noconfirm --clean --console dico.py
           rm -rf desktop/src-tauri/cli
           mv dist/dico desktop/src-tauri/cli
-        shell: bash
+          desktop/src-tauri/cli/dico --version
 
       - name: Linux packages
         if: matrix.label == 'linux'
@@ -57,10 +82,10 @@ jobs:
 
       - name: Build
         working-directory: desktop
+        shell: bash
         run: |
           npm ci
           npx tauri build
-        shell: bash
 
       - name: Collect
         shell: bash
