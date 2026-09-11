@@ -4,7 +4,7 @@
     python3 tests/check_goldens.py            # re-run every query, diff against tests/golden/
     python3 tests/check_goldens.py --record   # (re)write the goldens; runs each query twice
                                               # and reports any field that drifted between runs
-    python3 tests/check_goldens.py -k card    # only the queries whose name contains "card"
+    python3 tests/check_goldens.py -k save_term,card   # only these queries (exact names)
 
 Each query is run twice: with --json (golden/<name>.json) and as the terminal
 would print it (golden/<name>.txt, ANSI stripped), each mode on its own temporary
@@ -38,6 +38,11 @@ QUERIES = [
     ("koshka",       ["кошка"]),                         # RU word
     ("dire",         ["dire"]),                          # FR verb
     ("phrase",       ["i have to go"]),                  # EN phrase
+    # The card-direction rule (decide_direction): homographs and cognates.
+    ("manger",       ["manger"]),                        # FR verb Google mistakes for English
+    ("car",          ["car"]),                           # EN noun, also a FR conjunction
+    ("table",        ["table"]),                         # FR/EN cognate
+    ("chat",         ["chat"]),                          # FR noun / EN verb
     ("conj_dire",    ["-c", "dire"]),                    # conjugation grid
     ("fr_chat",      ["-f", "chat"]),                    # Wiktionary definition
     ("multi_chat",   ["-m", "chat"]),                    # Multitran fr→ru
@@ -147,13 +152,13 @@ def main():
     record = "--record" in sys.argv
     only = None
     if "-k" in sys.argv:
-        only = sys.argv[sys.argv.index("-k") + 1]
+        only = sys.argv[sys.argv.index("-k") + 1].split(",")   # exact names
     os.makedirs(GOLDEN, exist_ok=True)
     tmp = {"json": tempfile.mkdtemp(prefix="dico-golden-"), "txt": tempfile.mkdtemp(prefix="dico-golden-txt-")}
     failed = []
     try:
         for name, argv in QUERIES:
-            if only and only not in name:
+            if only and name not in only:
                 continue
             for ext in ("json", "txt"):
                 as_json = ext == "json"

@@ -1,0 +1,5 @@
+  🇬🇧 manger
+     nom        1 une crèche  2 une mangeoire   ← creche, nursery
+     « Tom travaille dans une crèche. » — Tom works in a nursery.
+     ↳  save N · conj · def · ru · ex · say · syn · ? question
+  ↔ « manger » is also a French word: manger (verbe, courant) — « def manger » for its meaning

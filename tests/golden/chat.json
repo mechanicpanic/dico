@@ -1,0 +1,40 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "Je vois un chat.",
+      "I see a cat."
+    ]
+  ],
+  "head": "un chat",
+  "lexique": {
+    "article": "un",
+    "band": "courant",
+    "cefr": "A1",
+    "cgram": "NOM",
+    "freqfilms": 57.71,
+    "freqlivres": 59.26,
+    "genre": "m",
+    "ipa": "ʃa",
+    "lemma": "chat",
+    "nbhomoph": 7,
+    "nbsyll": 1,
+    "nombre": "s",
+    "ortho": "chat",
+    "phon": "Sa",
+    "pos": "nom",
+    "syll": "ʃa"
+  },
+  "query": "chat",
+  "senses": [
+    {
+      "pos": "nom",
+      "terms": [
+        "cat",
+        "kitten",
+        "puss",
+        "gib"
+      ]
+    }
+  ]
+}

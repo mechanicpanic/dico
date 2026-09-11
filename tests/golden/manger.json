@@ -1,0 +1,44 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "Vous devriez manger ceci.",
+      "You should eat this."
+    ]
+  ],
+  "head": "manger",
+  "lexique": {
+    "article": null,
+    "band": "courant",
+    "cefr": "A1",
+    "cgram": "VER",
+    "freqfilms": 207.63,
+    "freqlivres": 134.26,
+    "genre": null,
+    "ipa": "mɑ̃ʒe",
+    "lemma": "manger",
+    "nbhomoph": 7,
+    "nbsyll": 2,
+    "nombre": null,
+    "ortho": "manger",
+    "phon": "m@Ze",
+    "pos": "verbe",
+    "syll": "mɑ̃-ʒe"
+  },
+  "query": "manger",
+  "senses": [
+    {
+      "pos": "verbe",
+      "terms": [
+        "eat",
+        "feed",
+        "meal",
+        "drink",
+        "mouth",
+        "manage",
+        "make",
+        "run through"
+      ]
+    }
+  ]
+}

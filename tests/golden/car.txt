@@ -1,0 +1,4 @@
+  🇬🇧 car
+     nom        1 voiture ★★  2 car ★★  3 un wagon ★  4 un autocar   ← vehicle, carriage
+     « Tom gare la voiture. » — Tom is parking the car.
+     ↳  save N · conj · def · ru · ex · say · syn · ? question

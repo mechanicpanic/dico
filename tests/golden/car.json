@@ -1,0 +1,39 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "Yanni avait une carie.",
+      "Yanni had a cavity."
+    ]
+  ],
+  "head": "car",
+  "lexique": {
+    "article": null,
+    "band": "courant",
+    "cefr": "A1",
+    "cgram": "CON",
+    "freqfilms": 237.2,
+    "freqlivres": 469.32,
+    "genre": null,
+    "ipa": "kaʁ",
+    "lemma": "car",
+    "nbhomoph": 12,
+    "nbsyll": 1,
+    "nombre": null,
+    "ortho": "car",
+    "phon": "kaR",
+    "pos": "conjonction",
+    "syll": "kaʁ"
+  },
+  "query": "car",
+  "senses": [
+    {
+      "pos": "nom",
+      "terms": [
+        "car",
+        "bus",
+        "motor"
+      ]
+    }
+  ]
+}

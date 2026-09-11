@@ -1,0 +1,39 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "Aucun téléphone à table !",
+      "No phone at the dinner table!"
+    ]
+  ],
+  "head": "une table",
+  "lexique": {
+    "article": "une",
+    "band": "courant",
+    "cefr": "A1",
+    "cgram": "NOM",
+    "freqfilms": 111.44,
+    "freqlivres": 341.08,
+    "genre": "f",
+    "ipa": "tabl",
+    "lemma": "table",
+    "nbhomoph": 4,
+    "nbsyll": 1,
+    "nombre": "s",
+    "ortho": "table",
+    "phon": "tabl",
+    "pos": "nom",
+    "syll": "tabl"
+  },
+  "query": "table",
+  "senses": [
+    {
+      "pos": "nom",
+      "terms": [
+        "table",
+        "board",
+        "calculator"
+      ]
+    }
+  ]
+}
