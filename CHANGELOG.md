@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.6 — 2026-09-11
+
+The Windows panel, after a day on a real screen.
+- The shortcuts scrim no longer sits over the panel (a `hidden` attribute
+  lost to `display:flex`); the window is transparent with its own shadow and
+  a margin, on every platform.
+- Lookups run off the main thread: the panel stays live, a sweep line under
+  the query shows work, results fade in. No spinner (it was spinning the
+  whole query bar). A keystroke no longer redraws the body.
+- Real WebKit font families (`ui-serif`, `ui-monospace`) and no glyph
+  thinning, so weights match the native app. Boot milestones and script
+  errors go to `~/.dico/desktop.log`. The Definitions pane says why
+  Wiktionary failed. `--show` opens the panel at launch; a taken Alt+D is
+  not fatal.
+- Installers are attached to the release by the workflow itself.
+
 ## 1.0.5 — 2026-09-11
 
 - **Windows (and Linux).** `desktop/` is the same panel as a Tauri app: a
