@@ -21,6 +21,7 @@ html[data-theme="light"] {
   --ink:#1b1c20; --ink-r:27,28,32;
 }
 * { box-sizing:border-box; }
+[hidden] { display:none !important; }
 html, body { margin:0; height:100%; background:transparent; overflow:hidden; }
 body { font-family:var(--sans); color:var(--ink); font-size:calc(13px * var(--z)); -webkit-font-smoothing:antialiased; }
 button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:default; }
