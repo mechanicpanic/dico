@@ -402,7 +402,9 @@ $('#q').addEventListener('input', e => {
   state.query = e.target.value;
   const prefixes = [['-c ', 'conjuguer'], ['-g ', 'grammaire'], ['-x ', 'rayonsX'], ['? ', 'demander']];
   for (const [p, m] of prefixes) if (state.query.startsWith(p)) { state.query = state.query.slice(p.length); e.target.value = state.query; setMode(m, false); break; }
-  if (!state.query.trim()) clearResults(); else render();
+  // A keystroke touches the bar only; the body is redrawn when a result changes.
+  if (!state.query.trim() && state.outcome.kind !== 'vide') clearResults();
+  else { $('#flag').textContent = CYR.test(state.query) ? '🇷🇺' : '🇫🇷'; $('#clear').hidden = state.busy || !state.query; }
 });
 document.addEventListener('keydown', e => {
   const k = e.key; const ctrl = e.ctrlKey || e.metaKey;
