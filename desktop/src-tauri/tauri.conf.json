@@ -12,8 +12,8 @@
       {
         "label": "main",
         "title": "Dico",
-        "width": 624,
-        "height": 484,
+        "width": 664,
+        "height": 524,
         "resizable": false,
         "decorations": false,
         "transparent": true,

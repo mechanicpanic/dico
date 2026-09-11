@@ -40,7 +40,7 @@ function applyZoom(z, save = true) {
   state.zoom = Math.min(1.6, Math.max(0.8, Math.round(z * 100) / 100));
   document.documentElement.style.setProperty('--z', state.zoom);
   if (save) localStorage.setItem('dico.zoom', state.zoom);
-  invoke('resize', { width: Math.round(600 * state.zoom) + 24, height: Math.round(460 * state.zoom) + 24 });
+  invoke('resize', { width: Math.round(600 * state.zoom) + 64, height: Math.round(460 * state.zoom) + 64 });
 }
 
 // ---------- Toast ----------
