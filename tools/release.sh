@@ -103,7 +103,7 @@ cask "dico" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Dico.app"
   binary "#{appdir}/Dico.app/Contents/Resources/bin/dico"
