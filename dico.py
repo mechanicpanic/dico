@@ -758,6 +758,12 @@ def _show_audio(word):
         print(f"  {DIM}🔈 {err}{RESET}")
         return None
     print(f"  🔈 {BOLD}{word}{RESET}  {DIM}(Wiktionnaire · Commons){RESET}")
+    if sys.platform == "win32":                       # no afplay: hand it to the default player
+        try:
+            os.startfile(path)                        # noqa: S606 — a local MP3 we just wrote
+        except OSError as e:
+            print(f"  {YELLOW}✗ cannot play: {e}{RESET}")
+        return
     player = shutil.which("afplay") or shutil.which("ffplay")
     if not player:
         print(f"     {DIM}{path}{RESET}")

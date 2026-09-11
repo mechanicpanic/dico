@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dico</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="panel" class="panel" data-mode="mot">
+  <nav class="rail" data-tauri-drag-region>
+    <div class="mark">é</div>
+    <button class="rail-item" data-mode="mot"><span class="icon">📖</span><span>Word</span></button>
+    <button class="rail-item" data-mode="conjuguer"><span class="icon">🔁</span><span>Conj.</span></button>
+    <button class="rail-item" data-mode="grammaire"><span class="icon">✅</span><span>Gram.</span></button>
+    <button class="rail-item" data-mode="rayonsX"><span class="icon">🔬</span><span>X-ray</span></button>
+    <button class="rail-item" data-mode="demander"><span class="icon">💬</span><span>Ask</span></button>
+    <button class="rail-item" data-mode="cartes"><span class="icon">🎴</span><span>Cards</span></button>
+    <div class="spacer"></div>
+    <button class="gear" id="gear" title="Settings (Ctrl+,)">⚙︎</button>
+  </nav>
+  <main class="content">
+    <div class="querybar" id="querybar">
+      <span class="flag" id="flag">🇫🇷</span>
+      <input id="q" class="query" type="text" autocomplete="off" spellcheck="false" placeholder="a word, a sentence, a question…">
+      <span class="busy" id="busy" hidden></span>
+      <button class="keyhint clear" id="clear" hidden>Ctrl+K clear</button>
+      <button class="ctx" id="ctx" hidden></button>
+    </div>
+    <div class="body" id="body"></div>
+    <div class="footer" id="footer">
+      <button id="keys">Ctrl+/ shortcuts</button><span>Esc clear</span><span id="hotkey">Alt+D anywhere</span>
+    </div>
+  </main>
+  <div class="toast" id="toast" hidden></div>
+  <div class="scrim" id="sheet" hidden></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

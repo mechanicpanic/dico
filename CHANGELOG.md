@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.5 — unreleased
+
+- **Windows (and Linux).** `desktop/` is the same panel as a Tauri app: a
+  plain HTML front end in the Atelier design driving the CLI, with Alt+D, a
+  tray icon, every mode, the Cards review and the settings sheet. The Windows
+  installer carries the CLI frozen with PyInstaller and the offline data, so
+  the person installing it needs nothing else. Built on GitHub Actions for
+  every tag; `npm test` renders every mode off screen against the real CLI.
+- The CLI plays audio on Windows through the default player.
+
 ## 1.0.4 — 2026-09-11
 
 - A Russian word whose Google entry carries no back-translations

@@ -1,0 +1,78 @@
+name: desktop
+
+# Builds the Tauri panel for Windows (and Linux) and attaches the installers
+# to the GitHub release of the tag. The Windows build carries the CLI as a
+# PyInstaller bundle, so the person installing it needs no Python.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: ubuntu-22.04
+            label: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Offline data (Lexique, conjugations, Grammalecte)
+        run: |
+          python dico.py --setup --no-llm
+        env:
+          DICO_DATA: ${{ github.workspace }}/data
+
+      - name: Freeze the CLI (PyInstaller)
+        run: |
+          pip install pyinstaller
+          pyinstaller --onedir --name dico --noconfirm --clean --console dico.py
+          rm -rf desktop/src-tauri/cli
+          mv dist/dico desktop/src-tauri/cli
+        shell: bash
+
+      - name: Linux packages
+        if: matrix.label == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build
+        working-directory: desktop
+        run: |
+          npm ci
+          npx tauri build
+        shell: bash
+
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p out
+          find desktop/src-tauri/target/release/bundle -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} out/ \;
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dico-${{ matrix.label }}
+          path: out/*
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${GITHUB_REF_NAME}" out/* --clobber
