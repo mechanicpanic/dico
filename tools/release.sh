@@ -114,15 +114,15 @@ cask "dico" do
     run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Dico.app"]
   end
 
-  caveats <<~EOS
-    Press ⌥D anywhere to open the panel.
-  EOS
-
   zap trash: [
     "~/.dico",
     "~/.dico_config.json",
     "~/Library/Preferences/fr.dico.popup.plist",
   ]
+
+  caveats <<~EOS
+    Press ⌥D anywhere to open the panel.
+  EOS
 end
 RUBY
   ( cd "$TAP_DIR" && git add -A && git -c commit.gpgsign=false commit -qm "dico $VERSION" && git push -q )
