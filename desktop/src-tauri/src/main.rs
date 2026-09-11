@@ -161,11 +161,14 @@ fn main() {
             // Alt+D anywhere — the same key as the macOS app.
             let hotkey = Shortcut::new(Some(Modifiers::ALT), Code::KeyD);
             let handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(hotkey, move |_app, _sc, event| {
+            // Another app may hold Alt+D (the native Dico, say): the tray still works.
+            if let Err(e) = app.global_shortcut().on_shortcut(hotkey, move |_app, _sc, event| {
                 if event.state == ShortcutState::Pressed {
                     toggle_panel(&handle);
                 }
-            })?;
+            }) {
+                eprintln!("Alt+D not registered: {e}");
+            }
 
             // The tray: Open · Quit; a left click toggles.
             let open = MenuItem::with_id(app, "open", "Open  (Alt+D)", true, None::<&str>)?;
@@ -195,6 +198,10 @@ fn main() {
                         let _ = w2.hide();
                     }
                 });
+                // `--show`: open the panel straight away (first run, demos).
+                if std::env::args().any(|a| a == "--show") {
+                    show_panel(&w);
+                }
             }
             Ok(())
         })
