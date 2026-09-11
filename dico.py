@@ -775,13 +775,27 @@ def audio_for(word):
     return dest, None
 
 
+def audio_result(word):
+    """{"audio": {"path", "error"}} — the native recording, fetched and cached."""
+    path, err = audio_for(word)
+    return {"audio": {"path": path, "error": err}, "_word": word}
+
+
+def render_audio(r):
+    a = r["audio"]
+    if a["error"]:
+        return [f"  {DIM}🔈 {a['error']}{RESET}"]
+    return [f"  🔈 {BOLD}{r['_word']}{RESET}  {DIM}(Wiktionnaire · Commons){RESET}"]
+
+
 def _show_audio(word):
     """« say » — play the native recording (macOS: afplay handles the MP3)."""
-    path, err = audio_for(word)
-    if err:
-        print(f"  {DIM}🔈 {err}{RESET}")
+    r = audio_result(word)
+    for line in render_audio(r):
+        print(line)
+    path = r["audio"]["path"]
+    if r["audio"]["error"]:
         return None
-    print(f"  🔈 {BOLD}{word}{RESET}  {DIM}(Wiktionnaire · Commons){RESET}")
     if sys.platform == "win32":                       # no afplay: hand it to the default player
         try:
             os.startfile(path)                        # noqa: S606 — a local MP3 we just wrote
@@ -801,25 +815,38 @@ def _show_audio(word):
     return path
 
 
-def _show_synonyms(word):
-    """« syn » — synonyms and homophones, from the Wiktionnaire."""
+def synonyms_result(word):
+    """{"synonyms", "homophones", "cefr", "ipa"} — Wiktionnaire synonyms, the
+    homophones Lexique settles offline (same `phon`) plus the ones the
+    Wiktionnaire happens to list."""
     try:
         entry = wiktionary(word)
     except Exception:
         entry = None
-    syn = (entry or {}).get("syn") or []
     homo = (entry or {}).get("homo") or []
-    # Lexique settles the homophones offline and exactly (same `phon`); the
-    # Wiktionnaire adds the ones it happens to list.
     known = {_deaccent(h["word"]) for h in homo}
     homo = homo + [{"word": w, "note": ""} for w in homophones(word)
                    if _deaccent(w) not in known]
-    if syn:
-        print(f"  {CYAN}≈ synonymes de {word}{RESET}  {_wikt_words(syn, 12)}")
-    if homo:
-        print(f"  {CYAN}♪ homophones{RESET}  {_wikt_words(homo, 12)}")
-    if not (syn or homo):
-        print(f"  {DIM}≈ no synonyms listed for « {word} »{RESET}")
+    lx = lexique_lookup(word)
+    return {"synonyms": (entry or {}).get("syn") or [], "homophones": homo,
+            "cefr": (lx or {}).get("cefr"), "ipa": (lx or {}).get("ipa"), "_word": word}
+
+
+def render_synonyms(r):
+    """« syn » — synonyms and homophones."""
+    lines = []
+    if r["synonyms"]:
+        lines.append(f"  {CYAN}≈ synonymes de {r['_word']}{RESET}  {_wikt_words(r['synonyms'], 12)}")
+    if r["homophones"]:
+        lines.append(f"  {CYAN}♪ homophones{RESET}  {_wikt_words(r['homophones'], 12)}")
+    if not lines:
+        lines.append(f"  {DIM}≈ no synonyms listed for « {r['_word']} »{RESET}")
+    return lines
+
+
+def _show_synonyms(word):
+    for line in render_synonyms(synonyms_result(word)):
+        print(line)
 
 
 def _wikt_words(items, limit=8):
@@ -830,37 +857,66 @@ def _wikt_words(items, limit=8):
     return " · ".join(out)
 
 
-def _show_wikt(lookup_word):
+def definition_result(word):
+    """Result section of a Wiktionary lookup: {"definition": {...} | None} plus
+    "definition_error" when the request failed — the panels' contract — and,
+    for the terminal / the save block, "_entry" (the raw entry), "_ipa" (the
+    Wiktionary IPA alone; the JSON falls back to Lexique) and "_word"."""
+    e, out = None, {"_word": word}
     try:
-        entry = wiktionary(lookup_word)
-    except Exception:
-        entry = None
-    if entry:
-        head = f"  {CYAN}📖 {entry['lemma']}{RESET}"
-        if entry["ipa"]:
-            head += f"  {DIM}[{entry['ipa']}]{RESET}"
-        if entry["gender"]:
-            head += f"  {DIM}·{RESET} {entry['gender']}"
-        elif entry["pos"]:
-            head += f"  {DIM}·{RESET} {entry['pos']}"
-        print(head)
-        for i, d in enumerate(entry["defs"], 1):
-            print(f"     {DIM}{i}.{RESET} {d}")
-        if entry.get("etym"):
-            print(f"     {DIM}🌱 etym. {entry['etym']}{RESET}")
-        if entry.get("syn"):
-            print(f"     {DIM}≈ synonymes{RESET} {_wikt_words(entry['syn'])}")
-        homo = entry.get("homo") or []
-        known = {_deaccent(h["word"]) for h in homo}
-        homo = homo + [{"word": w, "note": ""} for w in homophones(entry["lemma"])
-                       if _deaccent(w) not in known]
-        if homo:
-            print(f"     {DIM}♪ homophones{RESET} {_wikt_words(homo)}")
-        if entry.get("audio"):
-            print(f"     {DIM}🔈 « say » to hear it{RESET}")
+        e = wiktionary(word)
+    except Exception as exc:                  # say why: the panel shows it
+        out["definition_error"] = f"{type(exc).__name__}: {exc}"
+    if e:
+        known = {_deaccent(h["word"]) for h in (e.get("homo") or [])}
+        homo = (e.get("homo") or []) + [{"word": w, "note": ""}
+                                        for w in homophones(e["lemma"])
+                                        if _deaccent(w) not in known]
+        lx = lexique_lookup(e["lemma"])
+        out["definition"] = {"word": e["lemma"], "ipa": e["ipa"] or (lx or {}).get("ipa"),
+                             "gender": e["gender"], "pos": e["pos"], "defs": e["defs"],
+                             "etym": e.get("etym"), "syn": e.get("syn") or [],
+                             "homo": homo, "ru": e.get("ru") or [],
+                             "cefr": (lx or {}).get("cefr") or "",
+                             "has_audio": bool(e.get("audio"))}
+        out["_ipa"] = e["ipa"]
     else:
-        print(f"  {DIM}📖 (no Wiktionary entry for \u00ab {lookup_word} \u00bb){RESET}")
-    return entry
+        out["definition"] = None
+    out["_entry"] = e
+    return out
+
+
+def render_definition(r):
+    """The Wiktionary entry as the terminal prints it."""
+    d = r["definition"]
+    if not d:
+        return [f"  {DIM}📖 (no Wiktionary entry for \u00ab {r['_word']} \u00bb){RESET}"]
+    head = f"  {CYAN}📖 {d['word']}{RESET}"
+    if r["_ipa"]:
+        head += f"  {DIM}[{r['_ipa']}]{RESET}"
+    if d["gender"]:
+        head += f"  {DIM}·{RESET} {d['gender']}"
+    elif d["pos"]:
+        head += f"  {DIM}·{RESET} {d['pos']}"
+    lines = [head]
+    for i, x in enumerate(d["defs"], 1):
+        lines.append(f"     {DIM}{i}.{RESET} {x}")
+    if d["etym"]:
+        lines.append(f"     {DIM}🌱 etym. {d['etym']}{RESET}")
+    if d["syn"]:
+        lines.append(f"     {DIM}≈ synonymes{RESET} {_wikt_words(d['syn'])}")
+    if d["homo"]:
+        lines.append(f"     {DIM}♪ homophones{RESET} {_wikt_words(d['homo'])}")
+    if d["has_audio"]:
+        lines.append(f"     {DIM}🔈 « say » to hear it{RESET}")
+    return lines
+
+
+def _show_wikt(lookup_word):
+    r = definition_result(lookup_word)
+    for line in render_definition(r):
+        print(line)
+    return r["_entry"]
 
 
 # --------------------------------------------------------------------------- #
@@ -2423,42 +2479,49 @@ def _gloss_for(lemma, token):
     return ""
 
 
-def _show_multitran(word):
+def multitran_result(word):
+    """{"multitran": {"direction", "lines", "groups", "error"[, "wiktionary_ru"]}}
+    — offline Multitran; without it, the Wiktionnaire's Russian."""
     lines, direction, err = multitran_lookup(word)
-    arrow = "ru→fr" if direction == "rufr" else "fr→ru"
-    if lines:
-        print(f"  {CYAN}📚 Multitran ({arrow}){RESET}")
-        for ln in lines[:40]:
-            print(f"     {ln}")
-        if len(lines) > 40:
-            print(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
-    elif _show_wikt_ru(word):
-        pass                       # Wiktionary carried the Russian instead
-    elif err:
-        print(f"  {DIM}📚 Multitran: {err}{RESET}")
+    groups, _ = multitran_structured(word)
+    m = {"direction": direction, "lines": lines or [], "groups": groups, "error": err}
+    if not groups and not (lines or []):          # no Multitran → Wiktionary's Russian
+        try:
+            m["wiktionary_ru"] = (wiktionary(word) or {}).get("ru") or []
+        except Exception:
+            pass
+    return {"multitran": m, "_word": word}
+
+
+def render_multitran(r):
+    m = r["multitran"]
+    arrow = "ru→fr" if m["direction"] == "rufr" else "fr→ru"
+    lines = []
+    if m["lines"]:
+        lines.append(f"  {CYAN}📚 Multitran ({arrow}){RESET}")
+        for ln in m["lines"][:40]:
+            lines.append(f"     {ln}")
+        if len(m["lines"]) > 40:
+            lines.append(f"     {DIM}… (full entry in Dictionary.app — ⌃⌘D){RESET}")
+    elif m.get("wiktionary_ru"):               # Wiktionary carried the Russian instead
+        lines.append(f"  {CYAN}📚 russe {DIM}(Wiktionnaire){RESET}")
+        for x in m["wiktionary_ru"][:8]:
+            bits = x["word"]
+            if x.get("tr"):
+                bits += f"  {DIM}[{x['tr']}]{RESET}"
+            if x.get("gender"):
+                bits += f"  {DIM}{x['gender']}.{RESET}"
+            lines.append(f"     {bits}")
+    elif m["error"]:
+        lines.append(f"  {DIM}📚 Multitran: {m['error']}{RESET}")
     else:
-        print(f"  {DIM}📚 (not in Multitran {arrow}: « {word} »){RESET}")
+        lines.append(f"  {DIM}📚 (not in Multitran {arrow}: « {r['_word']} »){RESET}")
+    return lines
 
 
-def _show_wikt_ru(word):
-    """Russian from the Wiktionnaire — what you get without Multitran
-    (proprietary, bring-your-own). True when something was printed."""
-    try:
-        entry = wiktionary(word)
-    except Exception:
-        return False
-    rows = (entry or {}).get("ru") or []
-    if not rows:
-        return False
-    print(f"  {CYAN}📚 russe {DIM}(Wiktionnaire){RESET}")
-    for r in rows[:8]:
-        bits = r["word"]
-        if r.get("tr"):
-            bits += f"  {DIM}[{r['tr']}]{RESET}"
-        if r.get("gender"):
-            bits += f"  {DIM}{r['gender']}.{RESET}"
-        print(f"     {bits}")
-    return True
+def _show_multitran(word):
+    for line in render_multitran(multitran_result(word)):
+        print(line)
 
 
 def xray_result(sentence):
@@ -3377,53 +3440,15 @@ def _as_json(session, text, args):
                 target = translate_rich(text, session=session)[0] or text
             except Exception:
                 pass
-        e = None
-        try:
-            e = wiktionary(target)
-        except Exception as exc:                  # say why: the panel shows it
-            out["definition_error"] = f"{type(exc).__name__}: {exc}"
-        if e:
-            known = {_deaccent(h["word"]) for h in (e.get("homo") or [])}
-            homo = (e.get("homo") or []) + [{"word": w, "note": ""}
-                                            for w in homophones(e["lemma"])
-                                            if _deaccent(w) not in known]
-            lx = lexique_lookup(e["lemma"])
-            out["definition"] = {"word": e["lemma"], "ipa": e["ipa"] or (lx or {}).get("ipa"),
-                                 "gender": e["gender"], "pos": e["pos"], "defs": e["defs"],
-                                 "etym": e.get("etym"), "syn": e.get("syn") or [],
-                                 "homo": homo, "ru": e.get("ru") or [],
-                                 "cefr": (lx or {}).get("cefr") or "",
-                                 "has_audio": bool(e.get("audio"))}
-        else:
-            out["definition"] = None
+        out.update(definition_result(target))
         return out
     if args.say or args.syn:
-        e = None
-        try:
-            e = wiktionary(text)
-        except Exception:
-            pass
-        out["synonyms"] = (e or {}).get("syn") or []
-        known = {_deaccent(h["word"]) for h in ((e or {}).get("homo") or [])}
-        out["homophones"] = ((e or {}).get("homo") or []) + [
-            {"word": w, "note": ""} for w in homophones(text) if _deaccent(w) not in known]
-        lx = lexique_lookup(text)
-        out["cefr"] = (lx or {}).get("cefr")
-        out["ipa"] = (lx or {}).get("ipa")
+        out.update(synonyms_result(text))
         if args.say:
-            path, err = audio_for(text)
-            out["audio"] = {"path": path, "error": err}
+            out.update(audio_result(text))
         return out
     if args.multitran:
-        lines, direction, err = multitran_lookup(text)
-        groups, _ = multitran_structured(text)
-        out["multitran"] = {"direction": direction, "lines": lines or [], "groups": groups,
-                            "error": err}
-        if not groups and not (lines or []):          # no Multitran → Wiktionary's Russian
-            try:
-                out["multitran"]["wiktionary_ru"] = (wiktionary(text) or {}).get("ru") or []
-            except Exception:
-                pass
+        out.update(multitran_result(text))
         return out
     if args.conj:
         w, tense = _split_tense(text)
