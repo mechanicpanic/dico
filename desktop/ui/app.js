@@ -193,7 +193,7 @@ function render() {
   if (cards) return renderReview(body);
   const o = state.outcome;
   if (o.kind === 'vide') return renderEmpty(body);
-  if (o.kind === 'chargement') { body.innerHTML = `<div class="loading"><span class="busy"></span>${state.mode === 'demander' ? 'thinking…' : 'searching…'}</div>`; return; }
+  if (o.kind === 'chargement') { body.innerHTML = `<div class="loading">${state.mode === 'demander' ? 'thinking…' : 'searching…'}</div>`; return; }
   if (o.kind === 'mot') return renderCard(body, o.l);
   body.classList.add('pad');
   if (o.kind === 'conjugaison') return renderConj(body, o.c, false);
@@ -241,7 +241,7 @@ function exLine(fr, en, ru = false, save = true) { return `<div class="ex ${ru ?
 function renderPane(pane) {
   const p = state.pane; const st = state.panes[p];
   if (!p) { pane.innerHTML = `<span class="ink-35">Pick a pane above.</span>`; return; }
-  if (!st || st.loading) { pane.innerHTML = `<div style="display:flex;gap:7px;align-items:center" class="ink-45"><span class="busy"></span>loading…</div>`; return; }
+  if (!st || st.loading) { pane.innerHTML = `<div class="loading ink-45" style="justify-content:flex-start;height:auto">loading…</div>`; return; }
   if (st.error) { pane.innerHTML = `<div class="issue"><div class="eyebrow rouge">problem<span class="line"></span></div><div class="msg">${esc(st.error)}</div></div><button class="link" data-act="retry">Try again</button>`; return; }
   const d = st.data;
   if (p === 'definitions') {
@@ -325,7 +325,7 @@ function renderReview(body) {
   const r = state.review; const c = r.cards[r.i]; const cnt = r.counts || {};
   const counts = [cnt.due ? `${cnt.due} due` : '', cnt.learning ? `${cnt.learning} learning` : '', cnt.new ? `${cnt.new} new` : '', r.graded ? `${r.graded} done` : ''].filter(Boolean).join(' · ');
   let s = `<div class="rev"><div class="hd"><span>🎴</span><span class="t">Saved words</span><span class="c">${counts}</span></div><div class="bd">`;
-  if (r.loading && !r.cards.length) s += `<div class="loading"><span class="busy"></span>asking dico…</div>`;
+  if (r.loading && !r.cards.length) s += `<div class="loading">asking dico…</div>`;
   else if (r.error) s += `<div class="issue"><div class="eyebrow rouge">problem<span class="line"></span></div><div class="msg">${esc(r.error)}</div></div><button class="link dim" data-act="startreview">Try again</button>`;
   else if (c) {
     s += eyebrow(c.state === 'new' ? 'new' : (c.state === 'review' ? `review · ${c.ivl} d` : 'learning'), c.state === 'new' ? 'bleu' : '', `<span class="tr mono ink-30">${r.i + 1} / ${r.cards.length}</span>`);

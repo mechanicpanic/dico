@@ -73,8 +73,10 @@ html[data-theme="light"] .panel { box-shadow:0 12px 28px rgba(0,0,0,.28), 0 1px 
 .query:focus { outline:none }
 .keyhint { font-family:var(--mono); font-size:calc(9px * var(--z)); color:rgba(var(--ink-r),.30) }
 .keyhint.clear { font-size:calc(9.5px * var(--z)); color:rgba(var(--ink-r),.25) }
-.busy { width:12px; height:12px; border:2px solid rgba(var(--ink-r),.2); border-top-color:var(--ink); border-radius:50%; animation:spin .8s linear infinite }
-@keyframes spin { to { transform:rotate(360deg) } }
+/* No spinner: the sweep under the query bar is the only motion. */
+.busy { display:none !important }
+.loading { animation:pulse 1.2s ease-in-out infinite }
+@keyframes pulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
 .ctx { display:flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; background:rgba(232,143,176,.14); color:var(--rose-ink); font-size:calc(10.5px * var(--z)) }
 
 .body { flex:1; min-height:0; overflow:auto; }
