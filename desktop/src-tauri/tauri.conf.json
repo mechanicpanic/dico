@@ -12,8 +12,8 @@
       {
         "label": "main",
         "title": "Dico",
-        "width": 600,
-        "height": 460,
+        "width": 624,
+        "height": 484,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -21,20 +21,30 @@
         "skipTaskbar": true,
         "visible": false,
         "center": true,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' asset: http://asset.localhost; img-src 'self' data:",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/.dico/**", "$HOME/.dico/audio/*"]
+        "scope": [
+          "$HOME/.dico/**",
+          "$HOME/.dico/audio/*"
+        ]
       }
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi", "dmg", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "msi",
+      "dmg",
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -52,7 +62,11 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English", "French", "Russian"]
+        "languages": [
+          "English",
+          "French",
+          "Russian"
+        ]
       }
     }
   }
