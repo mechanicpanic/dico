@@ -2461,28 +2461,47 @@ def _show_wikt_ru(word):
     return True
 
 
-def _show_xray(sentence):
-    """Every word: lemma · pos · tense/person · gender · frequency · role · meaning."""
+def xray_result(sentence):
+    """Result section of the x-ray: {"sentence", "xray": [token dicts]} — the
+    panels' contract — plus, for the terminal, "_rows" (the table, richer verb
+    detection and a batch gloss), "_translation" and "_src_tag"."""
     sentence = sentence.strip()
-    print(f"  {BOLD}🩻 {sentence}{RESET}")
+    out = {"sentence": sentence, "_translation": "", "_rows": [], "_src_tag": ""}
     try:                                       # translation of the whole sentence (1 call)
         tr, _, _ = translate(sentence, tl="en")
         if tr and _deaccent(tr.lower()) != _deaccent(sentence.lower()):
-            print(f"  {DIM}→{RESET} {tr}")
+            out["_translation"] = tr
     except Exception:
         pass
     spacy_on = config_load().get("xray_spacy", True)
     sp = _spacy_tokens(sentence) if spacy_on else None
+    # The panels' tokens (what --json has always emitted).
+    toks = ([(t["text"].strip("-–"), t["lemma"], t["pos"], _DEP_FR.get(t["dep"], t["dep"]))
+             for t in sp if t["pos"] != "PUNCT"] if sp
+            else [(w, None, None, "") for w in _xray_tokens(sentence)])
+    words = []
+    for tx, lemma, pos, role in toks:
+        if not tx:
+            continue
+        lex = lexique_lookup(tx)
+        inf = _form_to_infinitive(tx)
+        words.append({"text": tx, "lemma": inf or (lex["lemma"] if lex else lemma or tx),
+                      "pos": (lex["pos"] if lex else _SPACY_POS_FR.get(pos or "", "")),
+                      "tense": (_conj_tense_of(inf, tx) if inf else "") or "",
+                      "gender": (lex["genre"] if lex else "") or "", "band": lex["band"] if lex else "",
+                      "role": role, "gloss": _gloss_for(inf or (lex["lemma"] if lex else tx), tx)})
+    out["xray"] = words
+    # The terminal's table.
     if sp:
         toks = [(t["text"], t["lemma"], t["pos"], _DEP_FR.get(t["dep"], t["dep"]))
                 for t in sp if t["pos"] != "PUNCT" and t["text"].strip()]
-        src_tag = "spaCy + Lexique + conjugations"
+        out["_src_tag"] = "spaCy + Lexique + conjugations"
     else:
         toks = [(w, None, None, "") for w in _xray_tokens(sentence)]
-        src_tag = ("Lexique + conjugations — spaCy off (\u00ab :spacy on \u00bb for roles)"
-                   if not spacy_on else
-                   "Lexique + conjugations — spaCy unavailable (uv?)" if not shutil.which("uv")
-                   else "Lexique + conjugations — spaCy: failed")
+        out["_src_tag"] = ("Lexique + conjugations — spaCy off (\u00ab :spacy on \u00bb for roles)"
+                           if not spacy_on else
+                           "Lexique + conjugations — spaCy unavailable (uv?)" if not shutil.which("uv")
+                           else "Lexique + conjugations — spaCy: failed")
     rows = []
     for text, lemma, pos, role in toks:
         text = text.strip("-–")                # spaCy leaves "-moi"
@@ -2534,22 +2553,39 @@ def _show_xray(sentence):
                     rows[i] = r[:6] + (g.lower() if g.lower() != (r[1] or r[0]).lower() else "",)
         except Exception:
             pass
+    out["_rows"] = rows
+    return out
+
+
+def render_xray(r):
+    """The x-ray as the terminal prints it: sentence, translation, table, source."""
+    lines = [f"  {BOLD}🩻 {r['sentence']}{RESET}"]
+    if r["_translation"]:
+        lines.append(f"  {DIM}→{RESET} {r['_translation']}")
+    rows = r["_rows"]
     heads = ("word", "lemma", "pos", "tense", "gender·freq", "role", "meaning")
-    widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(heads)]
-    print("  " + DIM + "  ".join(h.ljust(widths[i]) for i, h in enumerate(heads)).rstrip() + RESET)
-    for r in rows:
+    widths = [max(len(h), *(len(x[i]) for x in rows)) for i, h in enumerate(heads)]
+    lines.append("  " + DIM + "  ".join(h.ljust(widths[i]) for i, h in enumerate(heads)).rstrip() + RESET)
+    for x in rows:
         cells = []
-        for i, c in enumerate(r):
+        for i, c in enumerate(x):
             c = c.ljust(widths[i])
             if i == 0:
                 c = f"{BOLD}{c}{RESET}"
-            elif i == 3 and r[3]:
+            elif i == 3 and x[3]:
                 c = f"{GREEN}{c}{RESET}"
-            elif i in (5, 6) and r[i]:
+            elif i in (5, 6) and x[i]:
                 c = f"{DIM}{c}{RESET}"
             cells.append(c)
-        print("  " + "  ".join(cells).rstrip())
-    print(f"  {DIM}({src_tag}){RESET}")
+        lines.append("  " + "  ".join(cells).rstrip())
+    lines.append(f"  {DIM}({r['_src_tag']}){RESET}")
+    return lines
+
+
+def _show_xray(sentence):
+    """Sentence x-ray: each word — lemma, nature, tense, gender, frequency, role, meaning."""
+    for line in render_xray(xray_result(sentence)):
+        print(line)
 
 
 # --------------------------------------------------------------------------- #
@@ -2587,22 +2623,47 @@ def _grammalecte():
     return _GC or None
 
 
-def _show_grammar(sentence):
-    """Highlighted sentence → each mistake (what, why, suggestion) → fixed version."""
-    gc = _grammalecte()
-    if gc is None:
-        print(f"  {YELLOW}✗ Grammalecte not installed — run: dico --setup{RESET}")
-        return
+def grammar_result(sentence):
+    """Result section of a grammar check: {"sentence", "grammar": {"errors",
+    "spelling", "corrected"}} — the panels' contract; "_unavailable" carries the
+    reason when Grammalecte cannot run (the lists are then empty), "_spell_all"
+    the untrimmed spelling suggestions the terminal filters differently."""
     text = sentence.strip()
-    try:
-        gram, spell = gc.getParagraphErrors(text, bSpellSugg=True)
-    except Exception as e:
-        print(f"  {YELLOW}✗ Grammalecte : {e}{RESET}")
-        return
-    errs = sorted(gram, key=lambda e: e["nStart"])
-    sp = sorted(spell, key=lambda e: e["nStart"])
-    spans = sorted([(e["nStart"], e["nEnd"], RED) for e in errs]
-                   + [(e["nStart"], e["nEnd"], YELLOW) for e in sp])
+    gc = _grammalecte()
+    gram, spell, unavailable = [], [], ""
+    if gc is None:
+        unavailable = "Grammalecte not installed — run: dico --setup"
+    else:
+        try:
+            gram, spell = gc.getParagraphErrors(text, bSpellSugg=True)
+        except Exception as e:
+            unavailable = f"Grammalecte : {e}"
+    fixed = text
+    for e in sorted(gram, key=lambda e: -e["nStart"]):
+        if e.get("aSuggestions"):
+            fixed = fixed[:e["nStart"]] + e["aSuggestions"][0] + fixed[e["nEnd"]:]
+    return {"sentence": text,
+            "grammar": {"errors": [{"start": e["nStart"], "end": e["nEnd"],
+                                    "text": text[e["nStart"]:e["nEnd"]],
+                                    "message": (e.get("sMessage") or "").replace("\xa0", " "),
+                                    "type": _GRAM_TYPE.get(e.get("sType", ""), e.get("sType", "")),
+                                    "suggestions": e.get("aSuggestions") or []} for e in gram],
+                        "spelling": [{"start": e["nStart"], "end": e["nEnd"], "text": e["sValue"],
+                                      "suggestions": (e.get("aSuggestions") or [])[:4]} for e in spell],
+                        "corrected": fixed},
+            "_unavailable": unavailable,
+            "_spell_all": [e.get("aSuggestions") or [] for e in spell]}
+
+
+def render_grammar(r):
+    """Highlighted sentence → each mistake (what, why, suggestion) → fixed version."""
+    if r["_unavailable"]:
+        return [f"  {YELLOW}✗ {r['_unavailable']}{RESET}"]
+    text, g = r["sentence"], r["grammar"]
+    errs = sorted(g["errors"], key=lambda e: e["start"])
+    sp = sorted(zip(g["spelling"], r["_spell_all"]), key=lambda e: e[0]["start"])
+    spans = sorted([(e["start"], e["end"], RED) for e in errs]
+                   + [(e["start"], e["end"], YELLOW) for e, _ in sp])
     out, pos = "", 0
     for a, b, col in spans:                    # the sentence, mistakes highlighted
         if a < pos:
@@ -2610,34 +2671,32 @@ def _show_grammar(sentence):
         out += text[pos:a] + f"{col}{BOLD}{text[a:b]}{RESET}"
         pos = b
     out += text[pos:]
-    print(f"  📝 {out}")
+    lines = [f"  📝 {out}"]
     if not errs and not sp:
-        print(f"  {GREEN}✓ Nothing to report — this is correct!{RESET}")
-        return
+        lines.append(f"  {GREEN}✓ Nothing to report — this is correct!{RESET}")
+        return lines
     n = 0
     for e in errs:                             # each mistake: what, why, → suggestion
         n += 1
-        msg = (e.get("sMessage") or "").replace("\xa0", " ").strip()
-        typ = _GRAM_TYPE.get(e.get("sType", ""), e.get("sType", ""))
-        print(f"  {RED}{n}.{RESET} « {BOLD}{text[e['nStart']:e['nEnd']]}{RESET} » — {msg}"
-              + (f"  {DIM}[{typ}]{RESET}" if typ else ""))
-        sug = e.get("aSuggestions") or []
-        if sug:
-            print(f"     {GREEN}→ {' / '.join(sug[:4])}{RESET}")
-    for e in sp:
+        msg = e["message"].strip()
+        typ = e["type"]
+        lines.append(f"  {RED}{n}.{RESET} « {BOLD}{e['text']}{RESET} » — {msg}"
+                     + (f"  {DIM}[{typ}]{RESET}" if typ else ""))
+        if e["suggestions"]:
+            lines.append(f"     {GREEN}→ {' / '.join(e['suggestions'][:4])}{RESET}")
+    for e, all_sug in sp:
         n += 1
-        sug = [s for s in (e.get("aSuggestions") or [])
-               if s.lower() != e["sValue"].lower()][:4]
-        print(f"  {YELLOW}{n}.{RESET} \u00ab {BOLD}{e['sValue']}{RESET} \u00bb — unknown word "
-              f"(spelling? accent?)" + (f"  {DIM}→ {' / '.join(sug)}{RESET}" if sug else ""))
-    fixed, changed = text, False              # corrected version (1st suggestion)
-    for e in sorted(errs, key=lambda e: -e["nStart"]):
-        sug = e.get("aSuggestions") or []
-        if sug:
-            fixed = fixed[:e["nStart"]] + sug[0] + fixed[e["nEnd"]:]
-            changed = True
-    if changed:
-        print(f"  {GREEN}✓ {fixed}{RESET}")
+        sug = [s for s in all_sug if s.lower() != e["text"].lower()][:4]
+        lines.append(f"  {YELLOW}{n}.{RESET} \u00ab {BOLD}{e['text']}{RESET} \u00bb — unknown word "
+                     f"(spelling? accent?)" + (f"  {DIM}→ {' / '.join(sug)}{RESET}" if sug else ""))
+    if any(e["suggestions"] for e in errs):    # corrected version (1st suggestion)
+        lines.append(f"  {GREEN}✓ {g['corrected']}{RESET}")
+    return lines
+
+
+def _show_grammar(sentence):
+    for line in render_grammar(grammar_result(sentence)):
+        print(line)
 
 # --------------------------------------------------------------------------- #
 #  Display                                                                    #
@@ -3263,12 +3322,21 @@ def run_setup(ask_llm=True):
         print(f"\n{DIM}Try « dico --tour » for a 2-minute walkthrough.{RESET}")
 
 
+def _public(obj):
+    """A Result without its terminal-only fields (keys starting with "_")."""
+    if isinstance(obj, dict):
+        return {k: _public(v) for k, v in obj.items() if not str(k).startswith("_")}
+    if isinstance(obj, list):
+        return [_public(v) for v in obj]
+    return obj
+
+
 def as_json(session, text, args):
     """JSON representation of a lookup — for a graphical front-end."""
     out = _as_json(session, text, args)
     if session.fallback_note and "note" not in out:
         out["note"] = session.fallback_note
-    return out
+    return _public(out)
 
 
 def _as_json(session, text, args):
@@ -3292,40 +3360,11 @@ def _as_json(session, text, args):
             if tr:
                 out.update({"source": text, "source_lang": lang, "translated": tr})
                 text = tr
-        out["sentence"] = text
     if args.grammaire:
-        gc = _grammalecte()
-        gram, spell = gc.getParagraphErrors(text, bSpellSugg=True) if gc else ([], [])
-        fixed = text
-        for e in sorted(gram, key=lambda e: -e["nStart"]):
-            if e.get("aSuggestions"):
-                fixed = fixed[:e["nStart"]] + e["aSuggestions"][0] + fixed[e["nEnd"]:]
-        out["grammar"] = {"errors": [{"start": e["nStart"], "end": e["nEnd"],
-                                      "text": text[e["nStart"]:e["nEnd"]],
-                                      "message": (e.get("sMessage") or "").replace("\xa0", " "),
-                                      "type": _GRAM_TYPE.get(e.get("sType", ""), e.get("sType", "")),
-                                      "suggestions": e.get("aSuggestions") or []} for e in gram],
-                          "spelling": [{"start": e["nStart"], "end": e["nEnd"], "text": e["sValue"],
-                                        "suggestions": (e.get("aSuggestions") or [])[:4]} for e in spell],
-                          "corrected": fixed}
+        out.update(grammar_result(text))
         return out
     if args.xray:
-        sp = _spacy_tokens(text) if config_load().get("xray_spacy", True) else None
-        toks = ([(t["text"].strip("-–"), t["lemma"], t["pos"], _DEP_FR.get(t["dep"], t["dep"]))
-                 for t in sp if t["pos"] != "PUNCT"] if sp
-                else [(w, None, None, "") for w in _xray_tokens(text)])
-        words = []
-        for tx, lemma, pos, role in toks:
-            if not tx:
-                continue
-            lex = lexique_lookup(tx)
-            inf = _form_to_infinitive(tx)
-            words.append({"text": tx, "lemma": inf or (lex["lemma"] if lex else lemma or tx),
-                          "pos": (lex["pos"] if lex else _SPACY_POS_FR.get(pos or "", "")),
-                          "tense": (_conj_tense_of(inf, tx) if inf else "") or "",
-                          "gender": (lex["genre"] if lex else "") or "", "band": lex["band"] if lex else "",
-                          "role": role, "gloss": _gloss_for(inf or (lex["lemma"] if lex else tx), tx)})
-        out["xray"] = words
+        out.update(xray_result(text))
         return out
     if args.examples:
         out["examples"] = {"en": [{"fr": s, "en": t} for s, t in _tatoeba(text, "eng", limit=4)],
