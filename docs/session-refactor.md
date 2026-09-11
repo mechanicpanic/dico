@@ -89,10 +89,33 @@ npm test` + the goldens below must pass at every step)
    `car.json` (« voiture »); the panel's plain lookup also inherits the
    terminal's path for unaccented French words (« ecole » → French card),
    nonsense words (empty French card) and French sentences (grammar).
-4. **--serve.** JSON lines over stdin/stdout, one `Session` for the life of
+4. ✅ **--serve.** JSON lines over stdin/stdout, one `Session` for the life of
    the process, `cache_flush()` after each request, one bad request must not
    kill it. Then the panels can send either `args` (today's contract) or a
    `line` (the REPL's language) and get the same `Result`.
+   *Done as:* `serve(session, parser)` — one request per stdin line, one
+   response per stdout line, stderr free for logs, `cache_flush()` after each
+   request, EOF → exit 0. The envelope:
+
+   ```
+   → {"id": …, "line": "save 2"}                   the REPL's language
+   → {"id": …, "args": ["--json", "-c", "dire"]}   argv-style: exactly the flags the apps send today
+   → {"id": …, "op": "ping"}                       health check
+   ← {"id": …, "kind": "<_kind>", "result": {…}}    result = the --json dict (the same bytes as one-shot)
+   ← {"id": …, "ok": true, "version": "1.0.6"}     to a ping
+   ← {"id": …, "error": "…"}                        bad flags, an exception, an unknown request
+   ← {"error": "invalid JSON: …"}                   a line that is not a JSON object — no id, loop goes on
+   ```
+
+   `kind` is the Result's `_kind` (card_fr, card_to_fr, conjugation,
+   definition, multitran, synonyms, audio, examples, grammar, xray, answer,
+   saved, setting, help, message, error, empty; the store commands add deck,
+   card, paths). `--due / --card / --grade / --paths / --save-term` work over
+   `args` too (`command_result()`, shared with `main()`); `--context` sets the
+   session's last word for the tutor. Proof: `tests/check_serve.py` runs the
+   21 golden queries through one process and compares with the `.json`
+   goldens. The Swift and Tauri clients still spawn per call — switching them
+   is a separate step.
 5. **Tutor history.** With a live session, `ai_ask` keeps the last N
    exchanges in `Session` and sends them as context. Only now: this is the
    feature that justified the work.
