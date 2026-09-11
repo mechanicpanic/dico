@@ -42,23 +42,29 @@ as `_as_json` nests them now.
 ## Steps (commit after each; `macos/build/Dico.app --selftest` + `desktop
 npm test` + the goldens below must pass at every step)
 
-0. **Goldens.** Before touching anything, capture `--json` output for a fixed
+0. ✅ **Goldens.** Before touching anything, capture `--json` output for a fixed
    list of queries into `tests/golden/*.json` (cook, maison, кошка, dire, -c
    dire, -f chat, -m chat, --examples chat, -g "elle est parti", -x "le chat
    dort", --due on a temp store, --grade, --card, --save-term on a temp store)
    and a script `tests/check_goldens.py` that diffs them. Network answers are
    cached on disk (`data/translate_cache.json`), so the goldens are stable
    while the cache is warm; run them with the cache present.
-1. **Session.** Move `_LAST`, `_NO_AUTOSAVE`, `_FALLBACK_NOTE` into a class;
+1. ✅ **Session.** Move `_LAST`, `_NO_AUTOSAVE`, `_FALLBACK_NOTE` into a class;
    `show()` and `_as_json()` read/write `self.` instead of globals. No
    behaviour change. `_follow_up`, `_repl_command`, `ai_ask` take the session.
-2. **Results, not prints — one renderer at a time.** For each `_show_*`/
+2. ✅ **Results, not prints — one renderer at a time.** For each `_show_*`/
    `_render_*`: split into `x_result(...) -> dict` (the data, reusing what
    `_as_json` already computes) and `render_x(dict) -> [str]` (the exact lines
    printed today). `show()` calls both; `_as_json()` calls only the former.
    Order: grammar, xray, multitran, wikt, conj, card_to_fr, card_fr, ai.
    After this step `_as_json` is a thin wrapper and can be deleted: `--json`
    = `Session.handle_args(args)`.
+   *Done as:* every builder returns the JSON section **plus `_`-prefixed keys
+   for the terminal only** (`_card`, `_rows`, `_entry`, `_kind`…); `_public()`
+   strips them for `--json`, so the schema did not move by a byte. `show()` =
+   `lookup_result()` (the composite: card + sections + `saved`) → `render()`.
+   `Session.handle_args()` keeps `--json`'s one-section priority. Goldens now
+   cover the terminal too (`tests/golden/*.txt`), HOME-isolated.
 3. **handle(line).** Lift `interactive()`'s dispatch (`:`, follow-ups, `?`,
    `!`/`-` hint, plain lookup) into `Session.handle(line)`; `interactive()`
    becomes the readline loop calling it and printing `render(result)`.
@@ -77,6 +83,27 @@ what the terminal prints (goldens for the printer too if cheap: capture
 `dico cook` with `NO_COLOR`), touching the SRS/backup/enrich commands.
 
 ## Traps seen on the way
+
+- A scratch store needs `DICO_VOCAB` as well as `DICO_STORE`: `store_upsert()`
+  calls `store_render()`, which writes the markdown next to the vocab path —
+  with only `DICO_STORE` set, `vocabulaire.md` inside the repo gets rewritten.
+- A `conj` follow-up runs `show(session, fr, want_conj=True)`, which overwrites
+  `session.last["word"]` with the French verb: after `cook` → `conj`, the
+  tutor's context says « cuisiner », not « cook ». Kept as is (no behaviour
+  change); decide in step 3 whether follow-ups should leave `last` alone.
+- The two drivers decide the card's direction differently and each wins some
+  cases: `--json` trusts Lexique offline (`manger` → French verb; but `car`
+  → the French conjunction), the terminal translates first and flags cognates
+  (`car` → voiture; but `manger` → « une crèche » + « also French »). Step 2
+  left both in place behind shared builders; unify in step 3 on purpose, with
+  new goldens for `manger`, `car`, `table`, `dire`.
+- `Result.kind` is `_kind` for now: a public `kind` would be a schema change
+  for the one-shot `--json`; `--serve` (step 4) can expose it in its envelope.
+- `ai_result(progress=…)`: the « thinking… » line is a callback the terminal
+  passes and `--serve` will not — so builders never print.
+- Goldens must run with `HOME` pointed at the scratch dir: `~/.dico_config.json`
+  has no env override, and with the user's `autosave: true` every terminal
+  lookup writes (« seen before ×2 » on the second run).
 
 - `translate_rich` mutates `_FALLBACK_NOTE`; reset it per request.
 - `_render_card_to_fr` sets `_LAST["senses"]` (what `save N` uses) — the
