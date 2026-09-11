@@ -81,8 +81,16 @@ fn which(name: &str) -> Option<PathBuf> {
 }
 
 /// `dico --json …` → its stdout. Every lookup the panel makes goes through here.
+/// Async on purpose: a synchronous command runs on the main thread and would
+/// freeze the panel for the whole lookup, network calls included.
 #[tauri::command]
-fn dico(app: AppHandle, args: Vec<String>) -> Result<String, String> {
+async fn dico(app: AppHandle, args: Vec<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || run_cli(&app, args))
+        .await
+        .map_err(|e| format!("dico: {e}"))?
+}
+
+fn run_cli(app: &AppHandle, args: Vec<String>) -> Result<String, String> {
     let resources = app.path().resource_dir().unwrap_or_else(|_| PathBuf::from("."));
     let data = seed_data(&resources);
     let (program, prefix) = resolve_cli(&resources)

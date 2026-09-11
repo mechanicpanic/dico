@@ -186,7 +186,7 @@ function reviewKey(e) {
 function render() {
   const p = $('#panel'); const body = $('#body'); const bar = $('#querybar'); const foot = $('#footer');
   $('#flag').textContent = CYR.test(state.query) ? '🇷🇺' : '🇫🇷';
-  $('#busy').hidden = !state.busy; $('#clear').hidden = state.busy || !state.query;
+  $('#busy').hidden = !state.busy; $('#clear').hidden = state.busy || !state.query; bar.classList.toggle('busy', state.busy);
   const ctx = $('#ctx'); ctx.hidden = !(state.mode === 'demander' && state.askContext); if (!ctx.hidden) ctx.innerHTML = `about « ${esc(state.askContext)} » <span style="font-size:9px;opacity:.7">✕</span>`;
   const cards = state.mode === 'cartes'; bar.hidden = cards; foot.hidden = cards || state.outcome.kind === 'mot';
   body.className = 'body'; body.innerHTML = '';

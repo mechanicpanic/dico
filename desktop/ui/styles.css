@@ -55,7 +55,16 @@ html[data-theme="light"] .panel { box-shadow:0 12px 28px rgba(0,0,0,.28), 0 1px 
 .gear { font-size:calc(12px * var(--z)); opacity:.4 }
 
 .content { flex:1; min-width:0; display:flex; flex-direction:column; }
-.querybar { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--rule); }
+.querybar { position:relative; display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--rule); }
+/* While a lookup runs: a thin accent line sweeps under the query. */
+.querybar.busy::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+  background:linear-gradient(90deg, transparent, var(--bleu) 30%, var(--bleu) 70%, transparent); background-size:40% 100%; background-repeat:no-repeat;
+  animation:sweep 1s ease-in-out infinite; }
+.panel[data-mode="grammaire"] .querybar.busy::after { background-image:linear-gradient(90deg, transparent, var(--vert) 30%, var(--vert) 70%, transparent) }
+.panel[data-mode="demander"] .querybar.busy::after { background-image:linear-gradient(90deg, transparent, var(--rose) 30%, var(--rose) 70%, transparent) }
+@keyframes sweep { 0% { background-position:-40% 0 } 100% { background-position:140% 0 } }
+.body > * { animation:fade .16s ease-out }
+@keyframes fade { from { opacity:0; transform:translateY(2px) } to { opacity:1; transform:none } }
 .flag { font-size:calc(13px * var(--z)) }
 .query { flex:1; min-width:0; font-family:var(--serif); font-size:calc(20px * var(--z)); background:none; border:0; color:var(--ink); padding:0; }
 .query::placeholder { color:rgba(var(--ink-r),.28) }
