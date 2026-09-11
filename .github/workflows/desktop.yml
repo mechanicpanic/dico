@@ -13,6 +13,10 @@ env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: utf-8
 
+# Attaching to the release needs write access, which the default token lacks.
+permissions:
+  contents: write
+
 jobs:
   data:
     runs-on: ubuntu-22.04
