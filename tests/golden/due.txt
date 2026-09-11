@@ -1,0 +1,1 @@
+{"deck": "dico", "cards": [], "counts": {"learning": 0, "due": 0, "new": 0}, "total": 1, "recent": [{"front": "un chat", "gloss": "cat"}]}

@@ -1,0 +1,7 @@
+  🩻 le chat dort
+  → the cat is sleeping
+  word  lemma   pos             tense              gender·freq   role             meaning
+  le            article défini                     très courant  déterminant      the (m.)
+  chat          nom                                m. courant    sujet
+  dort  dormir  verbe           présent · il/elle  courant       verbe principal  sleep
+  (spaCy + Lexique + conjugations)

@@ -1,0 +1,1 @@
+{"card": {"key": "chat", "front": "un chat", "back": ["cat", "Je vois un chat.", "I see a cat."], "state": "learning", "ivl": 0, "reps": 1, <volatile>, "gender": "m", "pos": "nom", "cefr": "A1", "ipa": "ʃa"}}

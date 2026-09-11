@@ -1,0 +1,5 @@
+  🇬🇧 cook
+     verbe      1 cuisiner ★  2 cuire ★  3 faire ★★★  4 faire la cuisine
+     nom        5 un cuisinier ★  6 une cuisine ★★   ← chef
+     « Dois-tu cuisiner ? » — Do you have to cook?
+     ↳  save N · conj · def · ru · ex · say · syn · ? question

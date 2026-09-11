@@ -1,0 +1,7 @@
+config  <TMP>/.dico_config.json
+vocab   <TMP>/vocabulaire.md
+store   <TMP>/dico_vocab.json
+data    <HOME>/Projects/vibes/dico/data
+home    <TMP>/.dico
+cards_repo 
+cards_autosync False

@@ -1,0 +1,11 @@
+  🇫🇷 dire   verbe · très courant · A1   /diʁ/
+     verbe      say · tell · speak · state · put · express
+     ↳  save N · conj · def · ru · ex · say · syn · ? question
+  🔄 dire  (conjugation)
+            prés.   passé c.   imparf.   futur   cond.     subj.    impér.
+     je     dis     ai dit     disais    dirai   dirais    dise
+     tu     dis     as dit     disais    diras   dirais    dises    dis
+     il     dit     a dit      disait    dira    dirait    dise
+     nous   disons  avons dit  disions   dirons  dirions   disions  disons
+     vous   dites   avez dit   disiez    direz   diriez    disiez   dites
+     ils    disent  ont dit    disaient  diront  diraient  disent

@@ -6,14 +6,20 @@
                                               # and reports any field that drifted between runs
     python3 tests/check_goldens.py -k card    # only the queries whose name contains "card"
 
-Every query runs against a TEMPORARY store (DICO_STORE / DICO_VOCAB point into a
-scratch directory), so the real card store is never touched. Network answers are
+Each query is run twice: with --json (golden/<name>.json) and as the terminal
+would print it (golden/<name>.txt, ANSI stripped), each mode on its own temporary
+store, so the printer refactor is proven output-identical too.
+
+Every query runs with HOME, DICO_STORE and DICO_VOCAB pointing into a scratch
+directory, so neither the real card store nor ~/.dico_config.json is touched
+(and the goldens do not depend on the user's settings: autosave off, no LLM). Network answers are
 served from data/translate_cache.json; keep the cache warm. Fields listed in
 VOLATILE (timestamps, machine paths) are scrubbed before comparison.
 """
 import difflib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -55,6 +61,14 @@ VOLATILE = {
 }
 
 
+# Same idea for the terminal text: regexes whose matches are blanked.
+VOLATILE_TXT = {
+    "card":  [r'"due": "[^"]*"'],
+    "grade": [r'"due": "[^"]*"'],
+    "due":   [r'"due": "[^"]*"'],
+}
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
 # Queries that change the store: running them twice gives a different (correct)
 # answer, so the --record drift probe skips them.
 STATEFUL = {"save_term", "grade"}
@@ -92,15 +106,29 @@ def _normalise(text, name, tmp):
     return data
 
 
-def run(argv, tmp):
-    env = dict(os.environ,
+def _normalise_txt(text, name, tmp):
+    text = _ANSI.sub("", text).replace(tmp, "<TMP>").replace(os.path.expanduser("~"), "<HOME>")
+    for rx in VOLATILE_TXT.get(name, []):
+        text = re.sub(rx, "<volatile>", text)
+    return text
+
+
+def run(argv, tmp, as_json=True):
+    home = os.path.expanduser("~")
+    # HOME → the scratch dir: ~/.dico_config.json is not read (autosave off,
+    # no LLM), ~/.dico is scratch too. uv keeps its real caches (spaCy sidecar).
+    env = dict(os.environ, HOME=tmp,
+               UV_CACHE_DIR=os.environ.get("UV_CACHE_DIR") or os.path.join(home, ".cache", "uv"),
+               UV_PYTHON_INSTALL_DIR=os.environ.get("UV_PYTHON_INSTALL_DIR")
+               or os.path.join(home, ".local", "share", "uv", "python"),
                DICO_STORE=os.path.join(tmp, "dico_vocab.json"),
                DICO_VOCAB=os.path.join(tmp, "vocabulaire.md"),
                NO_COLOR="1", PYTHONIOENCODING="utf-8")
-    r = subprocess.run([sys.executable, DICO, "--json", *argv],
+    r = subprocess.run([sys.executable, DICO, *(["--json"] if as_json else []), *argv],
                        capture_output=True, text=True, env=env, timeout=300, cwd=REPO)
     if r.returncode:
-        return {"_exit": r.returncode, "_stdout": r.stdout, "_stderr": r.stderr[-2000:]}
+        err = {"_exit": r.returncode, "_stdout": r.stdout, "_stderr": r.stderr[-2000:]}
+        return err if as_json else json.dumps(err, ensure_ascii=False, indent=2)
     return r.stdout
 
 
@@ -108,9 +136,11 @@ def _dump(data):
     return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
-def _diff(a, b, name):
-    return "".join(difflib.unified_diff(_dump(a).splitlines(True), _dump(b).splitlines(True),
-                                        f"golden/{name}.json", f"{name} (now)"))
+def _diff(a, b, name, ext="json"):
+    ta = _dump(a) if ext == "json" else a
+    tb = _dump(b) if ext == "json" else b
+    return "".join(difflib.unified_diff(ta.splitlines(True), tb.splitlines(True),
+                                        f"golden/{name}.{ext}", f"{name} (now)"))
 
 
 def main():
@@ -119,42 +149,52 @@ def main():
     if "-k" in sys.argv:
         only = sys.argv[sys.argv.index("-k") + 1]
     os.makedirs(GOLDEN, exist_ok=True)
-    tmp = tempfile.mkdtemp(prefix="dico-golden-")
+    tmp = {"json": tempfile.mkdtemp(prefix="dico-golden-"), "txt": tempfile.mkdtemp(prefix="dico-golden-txt-")}
     failed = []
     try:
         for name, argv in QUERIES:
             if only and only not in name:
                 continue
-            out = run(argv, tmp)
-            now = _normalise(out, name, tmp) if isinstance(out, str) else out
-            path = os.path.join(GOLDEN, name + ".json")
-            if record:
-                if name in STATEFUL:           # a second run would change the store → no drift probe
-                    again = now
+            for ext in ("json", "txt"):
+                as_json = ext == "json"
+                out = run(argv, tmp[ext], as_json)
+                if as_json:
+                    now = _normalise(out, name, tmp[ext]) if isinstance(out, str) else out
                 else:
-                    out2 = run(argv, tmp)
-                    again = _normalise(out2, name, tmp) if isinstance(out2, str) else out2
-                if again != now:
-                    print(f"~ {name}: differs between two runs — mark the field volatile:\n"
-                          + _diff(now, again, name))
-                    failed.append(name)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(_dump(now))
-                print(f"= {name}: recorded ({len(_dump(now))} bytes)")
-                continue
-            if not os.path.exists(path):
-                print(f"? {name}: no golden (run with --record)")
-                failed.append(name)
-                continue
-            with open(path, encoding="utf-8") as f:
-                want = json.load(f)
-            if want == now:
-                print(f"ok {name}")
-            else:
-                print(f"FAIL {name}\n" + _diff(want, now, name))
-                failed.append(name)
+                    now = _normalise_txt(out, name, tmp[ext])
+                label = f"{name}.{ext}"
+                path = os.path.join(GOLDEN, label)
+                if record:
+                    if name in STATEFUL:       # a second run would change the store → no drift probe
+                        again = now
+                    else:
+                        out2 = run(argv, tmp[ext], as_json)
+                        if as_json:
+                            again = _normalise(out2, name, tmp[ext]) if isinstance(out2, str) else out2
+                        else:
+                            again = _normalise_txt(out2, name, tmp[ext])
+                    if again != now:
+                        print(f"~ {label}: differs between two runs — mark the field volatile:\n"
+                              + _diff(now, again, name, ext))
+                        failed.append(label)
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write(_dump(now) if as_json else now)
+                    print(f"= {label}: recorded")
+                    continue
+                if not os.path.exists(path):
+                    print(f"? {label}: no golden (run with --record)")
+                    failed.append(label)
+                    continue
+                with open(path, encoding="utf-8") as f:
+                    want = json.load(f) if as_json else f.read()
+                if want == now:
+                    print(f"ok {label}")
+                else:
+                    print(f"FAIL {label}\n" + _diff(want, now, name, ext))
+                    failed.append(label)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        for d in tmp.values():
+            shutil.rmtree(d, ignore_errors=True)
     if failed:
         print(f"\n{len(failed)} failed: {', '.join(failed)}")
         return 1

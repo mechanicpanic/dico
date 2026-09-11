@@ -1,0 +1,5 @@
+  🇷🇺 кошка
+     nom        1 un chat ★★
+     nom        2 une chatte ★  3 un piton
+     « Je vois un chat. » — I see a cat.
+     ↳  save N · conj · def · ru · ex · say · syn · ? question
