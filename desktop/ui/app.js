@@ -1,5 +1,10 @@
 // Dico — the panel's brain. Every lookup is `dico --json …` through Tauri.
 'use strict';
+// Diagnostics: a release build has no console, so milestones and errors go to ~/.dico/desktop.log.
+const dlog = m => { try { window.__TAURI__.core.invoke('log', { msg: String(m) }); } catch (e) {} };
+window.addEventListener('error', e => dlog(`error: ${e.message} @${e.filename || ''}:${e.lineno || 0}:${e.colno || 0}`));
+window.addEventListener('unhandledrejection', e => dlog(`rejection: ${e.reason && (e.reason.stack || e.reason.message) || e.reason}`));
+dlog(`boot: tauri=${!!window.__TAURI__} dark=${matchMedia('(prefers-color-scheme: dark)').matches} ls=${(() => { try { return typeof localStorage.getItem('x'); } catch (e) { return 'THROWS ' + e.message; } })()}`);
 const T = window.__TAURI__;
 const invoke = T.core.invoke;
 const $ = (s, r = document) => r.querySelector(s);
@@ -427,6 +432,7 @@ T.event.listen('dico:shown', () => { refreshHome(); if (state.mode !== 'cartes')
 applyTheme(); applyZoom(state.zoom, false);
 document.querySelector('.rail-item[data-mode="mot"]').classList.add('active');
 render(); refreshHome(true); $('#q').focus();
+dlog(`booted: theme=${document.documentElement.dataset.theme} body=${$('#body').innerHTML.length} zoom=${state.zoom}`);
 
 // For the off-screen smoke test (test/smoke.mjs).
 window.dico = { run, setMode, openPane, showSheet, render, state };

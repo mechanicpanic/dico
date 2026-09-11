@@ -151,6 +151,17 @@ fn toggle_panel(app: &AppHandle) {
     }
 }
 
+/// The page's diagnostics, appended to ~/.dico/desktop.log (a release build has no console).
+#[tauri::command]
+fn log(msg: String) {
+    use std::io::Write;
+    let path = dico_home().join("desktop.log");
+    let _ = std::fs::create_dir_all(dico_home());
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "{} {}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0), msg);
+    }
+}
+
 #[tauri::command]
 fn hide(window: WebviewWindow) {
     let _ = window.hide();
@@ -164,7 +175,7 @@ fn resize(window: WebviewWindow, width: f64, height: f64) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![dico, hide, resize])
+        .invoke_handler(tauri::generate_handler![dico, hide, resize, log])
         .setup(|app| {
             // Alt+D anywhere — the same key as the macOS app.
             let hotkey = Shortcut::new(Some(Modifiers::ALT), Code::KeyD);
