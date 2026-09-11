@@ -85,7 +85,9 @@ jobs:
         shell: bash
         run: |
           npm ci
-          npx tauri build
+          # One version for the whole project: dico.py's.
+          VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' ../dico.py)"
+          npx tauri build --config "{\"version\":\"$VERSION\"}"
 
       - name: Collect
         shell: bash

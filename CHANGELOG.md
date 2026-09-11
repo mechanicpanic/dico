@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.5 — unreleased
+## 1.0.5 — 2026-09-11
 
 - **Windows (and Linux).** `desktop/` is the same panel as a Tauri app: a
   plain HTML front end in the Atelier design driving the CLI, with Alt+D, a

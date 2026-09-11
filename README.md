@@ -13,6 +13,11 @@ them current:
 brew install --cask mechanicpanic/dico/dico          # add --no-quarantine to skip the Gatekeeper prompt
 ```
 
+**Windows:** download `Dico_<version>_x64-setup.exe` from the
+[releases](https://github.com/mechanicpanic/dico/releases) and run it (SmartScreen:
+« More info ▸ Run anyway », once). Alt+D opens the panel. Python, the
+dictionary and the grammar checker are inside. See `desktop/`.
+
 **Or the DMG — nothing to install.** Download `Dico-<version>.dmg` from the
 [releases](https://github.com/mechanicpanic/dico/releases), drag Dico
 to Applications, and press **⌥D** anywhere. The dictionary, the conjugations and
