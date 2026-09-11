@@ -65,9 +65,30 @@ npm test` + the goldens below must pass at every step)
    `lookup_result()` (the composite: card + sections + `saved`) → `render()`.
    `Session.handle_args()` keeps `--json`'s one-section priority. Goldens now
    cover the terminal too (`tests/golden/*.txt`), HOME-isolated.
-3. **handle(line).** Lift `interactive()`'s dispatch (`:`, follow-ups, `?`,
+3. ✅ **handle(line).** Lift `interactive()`'s dispatch (`:`, follow-ups, `?`,
    `!`/`-` hint, plain lookup) into `Session.handle(line)`; `interactive()`
    becomes the readline loop calling it and printing `render(result)`.
+   *Done as:* `Session.parse(line)` and `Session.request_from_args(args)`
+   each produce a **request** (`{"op": "lookup" | "definition" | "multitran"
+   | "synonyms" | "audio" | "examples" | "conj" | "grammar" | "xray" | "ai" |
+   "save_sense" | "setting" | "help" | "message", "text", …}`);
+   `Session.run(request)` is the one dispatch, `handle(line)` / `handle_args(args)`
+   the two entry points. `--json` keeps its one-section priority through
+   `request_from_args`; the terminal one-shot gets the composite lookup.
+   Audio playback moved out of the driver (`_play_audio`, after `render`).
+   **Card direction is decided once**, in `decide_direction(word)` → `"fr"`
+   when Lexique has the typed spelling as a *lemma* (accents as typed: « the »
+   is not « thé »), a content word (`cgram` ∈ NOM, ADJ, VER, ADV — « car »,
+   « pour », « son » stay English) with `freqfilms >= LEXIQUE_FRENCH_MIN`
+   (**50** films/million: manger 208, table 111, dire 1565, chat 58 are
+   French; chair 36, four 14, go 15 get translated, with the cognate flag);
+   otherwise `"to_fr"` — translate first, then the terminal's old cognate
+   logic. The accepted cost: frequent French homographs of English words
+   (« sale », « pain », « coin », « main », « but ») give the French card.
+   Goldens that moved: `dire.txt`, `manger.txt` (French verb cards) and
+   `car.json` (« voiture »); the panel's plain lookup also inherits the
+   terminal's path for unaccented French words (« ecole » → French card),
+   nonsense words (empty French card) and French sentences (grammar).
 4. **--serve.** JSON lines over stdin/stdout, one `Session` for the life of
    the process, `cache_flush()` after each request, one bad request must not
    kill it. Then the panels can send either `args` (today's contract) or a
@@ -91,12 +112,13 @@ what the terminal prints (goldens for the printer too if cheap: capture
   `session.last["word"]` with the French verb: after `cook` → `conj`, the
   tutor's context says « cuisiner », not « cook ». Kept as is (no behaviour
   change); decide in step 3 whether follow-ups should leave `last` alone.
-- The two drivers decide the card's direction differently and each wins some
-  cases: `--json` trusts Lexique offline (`manger` → French verb; but `car`
-  → the French conjunction), the terminal translates first and flags cognates
-  (`car` → voiture; but `manger` → « une crèche » + « also French »). Step 2
-  left both in place behind shared builders; unify in step 3 on purpose, with
-  new goldens for `manger`, `car`, `table`, `dire`.
+- The two drivers used to decide the card's direction differently and each
+  won some cases (`--json`: `manger` right, `car` wrong; the terminal: the
+  reverse). Step 3 settled it in `decide_direction()` — see step 3 for the
+  rule and the threshold; goldens `manger`, `car`, `table`, `chat`, `dire`,
+  `cook` pin it in both modes.
+- `tests/check_goldens.py -k` takes exact names (a comma list): a substring
+  match once re-recorded `card` while asked for `car`.
 - `Result.kind` is `_kind` for now: a public `kind` would be a schema change
   for the one-shot `--json`; `--serve` (step 4) can expose it in its envelope.
 - `ai_result(progress=…)`: the « thinking… » line is a callback the terminal
