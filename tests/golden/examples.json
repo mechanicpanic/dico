@@ -1,0 +1,33 @@
+{
+  "examples": {
+    "en": [
+      {
+        "en": "I see a cat.",
+        "fr": "Je vois un chat."
+      },
+      {
+        "en": "Cat, I farted!",
+        "fr": "Chat, j'ai pété !"
+      },
+      {
+        "en": "I love our cats.",
+        "fr": "J'aime nos chats."
+      },
+      {
+        "en": "I love our cats.",
+        "fr": "J'adore nos chats."
+      }
+    ],
+    "ru": [
+      {
+        "fr": "Je vois un chat.",
+        "ru": "Я вижу кошку."
+      },
+      {
+        "fr": "Votre chat est gras.",
+        "ru": "Ваш кот жирный."
+      }
+    ]
+  },
+  "query": "chat"
+}

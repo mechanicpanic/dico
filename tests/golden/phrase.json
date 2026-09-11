@@ -1,0 +1,14 @@
+{
+  "direction": "to_fr",
+  "examples": [
+    [
+      "Je dois y aller !",
+      "I've got to dash!"
+    ]
+  ],
+  "lexique": null,
+  "query": "i have to go",
+  "senses": [],
+  "src_lang": "en",
+  "translation": "je dois y aller"
+}

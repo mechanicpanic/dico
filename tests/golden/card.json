@@ -1,0 +1,19 @@
+{
+  "card": {
+    "back": [
+      "cat",
+      "Je vois un chat.",
+      "I see a cat."
+    ],
+    "cefr": "A1",
+    "due": "<volatile>",
+    "front": "un chat",
+    "gender": "m",
+    "ipa": "ʃa",
+    "ivl": 0,
+    "key": "chat",
+    "pos": "nom",
+    "reps": 0,
+    "state": "new"
+  }
+}

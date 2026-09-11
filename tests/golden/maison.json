@@ -1,0 +1,42 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "La maison m'appartient.",
+      "The house belongs to me."
+    ]
+  ],
+  "head": "maison",
+  "lexique": {
+    "article": null,
+    "band": "très courant",
+    "cefr": "A1",
+    "cgram": "NOM",
+    "freqfilms": 570.3,
+    "freqlivres": 461.55,
+    "genre": null,
+    "ipa": "mɛzɔ̃",
+    "lemma": "maison",
+    "nbhomoph": 2,
+    "nbsyll": 2,
+    "nombre": "s",
+    "ortho": "maison",
+    "phon": "mEz§",
+    "pos": "nom",
+    "syll": "mɛ-zɔ̃"
+  },
+  "query": "maison",
+  "senses": [
+    {
+      "pos": "nom",
+      "terms": [
+        "house",
+        "home",
+        "dwelling",
+        "place",
+        "domicile",
+        "tenement"
+      ]
+    }
+  ]
+}

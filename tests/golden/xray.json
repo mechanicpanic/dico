@@ -1,0 +1,36 @@
+{
+  "query": "le chat dort",
+  "sentence": "le chat dort",
+  "xray": [
+    {
+      "band": "très courant",
+      "gender": "m",
+      "gloss": "the (m.)",
+      "lemma": "le",
+      "pos": "article défini",
+      "role": "déterminant",
+      "tense": "",
+      "text": "le"
+    },
+    {
+      "band": "courant",
+      "gender": "m",
+      "gloss": "",
+      "lemma": "chat",
+      "pos": "nom",
+      "role": "sujet",
+      "tense": "",
+      "text": "chat"
+    },
+    {
+      "band": "courant",
+      "gender": "",
+      "gloss": "",
+      "lemma": "dormir",
+      "pos": "verbe",
+      "role": "verbe principal",
+      "tense": "présent · il/elle",
+      "text": "dort"
+    }
+  ]
+}

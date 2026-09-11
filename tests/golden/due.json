@@ -1,0 +1,16 @@
+{
+  "cards": [],
+  "counts": {
+    "due": 0,
+    "learning": 0,
+    "new": 0
+  },
+  "deck": "dico",
+  "recent": [
+    {
+      "front": "un chat",
+      "gloss": "cat"
+    }
+  ],
+  "total": 1
+}

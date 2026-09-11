@@ -1,0 +1,57 @@
+{
+  "direction": "to_fr",
+  "examples": [
+    [
+      "Je vois un chat.",
+      "I see a cat."
+    ]
+  ],
+  "lexique": {
+    "article": "un",
+    "band": "courant",
+    "cefr": "A1",
+    "cgram": "NOM",
+    "freqfilms": 57.71,
+    "freqlivres": 59.26,
+    "genre": "m",
+    "ipa": "ʃa",
+    "lemma": "chat",
+    "nbhomoph": 7,
+    "nbsyll": 1,
+    "nombre": "s",
+    "ortho": "chat",
+    "phon": "Sa",
+    "pos": "nom",
+    "syll": "ʃa"
+  },
+  "query": "кошка",
+  "senses": [
+    {
+      "back": [
+        "кошка"
+      ],
+      "band": "moyen",
+      "cefr": "A1",
+      "front": "une chatte",
+      "gender": "f",
+      "pos": "nom",
+      "term": "chatte"
+    },
+    {
+      "back": [
+        "скоба",
+        "кошка",
+        "пик",
+        "носище"
+      ],
+      "band": "rare",
+      "cefr": "",
+      "front": "un piton",
+      "gender": "m",
+      "pos": "nom",
+      "term": "piton"
+    }
+  ],
+  "src_lang": "ru",
+  "translation": "chat"
+}

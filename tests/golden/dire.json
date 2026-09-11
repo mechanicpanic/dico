@@ -1,0 +1,46 @@
+{
+  "direction": "fr",
+  "examples": [
+    [
+      "On devrait lui dire.",
+      "We should tell him."
+    ]
+  ],
+  "head": "dire",
+  "lexique": {
+    "article": null,
+    "band": "très courant",
+    "cefr": "A1",
+    "cgram": "VER",
+    "freqfilms": 1564.52,
+    "freqlivres": 827.84,
+    "genre": null,
+    "ipa": "diʁ",
+    "lemma": "dire",
+    "nbhomoph": 4,
+    "nbsyll": 1,
+    "nombre": null,
+    "ortho": "dire",
+    "phon": "diR",
+    "pos": "verbe",
+    "syll": "diʁ"
+  },
+  "query": "dire",
+  "senses": [
+    {
+      "pos": "verbe",
+      "terms": [
+        "say",
+        "tell",
+        "speak",
+        "state",
+        "put",
+        "express",
+        "mention",
+        "talk",
+        "admit",
+        "bid"
+      ]
+    }
+  ]
+}

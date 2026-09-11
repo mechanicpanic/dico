@@ -1,0 +1,136 @@
+{
+  "direction": "to_fr",
+  "examples": [
+    [
+      "Dois-tu cuisiner ?",
+      "Do you have to cook?"
+    ]
+  ],
+  "lexique": {
+    "article": null,
+    "band": "moyen",
+    "cefr": "A1",
+    "cgram": "VER",
+    "freqfilms": 11.99,
+    "freqlivres": 2.36,
+    "genre": null,
+    "ipa": "kɥizine",
+    "lemma": "cuisiner",
+    "nbhomoph": 10,
+    "nbsyll": 3,
+    "nombre": null,
+    "ortho": "cuisiner",
+    "phon": "k8izine",
+    "pos": "verbe",
+    "syll": "kɥi-zi-ne"
+  },
+  "query": "cook",
+  "senses": [
+    {
+      "back": [
+        "cook",
+        "bake",
+        "kiln",
+        "sting"
+      ],
+      "band": "moyen",
+      "cefr": "A1",
+      "front": "cuire",
+      "gender": "",
+      "pos": "verbe",
+      "term": "cuire"
+    },
+    {
+      "back": [
+        "cook"
+      ],
+      "band": "moyen",
+      "cefr": "A1",
+      "front": "cuisiner",
+      "gender": "",
+      "pos": "verbe",
+      "term": "cuisiner"
+    },
+    {
+      "back": [
+        "do",
+        "make",
+        "take",
+        "work"
+      ],
+      "band": "très courant",
+      "cefr": "A1",
+      "front": "faire",
+      "gender": "",
+      "pos": "verbe",
+      "term": "faire"
+    },
+    {
+      "back": [
+        "cook"
+      ],
+      "band": "",
+      "cefr": "",
+      "front": "faire la cuisine",
+      "gender": "",
+      "pos": "verbe",
+      "term": "faire la cuisine"
+    },
+    {
+      "back": [
+        "rig",
+        "fake",
+        "fudge",
+        "cook"
+      ],
+      "band": "peu courant",
+      "cefr": "",
+      "front": "truquer",
+      "gender": "",
+      "pos": "verbe",
+      "term": "truquer"
+    },
+    {
+      "back": [
+        "falsify",
+        "tamper with",
+        "fake",
+        "adulterate"
+      ],
+      "band": "peu courant",
+      "cefr": "",
+      "front": "falsifier",
+      "gender": "",
+      "pos": "verbe",
+      "term": "falsifier"
+    },
+    {
+      "back": [
+        "cook",
+        "chef"
+      ],
+      "band": "moyen",
+      "cefr": "A1",
+      "front": "un cuisinier",
+      "gender": "m",
+      "pos": "nom",
+      "term": "cuisinier"
+    },
+    {
+      "back": [
+        "kitchen",
+        "cuisine",
+        "cooking",
+        "cook"
+      ],
+      "band": "courant",
+      "cefr": "A1",
+      "front": "une cuisine",
+      "gender": "f",
+      "pos": "nom",
+      "term": "cuisine"
+    }
+  ],
+  "src_lang": "en",
+  "translation": "cuisiner"
+}

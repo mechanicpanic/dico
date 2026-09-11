@@ -1,0 +1,62 @@
+{
+  "conjugation": {
+    "error": null,
+    "infinitive": "dire",
+    "tenses": {
+      "conditionnel": [
+        "je dirais",
+        "tu dirais",
+        "il dirait",
+        "nous dirions",
+        "vous diriez",
+        "ils diraient"
+      ],
+      "futur simple": [
+        "je dirai",
+        "tu diras",
+        "il dira",
+        "nous dirons",
+        "vous direz",
+        "ils diront"
+      ],
+      "imparfait": [
+        "je disais",
+        "tu disais",
+        "il disait",
+        "nous disions",
+        "vous disiez",
+        "ils disaient"
+      ],
+      "impératif": [
+        "dis",
+        "disons",
+        "dites"
+      ],
+      "passé composé": [
+        "j'ai dit",
+        "tu as dit",
+        "il a dit",
+        "nous avons dit",
+        "vous avez dit",
+        "ils ont dit"
+      ],
+      "présent": [
+        "je dis",
+        "tu dis",
+        "il dit",
+        "nous disons",
+        "vous dites",
+        "ils disent"
+      ],
+      "subjonctif": [
+        "que je dise",
+        "que tu dises",
+        "qu'il dise",
+        "que nous disions",
+        "que vous disiez",
+        "qu'ils disent"
+      ]
+    }
+  },
+  "query": "dire"
+}

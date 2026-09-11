@@ -1,0 +1,9 @@
+{
+  "cards_autosync": true,
+  "cards_repo": "",
+  "config": "<HOME>/.dico_config.json",
+  "data": "<HOME>/Projects/vibes/dico/data",
+  "home": "<HOME>/.dico",
+  "store": "<TMP>/dico_vocab.json",
+  "vocab": "<TMP>/vocabulaire.md"
+}

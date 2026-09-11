@@ -1,0 +1,20 @@
+{
+  "grammar": {
+    "corrected": "elle est partie",
+    "errors": [
+      {
+        "end": 14,
+        "message": "Accord avec le sujet “elle” : “parti” devrait être au féminin singulier.",
+        "start": 9,
+        "suggestions": [
+          "partie"
+        ],
+        "text": "parti",
+        "type": "past participle"
+      }
+    ],
+    "spelling": []
+  },
+  "query": "elle est parti",
+  "sentence": "elle est parti"
+}
