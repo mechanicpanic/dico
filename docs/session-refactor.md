@@ -116,9 +116,33 @@ npm test` + the goldens below must pass at every step)
    21 golden queries through one process and compares with the `.json`
    goldens. The Swift and Tauri clients still spawn per call — switching them
    is a separate step.
-5. **Tutor history.** With a live session, `ai_ask` keeps the last N
+5. ✅ **Tutor history.** With a live session, `ai_ask` keeps the last N
    exchanges in `Session` and sends them as context. Only now: this is the
    feature that justified the work.
+   *Done as:* `Session.history`, the last `HISTORY_TURNS` (12) turns —
+   lookups (query **and** French word, sections shown, sense saved), grammar
+   checks (+ correction), x-rays, the sections asked for, questions with
+   answers trimmed to `HISTORY_ANSWER_CHARS` (300). `ai_ask` lists them oldest
+   first; the old « Last word / sentence » lines appear only when the history
+   lacks them, so the one-shot prompt is unchanged. `history` (REPL),
+   `{"op": "history"}` (serve), `:forget` alone clears. `tests/check_history.py`.
+
+## Next
+
+- Switch the Swift popup and the Tauri desktop to one `--serve` process
+  (spawn once, `{"id", "args"}` with the flags they send today, then `line`
+  requests for follow-ups and `? …` — the tutor's history is only useful when
+  the process lives). Keep the per-call spawn as the fallback.
+- Expose `kind` (and later `history`) in a versioned envelope for the apps;
+  the one-shot `--json` schema stays as it is.
+- Decide whether a `conj` / `def` follow-up should leave `session.last["word"]`
+  alone (the history now records both words, so the tutor is fine either way).
+- Terminal goldens depend on the network cache being warm; a `--record` on a
+  cold cache re-fetches — consider vendoring `data/translate_cache.json`
+  entries the goldens need.
+- Windows: selection lookup for the popup (the CLI paths already avoid afplay).
+- `Dico.app --selftest` was not run during this refactor (no GUI from the
+  agent) — run it once before merging.
 
 ## Non-goals
 

@@ -79,6 +79,7 @@ words:
 » say · syn           → hear it said · synonyms and homophones
 » grammar · x         → grammar check · x-ray, on the last sentence or one you give
 » ? is it formal      → ask the tutor about what you're looking at (?? = detailed)
+» history             → what the tutor remembers of this session (:forget clears it)
 » help                → the cheat-sheet
 ```
 
@@ -89,7 +90,8 @@ register** (*greffier (familier)*) and **homophones** — `vert` → *vair · ve
 vers · verre*. **No need to type
 accents**: `etre` finds *être*, `creche` finds *crèche*.
 
-Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>` ·
+Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>`
+(drop it from the store) · `:forget` (the tutor forgets this session) ·
 `:render` · `:examples on|off` · `:spacy on|off` · `:llm <url> [model]`.
 
 ## One-shot switches (from the shell)
@@ -112,6 +114,11 @@ Settings from inside the REPL: `:save on|off` (autosave) · `:forget <word>` ·
 
 They combine: `dico -mc хотеть`, `dico -fc manger`. `*` local = no internet needed.
 `dico --json …` returns the same things as JSON (what the popup and Raycast use).
+`dico --serve` keeps one process alive and answers JSON requests line by line —
+`{"id": 1, "args": ["--json", "-c", "dire"]}` (the flags above), `{"id": 2, "line":
+"save 2"}` (anything you would type in the REPL), `{"op": "ping"}`, `{"op":
+"history"}` — with `{"id", "kind", "result"}` in return; the session, and so the
+tutor's memory, lasts as long as the process.
 
 ## What is behind the card
 
@@ -140,8 +147,11 @@ speech · gender · article · frequency, then its English senses. Definitions
 ### The tutor
 
 The tutor is a **question you ask**, not a tier you switch on. In the REPL,
-`? your question` (`?? …` for a detailed answer) — it knows the last word you
-looked up and the last sentence you analysed:
+`? your question` (`?? …` for a detailed answer) — it remembers the session:
+the words you looked up (and the sense you saved), the sentences you checked,
+your earlier questions and its answers (the last 12 turns), so a follow-up
+like « and in the passé composé ? » lands. `history` shows what it knows,
+`:forget` wipes it.
 
 ```
 » cuisiner
