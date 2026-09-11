@@ -74,6 +74,11 @@ def main():
         r3 = s.ask(id="c", line="conj")
         ok("follow-up: conj on the last card", r3.get("kind") == "card_fr" and
            r3["result"].get("conjugation", {}).get("infinitive") == "cuisiner", r3.get("result", r3).get("conjugation"))
+        r = s.ask(id="h", op="history")
+        turns = r.get("result", {}).get("history", [])
+        ok("op history: the session's turns persist across requests", r.get("kind") == "history"
+           and any(t.get("query") == "cook" and t.get("saved") == "cuisiner" for t in turns)
+           and turns[-1].get("query") == "cuisiner", turns[-3:])
         # garbage in → an error out, no id, and the loop goes on
         r = s.raw("this is not json")
         ok("invalid JSON → error without id", "error" in r and "id" not in r, r)

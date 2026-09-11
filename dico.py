@@ -227,6 +227,10 @@ def _google_query(word, tl="fr", sl="auto"):
     raise RateLimited("Google refused the query") from refused
 
 
+HISTORY_TURNS = 12               # what the tutor is told about: the last N turns…
+HISTORY_ANSWER_CHARS = 300       # …with its own earlier answers trimmed to this
+
+
 class Session:
     """The REPL's state and its driver — one per terminal session, per one-shot
     call, and (later) per --serve process.
@@ -236,6 +240,10 @@ class Session:
                   hints (follow-up hint shown ≤ 3 times), conj_shown
     no_autosave   True while a follow-up or the --tour runs (never re-save)
     fallback_note set when a card came from the MyMemory fallback, shown once
+    history       the last HISTORY_TURNS turns — lookups (the query AND the
+                  French word, the sense saved), grammar checks, x-rays, the
+                  sections asked for, questions with the tutor's (trimmed)
+                  answers — the context « ? » questions are asked in
 
     Driver: handle(line) understands every REPL line; handle_args(args) the
     argparse flags. Both turn their input into a *request* ({"op": …}) and
@@ -247,6 +255,35 @@ class Session:
         self.last = {"word": "", "fr": "", "sentence": "", "senses": []}
         self.no_autosave = False
         self.fallback_note = ""
+        self.history = []
+
+    def remember(self, turn):
+        """Append a turn, keeping the last HISTORY_TURNS."""
+        self.history.append(turn)
+        del self.history[:-HISTORY_TURNS]
+
+    def _remember_result(self, req, r):
+        """What a request leaves in the history (questions are recorded by ai_ask)."""
+        op, kind = req["op"], r.get("_kind")
+        if op == "lookup" and kind in ("card_fr", "card_to_fr"):
+            turn = {"kind": "lookup", "query": req["text"], "direction": r["direction"],
+                    "fr": (r.get("translation") if kind == "card_to_fr" else r["_card"]["word"]) or req["text"],
+                    "sections": [k for k in ("conjugation", "definition", "multitran") if k in r]}
+            if "saved" in r:
+                turn["saved"] = r["saved"]["front"]
+            self.remember(turn)
+        elif kind in ("grammar", "xray"):
+            turn = {"kind": kind, "sentence": r["sentence"]}
+            if kind == "grammar" and not r.get("_unavailable"):
+                turn["corrected"] = r["grammar"]["corrected"]
+            self.remember(turn)
+        elif op == "save_sense" and kind == "saved":
+            for t in reversed(self.history):   # the sense chosen belongs to its card
+                if t["kind"] == "lookup":
+                    t["saved"] = r["saved"]["front"]
+                    break
+        elif op in ("definition", "multitran", "synonyms", "audio", "examples", "conj") and kind != "error":
+            self.remember({"kind": op, "fr": req["text"]})
 
     # ---- the two languages → a request ---------------------------------
     _FOLLOW = re.compile(r"^(conj|conjugate|def|definition|define|ru|multitran|ex|examples|x|xray|x-ray"
@@ -262,6 +299,8 @@ class Session:
             return {"op": "setting", "line": line}
         if line.lower() in ("help", "h", "?help"):
             return {"op": "help"}
+        if line.lower() == "history":
+            return {"op": "history"}
         m = re.match(r"^(?:save|s)\s+(\d+)$", line, re.I)
         if m:
             return {"op": "save_sense", "n": int(m.group(1))}
@@ -348,7 +387,7 @@ class Session:
         self.fallback_note = ""
         op, text = req["op"], req.get("text", "")
         r = {"query": text}
-        if op in ("setting", "help", "message", "save_sense"):
+        if op in ("setting", "help", "message", "save_sense", "history"):
             r = self._run_local(op, req)
         elif not text:
             r["_kind"] = "empty"
@@ -411,12 +450,15 @@ class Session:
                 self.last["fr"] = text
         if self.fallback_note and "note" not in r:
             r["note"] = self.fallback_note
+        self._remember_result(req, r)
         return r
 
     def _run_local(self, op, req):
         """Requests that touch no dictionary: settings, help, « save N », a hint."""
         if op == "help":
             return {"_kind": "help"}
+        if op == "history":
+            return {"_kind": "history", "history": [dict(t) for t in self.history]}
         if op == "message":
             return {"_kind": "message", "message": req["text"]}
         if op == "save_sense":
@@ -426,7 +468,7 @@ class Session:
             word = self.last.get("word", "")
             front, status, cnt = _save_term(senses[n - 1], word, detect_lang(word), quiet=True)
             return {"_kind": "saved", "saved": {"front": front, "status": status, "count": cnt, "auto": False}}
-        return setting_result(req["line"])
+        return setting_result(self, req["line"])
 
 
 def _public(obj):
@@ -1323,16 +1365,59 @@ def ai_explain(word, deep=False):
     return llm_complete(_TUTOR_SYS, prompt, 1100 if deep else 400, deep=deep)
 
 
+def _turn_line(t):
+    """One history turn, in words (for the tutor's prompt and « history »)."""
+    k = t["kind"]
+    if k == "lookup":
+        s = f"Looked up \u00ab {t['query']} \u00bb"
+        s += (f" \u2192 \u00ab {t['fr']} \u00bb" if t["fr"].lower() != t["query"].lower()
+              else " (a French word)")
+        if t.get("sections"):
+            s += f" ({', '.join(t['sections'])} shown)"
+        if t.get("saved"):
+            s += f", saved \u00ab {t['saved']} \u00bb"
+        return s
+    if k == "grammar":
+        fixed = t.get("corrected")
+        return (f"Grammar check: \u00ab {t['sentence']} \u00bb"
+                + (f" \u2192 \u00ab {fixed} \u00bb" if fixed and fixed != t["sentence"] else " (correct)"))
+    if k == "xray":
+        return f"X-ray of \u00ab {t['sentence']} \u00bb"
+    if k == "question":
+        return f"Asked: {t['question']}\n  Answered: {t['answer']}"
+    label = {"definition": "Definition", "multitran": "Russian (Multitran)", "synonyms": "Synonyms",
+             "examples": "Examples", "audio": "Pronunciation", "conj": "Conjugation"}.get(k, k)
+    return f"{label} of \u00ab {t['fr']} \u00bb"
+
+
+def _trim(text, n):
+    text = " ".join((text or "").split())
+    return text if len(text) <= n else text[:n - 1].rstrip() + "\u2026"
+
+
 def ai_ask(session, question, deep=False):
-    """Free-form question to the tutor, with the last word / last sentence as context."""
-    ctx, last = [], session.last
-    if last["sentence"]:
+    """Free-form question to the tutor, in context: the session's history
+    (lookups, saves, grammar checks, earlier questions and answers — oldest
+    first, capped), plus the last word / sentence when the history does not
+    already show them (a one-shot « --context »)."""
+    last, hist = session.last, session.history
+    ctx = []
+    if last["sentence"] and not any(t.get("sentence") == last["sentence"] for t in hist):
         ctx.append(f"Last sentence analysed: \u00ab {last['sentence']} \u00bb.")
-    if last["word"]:
+    if last["word"] and not any(t["kind"] == "lookup" and last["word"] in (t["query"], t["fr"]) for t in hist):
         ctx.append(f"Last word looked up: \u00ab {last['word']} \u00bb"
                    + (f" (\u2192 \u00ab {last['fr']} \u00bb)" if last["fr"] else "") + ".")
-    user = ("Context: " + " ".join(ctx) + "\n\n" if ctx else "") + "Question: " + question
-    return llm_complete(_TUTOR_SYS, user, 700 if deep else 350, deep=deep)
+    parts = []
+    if hist:
+        parts.append("Earlier in this session, oldest first:\n" + "\n".join("- " + _turn_line(t) for t in hist))
+    if ctx:
+        parts.append("Context: " + " ".join(ctx))
+    user = ("\n\n".join(parts) + "\n\n" if parts else "") + "Question: " + question
+    text, err = llm_complete(_TUTOR_SYS, user, 700 if deep else 350, deep=deep)
+    if text:
+        session.remember({"kind": "question", "question": _trim(question, 200),
+                          "answer": _trim(text, HISTORY_ANSWER_CHARS)})
+    return text, err
 
 
 def _render_md(text):
@@ -3315,6 +3400,11 @@ def render(r):
         return render_setting(r)
     if kind == "message":
         return [f"  {DIM}{r['message']}{RESET}"]
+    if kind == "history":
+        if not r["history"]:
+            return [f"  {DIM}(nothing yet — look something up, then ask « ? … »){RESET}"]
+        return [f"  {DIM}{i}.{RESET} " + _turn_line(t).replace("\n  ", f"\n     {DIM}") + (RESET if t["kind"] == "question" else "")
+                for i, t in enumerate(r["history"], 1)]
     if kind == "empty":
         return []
     lines = []
@@ -3374,7 +3464,7 @@ def render(r):
 _FOLLOW_HINT = "↳  save N · conj · def · ru · ex · say · syn · ? question"
 
 
-def setting_result(line):
+def setting_result(session, line):
     """« : » commands of the interactive mode (settings, not lookups) → a Result
     {"_kind": "setting", "setting": name, …}."""
     parts = line[1:].split()
@@ -3389,6 +3479,9 @@ def setting_result(line):
         r["value"] = autosave_on()
     elif cmd == "forget" and arg:
         r.update(word=arg, count=store_forget(arg))
+    elif cmd == "forget":                     # alone: the tutor forgets this session
+        session.history.clear()
+        r["setting"] = "forget_history"
     elif cmd == "render":
         store_render()
     elif cmd == "llm":
@@ -3423,6 +3516,8 @@ def render_setting(r):
     if s == "forget":
         return [f"  {GREEN}✓ \u00ab {r['word']} \u00bb dropped{RESET}" if r["count"]
                 else f"  {DIM}\u00ab {r['word']} \u00bb not found{RESET}"]
+    if s == "forget_history":
+        return [f"  {GREEN}✓ tutor history cleared{RESET}"]
     if s == "render":
         return [f"  {GREEN}✓ markdown regenerated{RESET}"]
     if s == "llm":
@@ -3434,7 +3529,7 @@ def render_setting(r):
     if s == "spacy":
         return [f"  spaCy for \u00ab !x \u00bb: {'ON' if r['value'] else 'off'}   {DIM}(:spacy on | :spacy off — off = "
                 f"instant, Lexique only){RESET}"]
-    return [f"  {DIM}commands: :save on|off · :forget <word> · :render · :spacy on|off · :llm{RESET}"]
+    return [f"  {DIM}commands: :save on|off · :forget [word] · :render · :spacy on|off · :llm{RESET}"]
 
 
 def _load_history():
@@ -3624,8 +3719,8 @@ def cheatsheet_lines():
             ("conj · def · ru · ex", "on the last card — or give a word: « conj manger », « def maison »"),
             ("say · syn", "hear a native recording · synonyms and homophones"),
             ("grammar · x [sentence]", "grammar check · x-ray, on the last sentence or the one you give"),
-            ("? question", "ask the tutor, in context (?? = detailed)"),
-            (":save on|off", "auto-save every lookup (also :forget word, :render, :llm, :spacy)"),
+            ("? question", "ask the tutor, in context (?? = detailed) · « history » shows what it knows"),
+            (":save on|off", "auto-save every lookup (also :forget [word], :render, :llm, :spacy)"),
             ("q", "quit")]
     w = max(len(k) for k, _ in rows)
     return [f"   {BOLD}{CYAN}{k.ljust(w)}{RESET}  {d}" for k, d in rows]
@@ -3842,6 +3937,7 @@ def serve(session, parser, stdin=None, stdout=None):
       {"id": …, "line": "save 2"}                  the REPL's language
       {"id": …, "args": ["--json", "-c", "dire"]}  argv-style, the apps' flags as today
       {"id": …, "op": "ping"}                      → {"id": …, "ok": true, "version": …}
+      {"id": …, "op": "history"}                   the tutor's context, as turns
       →  {"id": …, "kind": <_kind>, "result": <the --json dict>}
       →  {"id": …, "error": "…"}   (a bad line has no id; nothing ever kills the loop)
 
@@ -3875,6 +3971,8 @@ def serve(session, parser, stdin=None, stdout=None):
                     continue
                 if "line" in req:
                     r = session.handle(str(req["line"]))
+                elif "op" in req:              # e.g. {"op": "history"}
+                    r = session.run({"op": str(req["op"]), "text": str(req.get("text", ""))})
                 elif "args" in req:
                     args = parser.parse_args([str(a) for a in req["args"]])
                     if args.context:
@@ -3883,7 +3981,7 @@ def serve(session, parser, stdin=None, stdout=None):
                     if r is None:
                         r = session.handle_args(args)
                 else:
-                    raise ValueError('a request needs "line", "args" or "op": "ping"')
+                    raise ValueError('a request needs "line", "args" or "op" (ping, history)')
                 cache_flush()
             reply({"id": rid, "kind": r.get("_kind", ""), "result": _public(r)})
         except SystemExit as e:                 # argparse refused the flags
