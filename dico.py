@@ -241,6 +241,77 @@ class Session:
         self.no_autosave = False
         self.fallback_note = ""
 
+    def handle_args(self, args):
+        """The --json contract (the panels): argparse flags → ONE section, in
+        the priority --json has always had. The composite REPL lookup is
+        lookup_result()."""
+        self.fallback_note = ""
+        text = " ".join(args.words).strip()
+        out = {"query": text}
+        if not text:
+            return out
+        if args.ai or args.profond:
+            q = text if len(text.split()) > 1 else None
+            out.update(ai_result(self, text, bool(args.profond), question=q))
+        elif args.grammaire or args.xray:
+            # English or Russian in: translate first, analyse the French.
+            lang = _sentence_lang(text)
+            if lang != "fr":
+                try:
+                    tr = translate(text, "fr")[0].strip()
+                except Exception:
+                    tr = ""
+                if tr:
+                    out.update({"source": text, "source_lang": lang, "translated": tr})
+                    text = tr
+            out.update(grammar_result(text) if args.grammaire else xray_result(text))
+        elif args.examples:
+            out.update(examples_result(text))
+        elif args.francais or args.dico:
+            target = text
+            if args.dico and detect_lang(text) != "fr":
+                try:
+                    target = translate_rich(text, session=self)[0] or text
+                except Exception:
+                    pass
+            out.update(definition_result(target))
+        elif args.say or args.syn:
+            out.update(synonyms_result(text))
+            if args.say:
+                out.update(audio_result(text))
+        elif args.multitran:
+            out.update(multitran_result(text))
+        elif args.conj:
+            out.update(conj_result(text))
+        else:
+            lang = detect_lang(text)
+            lex = lexique_lookup(text)
+            if lang == "en" and lex and lex["freqfilms"] >= 1 and lex["cgram"][:3] in (
+                    "NOM", "ADJ", "VER", "ADV", "PRE", "PRO", "CON", "ART"):
+                out.update(card_fr_result(self, text))
+            else:
+                try:
+                    tr, det, groups = translate_rich(text, session=self)
+                except Exception as e:
+                    out["error"] = str(e)
+                    return out
+                # The French RESULT deserves the same badges as a French query: what a
+                # learner wants to know about « cuisiner » does not depend on how they
+                # arrived at it.
+                out.update(card_to_fr_result(self, text, det or lang, tr, groups))
+        if self.fallback_note and "note" not in out:
+            out["note"] = self.fallback_note
+        return out
+
+
+def _public(obj):
+    """A Result without its terminal-only fields (keys starting with "_")."""
+    if isinstance(obj, dict):
+        return {k: _public(v) for k, v in obj.items() if not str(k).startswith("_")}
+    if isinstance(obj, list):
+        return [_public(v) for v in obj]
+    return obj
+
 
 _POS_FR = {"noun": "nom", "verb": "verbe", "adjective": "adjectif", "adverb": "adverbe",
            "preposition": "préposition", "pronoun": "pronom", "conjunction": "conjonction",
@@ -397,12 +468,25 @@ def _fr_head(term):
     return term, lex
 
 
-def _render_card_to_fr(session, word, src, translation, groups, examples=True):
-    """RU/EN → FR card: numbered senses grouped by part of speech ("save N" saves sense N)."""
-    print(f"  {FLAG.get(src, '🌐')} {BOLD}{word}{RESET}")
-    if session.fallback_note:
-        print(f"     {DIM}⚠ {session.fallback_note}{RESET}")
-    # The main translation (the one autosave keeps) must be sense 1.
+def card_to_fr_result(session, word, src, translation, groups, examples=True):
+    """RU/EN → FR card: {"direction": "to_fr", "src_lang", "translation", "lexique",
+    "senses", "examples"} — the panels' contract — plus "_card" for the terminal:
+    the senses renumbered so that the main translation is sense 1 ("save N"
+    saves sense N), their ★ bands, back-translations, the hint. Sets
+    session.last["senses"]."""
+    out = {"direction": "to_fr", "src_lang": src, "translation": translation,
+           "lexique": lexique_lookup(translation) if translation else None}
+    senses = []
+    for pos, terms in groups:
+        for term, back in terms:
+            front, lx = _fr_head(term)
+            senses.append({"pos": pos, "term": term, "front": front, "back": back,
+                           "gender": (lx["genre"] if lx else "") or "",
+                           "band": lx["band"] if lx else "",
+                           "cefr": (lx or {}).get("cefr") or ""})
+    out["senses"] = senses
+    out["examples"] = _tatoeba(translation, "eng") if translation else []
+    # The terminal's rows. The main translation (the one autosave keeps) must be sense 1.
     tmain = (translation or "").strip().lower()
     groups = [(p, list(t)) for p, t in groups]
     hit = next((i for i, (_, t) in enumerate(groups) if any(x.lower() == tmain for x, _ in t)), None)
@@ -413,31 +497,50 @@ def _render_card_to_fr(session, word, src, translation, groups, examples=True):
         pos, terms = groups.pop(hit)
         terms.sort(key=lambda x: x[0].lower() != tmain)
         groups.insert(0, (pos, terms))
-    senses, n = [], 0
+    fronts, rows, n = [], [], 0
     for pos, terms in groups[:4]:
         cells = []
         for term, back in terms[:4]:
             n += 1
             front, lex = _fr_head(term)
-            senses.append(front)
-            stars = _BAND_STARS.get(lex["band"], "") if lex else ""
-            cells.append(f"{DIM}{n}{RESET} {GREEN if n == 1 else ''}{front}{RESET}"
-                         + (f" {DIM}{stars}{RESET}" if stars else ""))
+            fronts.append(front)
+            cells.append((n, front, _BAND_STARS.get(lex["band"], "") if lex else ""))
         back = [b for b in terms[0][1] if b.lower() != word.lower()][:2]
-        tail = f"   {DIM}← {', '.join(back)}{RESET}" if back else ""
-        print(f"     {DIM}{pos:10}{RESET} " + "  ".join(cells) + tail)
-    session.last["senses"] = senses
+        rows.append((pos, cells, back))
+    session.last["senses"] = fronts
+    shown = []
     if examples and translation:
-        for fr, tr in _tatoeba(translation.split()[-1] if " " in translation else translation, "eng"):
-            print(f"     {DIM}« {fr} » — {tr}{RESET}")
+        shown = _tatoeba(translation.split()[-1] if " " in translation else translation, "eng")
     session.last["hints"] = session.last.get("hints", 0) + 1
-    if session.last["hints"] <= 3:
-        print(f"     {DIM}{_FOLLOW_HINT}{RESET}")
+    out["_card"] = {"word": word, "src": src, "rows": rows, "examples": shown,
+                    "hint": session.last["hints"] <= 3}
+    return out
 
 
-def _render_card_fr(session, word, lex, examples=True):
-    """Card for a FRENCH word: pos · gender/article · frequency, then EN senses."""
+def render_card_to_fr(r):
+    c = r["_card"]
+    lines = [f"  {FLAG.get(c['src'], '🌐')} {BOLD}{c['word']}{RESET}"]
+    if r.get("note"):
+        lines.append(f"     {DIM}⚠ {r['note']}{RESET}")
+    for pos, cells, back in c["rows"]:
+        cs = [f"{DIM}{n}{RESET} {GREEN if n == 1 else ''}{front}{RESET}"
+              + (f" {DIM}{stars}{RESET}" if stars else "") for n, front, stars in cells]
+        tail = f"   {DIM}← {', '.join(back)}{RESET}" if back else ""
+        lines.append(f"     {DIM}{pos:10}{RESET} " + "  ".join(cs) + tail)
+    for fr, tr in c["examples"]:
+        lines.append(f"     {DIM}« {fr} » — {tr}{RESET}")
+    if c["hint"]:
+        lines.append(f"     {DIM}{_FOLLOW_HINT}{RESET}")
+    return lines
+
+
+def card_fr_result(session, word, lex=None, examples=True):
+    """Card for a FRENCH word: {"direction": "fr", "head", "lexique", "senses",
+    "examples"} — the panels' contract — plus "_card" for the terminal: the head
+    with the gender Wiktionary supplies when Lexique lacks it, the badges, the
+    présent preview of a verb, the hint. Sets session.last["senses"]."""
     head, lex2 = _fr_head(word)
+    out = {"direction": "fr", "head": head, "lexique": lex2}
     lex = lex2 or lex
     if lex and lex["cgram"].startswith("NOM") and not lex["genre"]:
         try:                                   # Lexique has no gender ("maison") → Wiktionary
@@ -457,10 +560,6 @@ def _render_card_fr(session, word, lex, examples=True):
         bits.append(lex["band"])
         if lex.get("cefr"):
             bits.append(lex["cefr"])
-    line = f"  🇫🇷 {BOLD}{word}{RESET}" + (f"   {DIM}{' · '.join(bits)}{RESET}" if bits else "")
-    if lex and lex.get("ipa"):
-        line += f"   {DIM}/{lex['ipa']}/{RESET}"
-    print(line)
     try:
         _, _, groups = translate_rich(word, tl="en", sl="fr", session=session)   # explicit sl → grouped senses
     except Exception:
@@ -471,23 +570,38 @@ def _render_card_fr(session, word, lex, examples=True):
                 groups = [("", [(t, [])])]
         except Exception:
             pass
-    senses = []
-    for pos, terms in groups[:3]:
-        line = " · ".join(t for t, _ in terms[:6])
-        print(f"     {DIM}{pos:10}{RESET} {line}")
-        senses.extend(t for t, _ in terms[:6])
+    out["senses"] = [{"pos": p, "terms": [t for t, _ in ts]} for p, ts in groups]
     session.last["senses"] = [head]
     session.last["hints"] = session.last.get("hints", 0) + 1
-    if session.last["hints"] <= 3:
-        print(f"     {DIM}{_FOLLOW_HINT}{RESET}")
+    present = None
     if lex and lex["cgram"].startswith(("VER", "AUX")) and not session.last.get("conj_shown"):
         inf, data, _ = _conj_query(lex["lemma"])
         if data and data.get("présent"):
-            print(f"     {DIM}présent{RESET}    " + "  ·  ".join(data["présent"])
-                  + f"   {DIM}(« conj » for the full table){RESET}")
-    if examples:
-        for fr, tr in _tatoeba(word, "eng"):
-            print(f"     {DIM}« {fr} » — {tr}{RESET}")
+            present = data["présent"]
+    out["examples"] = _tatoeba(word, "eng") if examples else []
+    out["_card"] = {"word": word, "head": head, "bits": bits,
+                    "ipa": (lex or {}).get("ipa") or "", "groups": groups[:3],
+                    "hint": session.last["hints"] <= 3, "present": present,
+                    "examples": out["examples"] if examples else []}
+    return out
+
+
+def render_card_fr(r):
+    c = r["_card"]
+    line = f"  🇫🇷 {BOLD}{c['word']}{RESET}" + (f"   {DIM}{' · '.join(c['bits'])}{RESET}" if c["bits"] else "")
+    if c["ipa"]:
+        line += f"   {DIM}/{c['ipa']}/{RESET}"
+    lines = [line]
+    for pos, terms in c["groups"]:
+        lines.append(f"     {DIM}{pos:10}{RESET} " + " · ".join(t for t, _ in terms[:6]))
+    if c["hint"]:
+        lines.append(f"     {DIM}{_FOLLOW_HINT}{RESET}")
+    if c["present"]:
+        lines.append(f"     {DIM}présent{RESET}    " + "  ·  ".join(c["present"])
+                     + f"   {DIM}(« conj » for the full table){RESET}")
+    for fr, tr in c["examples"]:
+        lines.append(f"     {DIM}« {fr} » — {tr}{RESET}")
+    return lines
 
 
 # --------------------------------------------------------------------------- #
@@ -1151,20 +1265,40 @@ def _llm_label():
     return "Claude"
 
 
-def _show_ai(session, word, deep, question=None):
+def ai_result(session, word, deep, question=None, progress=None):
+    """{"answer", "error", "model"} from the tutor — a card for a word, or the
+    answer to a free-form question (with the session's last word / sentence as
+    context). `progress(line)` is called before the call: the terminal shows
+    « thinking… », --serve nothing."""
     icon = "🧠" if deep else "🤖"
     label = _llm_label()
-    pad = " " * 12
-    print(f"  {CYAN}{icon} {label} is thinking…{RESET}", end="\r", flush=True)
+    if progress:
+        progress(f"  {CYAN}{icon} {label} is thinking…{RESET}")
     t0 = time.time()
     text, err = (ai_ask(session, question, deep) if question else ai_explain(word, deep=deep))
-    label += f"  {DIM}{time.time() - t0:.1f}s{RESET}{CYAN}"
-    if text:
-        print(f"  {CYAN}{icon} {label} :{RESET}{pad}")
-        for line in _render_md(text):
-            print(f"     {line}")
-    else:
-        print(f"  {YELLOW}{icon} AI unavailable:{RESET} {err}{pad}")
+    return {"answer": text, "error": err, "model": label,
+            "_deep": deep, "_elapsed": time.time() - t0}
+
+
+def render_ai(r):
+    icon = "🧠" if r["_deep"] else "🤖"
+    pad = " " * 12
+    label = r["model"] + f"  {DIM}{r['_elapsed']:.1f}s{RESET}{CYAN}"
+    if r["answer"]:
+        lines = [f"  {CYAN}{icon} {label} :{RESET}{pad}"]
+        lines += [f"     {line}" for line in _render_md(r["answer"])]
+        return lines
+    return [f"  {YELLOW}{icon} AI unavailable:{RESET} {r['error']}{pad}"]
+
+
+def _progress(line):
+    """The terminal's « thinking… » line, overwritten by the answer."""
+    print(line, end="\r", flush=True)
+
+
+def _show_ai(session, word, deep, question=None):
+    for line in render_ai(ai_result(session, word, deep, question, progress=_progress)):
+        print(line)
 
 
 # --------------------------------------------------------------------------- #
@@ -2075,6 +2209,55 @@ def _bare_form(form):
     return s                                  # impératif ("éteins"): no pronoun
 
 
+def conj_result(text):
+    """{"conjugation": {"infinitive", "tenses", "error"}} for a verb (infinitive
+    or conjugated form; « manger présent » filters to one tense — "_conj" keeps
+    the word and the tense for the terminal)."""
+    w, tense = _split_tense(text)
+    inf, data, err, from_fr = conjugate_lookup(w)
+    return {"conjugation": {"infinitive": inf, "tenses": data, "error": err},
+            "_conj": {"word": w, "tense": tense, "from_fr": from_fr}}
+
+
+def render_conjugation(r):
+    c, extra = r["conjugation"], r["_conj"]
+    inf, tenses, tense, word = c["infinitive"], c["tenses"], extra["tense"], extra["word"]
+    shown = tenses
+    if tenses and tense:
+        shown = {k: v for k, v in tenses.items() if k == tense}
+    lines = []
+    if shown:
+        if inf and _deaccent(inf) != _deaccent(word):
+            lines.append(f"  {DIM}\u00ab {word} \u00bb → a form of{RESET} {BOLD}{inf}{RESET}")
+        lines.append(f"  {CYAN}🔄 {inf}{RESET}  {DIM}(conjugation){RESET}")
+        lines += [f"     {line}" for line in _conj_lines(shown)]   # aligned pronoun × tense grid
+    elif tenses and tense:
+        lines.append(f"  {DIM}🔄 (\u00ab {tense} \u00bb unavailable for \u00ab {inf} \u00bb){RESET}")
+    elif c["error"]:
+        lines.append(f"  {DIM}🔄 conjugation: {c['error']}{RESET}")
+    else:
+        lines.append(f"  {DIM}🔄 (verb not found: \u00ab {word} \u00bb){RESET}")
+    return lines
+
+
+def examples_result(text, en=4, ru=2):
+    """{"examples": {"en": [{"fr", "en"}], "ru": [{"fr", "ru"}]}} — Tatoeba."""
+    return {"examples": {"en": [{"fr": s, "en": t} for s, t in _tatoeba(text, "eng", limit=en)],
+                         "ru": [{"fr": s, "ru": t} for s, t in _tatoeba(text, "rus", limit=ru)]},
+            "_word": text}
+
+
+def render_examples(r, follow_up=False):
+    """The sentences; `follow_up` is the REPL's « ex » (indented, dimmed)."""
+    ex = r["examples"]
+    pairs = [(x["fr"], x["en"]) for x in ex["en"]] + [(x["fr"], x["ru"]) for x in ex["ru"]]
+    if follow_up:
+        lines = [f"     {DIM}« {s} » — {t}{RESET}" for s, t in pairs]
+        return lines or [f"  {DIM}no example sentences found for « {r['_word']} »{RESET}"]
+    lines = [f"  « {s} » — {DIM}{t}{RESET}" for s, t in pairs]
+    return lines or [f"  {DIM}no examples found for « {r['_word']} »{RESET}"]
+
+
 def _conj_lines(shown):
     """Colored lines of a pronoun × tense grid, from {tense: [forms]}."""
     tenses = list(shown.keys())
@@ -2813,38 +2996,47 @@ def _looks_french_sentence(text):
     return hits / len(toks) >= 0.6
 
 
-def show(session, word, want_dict=False, want_ai=False, want_save=False,
-         want_multi=False, want_conj=False, want_deep=False, want_fr=False,
-         want_save_main=False, want_gram=False, want_xray=False):
+def lookup_result(session, word, want_dict=False, want_ai=False, want_save=False,
+                  want_multi=False, want_conj=False, want_deep=False, want_fr=False,
+                  want_save_main=False, want_gram=False, want_xray=False, progress=None):
+    """The REPL's lookup, as data: what a line means — a card (with the extra
+    sections asked for under their keys), a grammar check / x-ray, an answer
+    from the tutor, or an error. "_kind" names it; "_"-prefixed keys serve
+    render() only. Autosave happens here and is reported under "saved"."""
+    session.fallback_note = ""
+    r = {"_kind": "", "query": word}
     # Intent detection: a French SENTENCE with no prefix → grammar check.
     if not any((want_dict, want_ai, want_save, want_multi, want_conj, want_deep,
                 want_fr, want_save_main, want_gram, want_xray)) and _looks_french_sentence(word):
         want_gram = True
-        print(f"  {DIM}French sentence → grammar  (\u00ab !x \u00bb for the x-ray, \u00ab ? \u00bb to ask){RESET}")
+        r["_sentence_note"] = True
     if (want_ai or want_deep) and len(word.split()) > 1 and not (
             want_dict or want_fr or want_multi or want_conj):
-        _show_ai(session, word, deep=bool(want_deep), question=word)   # free-form question
-        return
+        r.update(ai_result(session, word, bool(want_deep), question=word, progress=progress))
+        r["_kind"] = "answer"                  # free-form question
+        return r
     if want_gram or want_xray:                # "sentence" tools: their own pipeline
         session.last["sentence"] = word.strip()
         if want_xray:
-            _show_xray(word)
+            r.update(xray_result(word))
         if want_gram:
-            _show_grammar(word)
-        return
+            r.update(grammar_result(word))
+        r["_kind"] = "grammar" if want_gram else "xray"
+        return r
     src_guess = detect_lang(word)
     offline_ok = want_multi or want_conj      # sections that work offline
 
     # If the word is already French (a known verb, or -f "French Wiktionary"
     # mode), sending it to Google is useless and misleading ("manger" is also an
     # English word → "crèche").
-    conj_inf = conj_tenses = conj_err = None
-    conj_tense = None
+    conj_inf = conj_tenses = None
     conj_from_fr = False
     session.last["conj_shown"] = bool(want_conj)
     if want_conj:
-        word, conj_tense = _split_tense(word)   # "manger present" → filter to one tense
-        conj_inf, conj_tenses, conj_err, conj_from_fr = conjugate_lookup(word)
+        conj = conj_result(word)               # "manger present" → filter to one tense
+        word = conj["_conj"]["word"]
+        conj_inf, conj_tenses = conj["conjugation"]["infinitive"], conj["conjugation"]["tenses"]
+        conj_from_fr = conj["_conj"]["from_fr"]
     # -c found a French verb (infinitive OR conjugated form) → skip the useless
     # Google fr→fr "translation" (doit → doit).
     direct_fr_verb = bool(conj_inf) and conj_from_fr
@@ -2870,11 +3062,10 @@ def show(session, word, want_dict=False, want_ai=False, want_save=False,
             if translation:
                 pass
             elif not offline_ok:
-                print(f"{RED}✗ Error / no connection:{RESET} {e}")
-                print(f"{DIM}  (the quick translation needs internet){RESET}")
-                return
+                r.update({"_kind": "error", "error": str(e)})
+                return r
             else:
-                print(f"  {DIM}(offline: no quick translation){RESET}")
+                r["_offline_note"] = True
     src = detected or src_guess
     session.last.update(word=word, fr=translation or "")
 
@@ -2893,118 +3084,175 @@ def show(session, word, want_dict=False, want_ai=False, want_save=False,
 
     lex_fr = lexique_lookup(translation) if translation else None
     if not translation and not offline_ok:
-        print(f"{YELLOW}No translation found for \u00ab {word} \u00bb.{RESET}")
-        return
+        r.update({"_kind": "error", "_no_translation": True})
+        return r
     if translation:
         ex_on = config_load().get("examples", True)
         is_fr = input_is_french or _deaccent(translation.lower()) == _deaccent(word.strip().lower())
         if is_fr:
-            _render_card_fr(session, translation, lex_fr, examples=ex_on and not want_conj)
+            r.update(card_fr_result(session, translation, lex_fr, examples=ex_on and not want_conj))
+            r["_kind"] = "card_fr"
         else:
-            _render_card_to_fr(session, word, src, translation, groups if not input_is_french else [],
-                               examples=ex_on)
-
+            r.update(card_to_fr_result(session, word, src, translation,
+                                       groups if not input_is_french else [], examples=ex_on))
+            r["_kind"] = "card_to_fr"
+    if session.fallback_note:
+        r["note"] = session.fallback_note
     if cognate:                               # possible false friend: flag it
-        art = (cognate["article"] + " ") if cognate["article"] else ""
-        g = (" " + ("masc." if cognate["genre"] == "m" else "fém.")) \
-            if cognate["genre"] else ""
-        print(f"  {YELLOW}↔ \u00ab {word} \u00bb is also a French word{RESET}: "
-              f"{BOLD}{art}{cognate['lemma']}{RESET} {DIM}({cognate['pos']}{g}, "
-              f"{cognate['band']}) — \u00ab def {word} \u00bb for its meaning{RESET}")
+        r["_cognate"] = {"word": word, "lemma": cognate["lemma"], "article": cognate["article"],
+                         "genre": cognate["genre"], "pos": cognate["pos"], "band": cognate["band"]}
 
     if want_multi:
-        _show_multitran(word)
+        r.update(multitran_result(word))
 
     if want_conj:
-        shown = conj_tenses
-        if conj_tenses and conj_tense:
-            shown = {k: v for k, v in conj_tenses.items() if k == conj_tense}
-        if shown:
-            if conj_inf and _deaccent(conj_inf) != _deaccent(word):
-                print(f"  {DIM}\u00ab {word} \u00bb → a form of{RESET} {BOLD}{conj_inf}{RESET}")
-            print(f"  {CYAN}🔄 {conj_inf}{RESET}  {DIM}(conjugation){RESET}")
-            for line in _conj_lines(shown):       # aligned pronoun × tense grid
-                print(f"     {line}")
-        elif conj_tenses and conj_tense:
-            print(f"  {DIM}🔄 (\u00ab {conj_tense} \u00bb unavailable for \u00ab {conj_inf} \u00bb){RESET}")
-        elif conj_err:
-            print(f"  {DIM}🔄 conjugation: {conj_err}{RESET}")
-        else:
-            print(f"  {DIM}🔄 (verb not found: \u00ab {word} \u00bb){RESET}")
+        r.update(conj)
 
-    wikt_entry = None
+    r["_definitions"] = []
     if want_fr:                               # Wiktionary for the word as typed
-        wikt_entry = _show_wikt(word)
-
+        r["_definitions"].append(definition_result(word))
     if want_dict and translation:             # Wiktionary for the translation
-        wikt_entry = _show_wikt(translation)
+        r["_definitions"].append(definition_result(translation))
+    if r["_definitions"]:
+        r.update(r["_definitions"][-1])
+    wikt_entry = r["_definitions"][-1]["_entry"] if r["_definitions"] else None
 
     if want_ai or want_deep:
         q = word if len(word.split()) > 1 else None   # several words = free-form question
-        _show_ai(session, word, deep=bool(want_deep), question=q)
+        r.update(ai_result(session, word, bool(want_deep), question=q, progress=progress))
 
     auto = autosave_on() and not session.no_autosave
     if (auto or want_save or want_save_main) and translation:
-        # Enrichment: 1) the Wiktionary entry already shown (-f/-d, rich),
-        # 2) OFFLINE Lexique (lemma/gender/pos, no network),
-        # 3) only as a last resort, a Wiktionary request.
-        entry, lex = wikt_entry, lex_fr
-        # A phrase (several words, leading article aside)? Keep the WHOLE group
-        # ("éteindre le feu") instead of shrinking it to "un feu".
-        core = translation.strip().split()
-        while len(core) > 1 and core[0].lower() in _FR_ARTICLES:
-            core = core[1:]
-        is_phrase = len(core) > 1
-        if not is_phrase and entry is None and lex is None:
-            try:
-                entry = wiktionary(translation)    # network, only for a single word
-            except Exception:
-                entry = None
-        if is_phrase:
-            lemma = " ".join(core)
-            front = lemma                          # no article in front of a phrase
-        else:
-            lemma = ((entry.get("lemma") if entry else None)
-                     or (lex.get("lemma") if lex else None)
-                     or (core[0] if core else translation))
-            article = ARTICLE_FOR.get((entry.get("gender") if entry else "") or "")
-            if not article and lex:
-                article = lex.get("article")
-            front = f"{article} {lemma}" if article else lemma
-        if input_is_french and entry and entry["defs"]:
-            d = entry["defs"][0]
-            sens = d[:55] + ("…" if len(d) > 55 else "")
-        elif want_conj and input_is_french:
-            sens = ""                              # conj. card: the back = the forms
-        else:
-            sens = word                            # the original (ru/en) word = the meaning
-        # Conjugation → put the PRÉSENT on the back of the card (other tenses: later).
-        example = ""
-        if want_conj and conj_tenses and conj_tenses.get("présent"):
-            example = "prés. : " + ", ".join(conj_tenses["présent"])
-        record = {
-            "key": store_key(lemma),
-            "front": front,
-            "lemma": lemma,
-            "sens": sens,
-            "pos": ((entry.get("pos") if entry else None)
-                    or (lex.get("pos") if lex else "") or ""),
-            "gender": ((entry.get("gender") if entry else None)
-                       or (lex.get("genre") if lex else "") or ""),
-            "example": example,
-            "src_word": word,
-            "src_lang": src,
-            "tier": ("wiktionnaire" if input_is_french
-                     else "multitran" if want_multi else "google"),
-        }
+        r.update(save_from_card(word, src, translation, wikt_entry, lex_fr, input_is_french,
+                                want_conj, conj_tenses, want_multi,
+                                auto and not (want_save or want_save_main)))
+    return r
+
+
+def save_from_card(word, src, translation, entry, lex, input_is_french, want_conj,
+                   conj_tenses, want_multi, auto):
+    """Store the card that was just shown: {"saved": {"front", "status", "count",
+    "auto"}} or {"_save_error": str}. Enrichment: 1) the Wiktionary entry
+    already shown (-f/-d, rich), 2) OFFLINE Lexique (lemma/gender/pos, no
+    network), 3) only as a last resort, a Wiktionary request."""
+    # A phrase (several words, leading article aside)? Keep the WHOLE group
+    # ("éteindre le feu") instead of shrinking it to "un feu".
+    core = translation.strip().split()
+    while len(core) > 1 and core[0].lower() in _FR_ARTICLES:
+        core = core[1:]
+    is_phrase = len(core) > 1
+    if not is_phrase and entry is None and lex is None:
         try:
-            status, cnt = store_upsert(record)
-            tag = f"  {DIM}×{cnt}{RESET}" if cnt > 1 else ""
-            badge = (f"  {DIM}auto{RESET}"
-                     if auto and not (want_save or want_save_main) else "")
-            print(f"  {GREEN}💾 \u00ab {front} \u00bb → {status}{RESET}{tag}{badge}")
-        except Exception as e:
-            print(f"  {YELLOW}💾 save failed:{RESET} {e}")
+            entry = wiktionary(translation)    # network, only for a single word
+        except Exception:
+            entry = None
+    if is_phrase:
+        lemma = " ".join(core)
+        front = lemma                          # no article in front of a phrase
+    else:
+        lemma = ((entry.get("lemma") if entry else None)
+                 or (lex.get("lemma") if lex else None)
+                 or (core[0] if core else translation))
+        article = ARTICLE_FOR.get((entry.get("gender") if entry else "") or "")
+        if not article and lex:
+            article = lex.get("article")
+        front = f"{article} {lemma}" if article else lemma
+    if input_is_french and entry and entry["defs"]:
+        d = entry["defs"][0]
+        sens = d[:55] + ("…" if len(d) > 55 else "")
+    elif want_conj and input_is_french:
+        sens = ""                              # conj. card: the back = the forms
+    else:
+        sens = word                            # the original (ru/en) word = the meaning
+    # Conjugation → put the PRÉSENT on the back of the card (other tenses: later).
+    example = ""
+    if want_conj and conj_tenses and conj_tenses.get("présent"):
+        example = "prés. : " + ", ".join(conj_tenses["présent"])
+    record = {
+        "key": store_key(lemma),
+        "front": front,
+        "lemma": lemma,
+        "sens": sens,
+        "pos": ((entry.get("pos") if entry else None)
+                or (lex.get("pos") if lex else "") or ""),
+        "gender": ((entry.get("gender") if entry else None)
+                   or (lex.get("genre") if lex else "") or ""),
+        "example": example,
+        "src_word": word,
+        "src_lang": src,
+        "tier": ("wiktionnaire" if input_is_french
+                 else "multitran" if want_multi else "google"),
+    }
+    try:
+        status, cnt = store_upsert(record)
+    except Exception as e:
+        return {"_save_error": str(e)}
+    return {"saved": {"front": front, "status": status, "count": cnt, "auto": auto}}
+
+
+def render(r):
+    """THE terminal printer: a Result → its lines, sections in the order the
+    REPL has always shown them. Colours live here and in the render_* it calls."""
+    kind = r.get("_kind", "")
+    lines = []
+    if r.get("_sentence_note"):
+        lines.append(f"  {DIM}French sentence → grammar  (\u00ab !x \u00bb for the x-ray, \u00ab ? \u00bb to ask){RESET}")
+    if kind == "answer":
+        return lines + render_ai(r)
+    if "xray" in r:
+        lines += render_xray(r)
+    if "grammar" in r:
+        lines += render_grammar(r)
+    if kind == "error":
+        if r.get("_no_translation"):
+            lines.append(f"{YELLOW}No translation found for \u00ab {r['query']} \u00bb.{RESET}")
+        else:
+            lines.append(f"{RED}✗ Error / no connection:{RESET} {r['error']}")
+            lines.append(f"{DIM}  (the quick translation needs internet){RESET}")
+        return lines
+    if r.get("_offline_note"):
+        lines.append(f"  {DIM}(offline: no quick translation){RESET}")
+    if "_card" in r:
+        lines += render_card_fr(r) if r["direction"] == "fr" else render_card_to_fr(r)
+    if r.get("_cognate"):
+        c = r["_cognate"]
+        art = (c["article"] + " ") if c["article"] else ""
+        g = (" " + ("masc." if c["genre"] == "m" else "fém.")) if c["genre"] else ""
+        lines.append(f"  {YELLOW}↔ \u00ab {c['word']} \u00bb is also a French word{RESET}: "
+                     f"{BOLD}{art}{c['lemma']}{RESET} {DIM}({c['pos']}{g}, "
+                     f"{c['band']}) — \u00ab def {c['word']} \u00bb for its meaning{RESET}")
+    if "multitran" in r:
+        lines += render_multitran(r)
+    if "conjugation" in r:
+        lines += render_conjugation(r)
+    for d in r.get("_definitions", [r] if "definition" in r else []):
+        lines += render_definition(d)
+    if "synonyms" in r:
+        lines += render_synonyms(r)
+    if "audio" in r:
+        lines += render_audio(r)
+    if "examples" in r and isinstance(r["examples"], dict):
+        lines += render_examples(r)
+    if "model" in r:
+        lines += render_ai(r)
+    if "saved" in r:
+        s = r["saved"]
+        tag = f"  {DIM}×{s['count']}{RESET}" if s["count"] > 1 else ""
+        badge = f"  {DIM}auto{RESET}" if s["auto"] else ""
+        lines.append(f"  {GREEN}💾 \u00ab {s['front']} \u00bb → {s['status']}{RESET}{tag}{badge}")
+    if r.get("_save_error"):
+        lines.append(f"  {YELLOW}💾 save failed:{RESET} {r['_save_error']}")
+    return lines
+
+
+def show(session, word, want_dict=False, want_ai=False, want_save=False,
+         want_multi=False, want_conj=False, want_deep=False, want_fr=False,
+         want_save_main=False, want_gram=False, want_xray=False):
+    """The terminal's lookup: build the Result, print it."""
+    r = lookup_result(session, word, want_dict, want_ai, want_save, want_multi, want_conj,
+                      want_deep, want_fr, want_save_main, want_gram, want_xray, progress=_progress)
+    for line in render(r):
+        print(line)
 
 
 # --------------------------------------------------------------------------- #
@@ -3051,11 +3299,8 @@ def _follow_up(session, line):
         elif cmd in ("syn", "synonyms"):
             _show_synonyms(fr)
         elif cmd in ("ex", "examples"):
-            exs = _tatoeba(fr, "eng", limit=3) + _tatoeba(fr, "rus", limit=1)
-            for s, t in exs:
-                print(f"     {DIM}« {s} » — {t}{RESET}")
-            if not exs:
-                print(f"  {DIM}no example sentences found for « {fr} »{RESET}")
+            for line in render_examples(examples_result(fr, en=3, ru=1), follow_up=True):
+                print(line)
         elif cmd in ("grammar", "check"):
             _show_grammar(sentence)
         else:
@@ -3385,110 +3630,6 @@ def run_setup(ask_llm=True):
         print(f"\n{DIM}Try « dico --tour » for a 2-minute walkthrough.{RESET}")
 
 
-def _public(obj):
-    """A Result without its terminal-only fields (keys starting with "_")."""
-    if isinstance(obj, dict):
-        return {k: _public(v) for k, v in obj.items() if not str(k).startswith("_")}
-    if isinstance(obj, list):
-        return [_public(v) for v in obj]
-    return obj
-
-
-def as_json(session, text, args):
-    """JSON representation of a lookup — for a graphical front-end."""
-    out = _as_json(session, text, args)
-    if session.fallback_note and "note" not in out:
-        out["note"] = session.fallback_note
-    return _public(out)
-
-
-def _as_json(session, text, args):
-    text = text.strip()
-    out = {"query": text}
-    if not text:
-        return out
-    if args.ai or args.profond:
-        q = text if len(text.split()) > 1 else None
-        ans, err = (ai_ask(session, q, args.profond) if q else ai_explain(text, deep=args.profond))
-        out.update({"answer": ans, "error": err, "model": _llm_label()})
-        return out
-    if args.grammaire or args.xray:
-        # English or Russian in: translate first, analyse the French.
-        lang = _sentence_lang(text)
-        if lang != "fr":
-            try:
-                tr = translate(text, "fr")[0].strip()
-            except Exception:
-                tr = ""
-            if tr:
-                out.update({"source": text, "source_lang": lang, "translated": tr})
-                text = tr
-    if args.grammaire:
-        out.update(grammar_result(text))
-        return out
-    if args.xray:
-        out.update(xray_result(text))
-        return out
-    if args.examples:
-        out["examples"] = {"en": [{"fr": s, "en": t} for s, t in _tatoeba(text, "eng", limit=4)],
-                           "ru": [{"fr": s, "ru": t} for s, t in _tatoeba(text, "rus", limit=2)]}
-        return out
-    if args.francais or args.dico:
-        target = text
-        if args.dico and detect_lang(text) != "fr":
-            try:
-                target = translate_rich(text, session=session)[0] or text
-            except Exception:
-                pass
-        out.update(definition_result(target))
-        return out
-    if args.say or args.syn:
-        out.update(synonyms_result(text))
-        if args.say:
-            out.update(audio_result(text))
-        return out
-    if args.multitran:
-        out.update(multitran_result(text))
-        return out
-    if args.conj:
-        w, tense = _split_tense(text)
-        inf, data, err, _ = conjugate_lookup(w)
-        out["conjugation"] = {"infinitive": inf, "tenses": data, "error": err}
-        return out
-    lang = detect_lang(text)
-    lex = lexique_lookup(text)
-    if lang == "en" and lex and lex["freqfilms"] >= 1 and lex["cgram"][:3] in ("NOM", "ADJ", "VER", "ADV", "PRE", "PRO", "CON", "ART"):
-        head, lx = _fr_head(text)
-        try:
-            _, _, groups = translate_rich(text, tl="en", sl="fr", session=session)
-        except Exception:
-            groups = []
-        out.update({"direction": "fr", "head": head, "lexique": lx,
-                    "senses": [{"pos": p, "terms": [t for t, _ in ts]} for p, ts in groups],
-                    "examples": _tatoeba(text, "eng")})
-        return out
-    try:
-        tr, det, groups = translate_rich(text, session=session)
-    except Exception as e:
-        out["error"] = str(e)
-        return out
-    senses = []
-    for pos, terms in groups:
-        for term, back in terms:
-            front, lx = _fr_head(term)
-            senses.append({"pos": pos, "term": term, "front": front, "back": back,
-                           "gender": (lx["genre"] if lx else "") or "",
-                           "band": lx["band"] if lx else "",
-                           "cefr": (lx or {}).get("cefr") or ""})
-    # The French RESULT deserves the same badges as a French query: what a
-    # learner wants to know about « cuisiner » does not depend on how they
-    # arrived at it.
-    out.update({"direction": "to_fr", "src_lang": det or lang, "translation": tr,
-                "lexique": lexique_lookup(tr) if tr else None,
-                "senses": senses, "examples": _tatoeba(tr, "eng") if tr else []})
-    return out
-
-
 def main():
     p = argparse.ArgumentParser(
         prog="dico", add_help=True,
@@ -3635,13 +3776,11 @@ def main():
     if args.context:
         session.last["word"] = args.context
     if args.examples and not args.json:
-        w = " ".join(args.words if "words" in args else args.mots)
-        exs = _tatoeba(w, "eng", limit=4) + _tatoeba(w, "rus", limit=2)
-        for s, t in exs:
-            print(f"  « {s} » — {DIM}{t}{RESET}")
-        return None if exs else print(f"  {DIM}no examples found for « {w} »{RESET}")
+        for line in render_examples(examples_result(" ".join(args.words))):
+            print(line)
+        return
     if args.json:
-        return print(json.dumps(as_json(session, " ".join(args.words), args), ensure_ascii=False, indent=2))
+        return print(json.dumps(_public(session.handle_args(args)), ensure_ascii=False, indent=2))
     if args.mots_outils is not None:
         show_mots_outils(args.mots_outils, save=(args.save or args.save_main))
         return
