@@ -285,9 +285,7 @@ class Session:
             out.update(conj_result(text))
         else:
             lang = detect_lang(text)
-            lex = lexique_lookup(text)
-            if lang == "en" and lex and lex["freqfilms"] >= 1 and lex["cgram"][:3] in (
-                    "NOM", "ADJ", "VER", "ADV", "PRE", "PRO", "CON", "ART"):
+            if decide_direction(text) == "fr":
                 out.update(card_fr_result(self, text))
             else:
                 try:
@@ -2996,6 +2994,30 @@ def _looks_french_sentence(text):
     return hits / len(toks) >= 0.6
 
 
+# The card's direction, decided ONCE for the terminal and the panels.
+LEXIQUE_FRENCH_MIN = 50          # films per million (Lexique's freqfilms)
+
+
+def decide_direction(word):
+    """« fr » when the typed word is, offline, a real French word: Lexique has it
+    as a LEMMA with this exact spelling (accents included — « the » must not
+    become « thé »; « mange » is a form, not a lemma), a content word (NOM, ADJ,
+    VER, ADV — « car », « pour », « on », « son » are grammatical words, and
+    their English readings win) and frequent enough: freqfilms >=
+    LEXIQUE_FRENCH_MIN. At 50/million manger (208), table (111), dire (1565)
+    and chat (58) are French; chair (36), four (14), go (15) get translated —
+    with the cognate flag when Lexique knows them. Everything else, phrases
+    and anything under 3 letters included, is « to_fr »: translate first."""
+    w = word.strip().lower()
+    if len(w) < 3 or " " in w or CYRILLIC.search(w):
+        return "to_fr"
+    lex = lexique_lookup(w)
+    if (lex and lex["lemma"] == w and lex["cgram"] in ("NOM", "ADJ", "VER", "ADV")
+            and lex["freqfilms"] >= LEXIQUE_FRENCH_MIN):
+        return "fr"
+    return "to_fr"
+
+
 def lookup_result(session, word, want_dict=False, want_ai=False, want_save=False,
                   want_multi=False, want_conj=False, want_deep=False, want_fr=False,
                   want_save_main=False, want_gram=False, want_xray=False, progress=None):
@@ -3043,7 +3065,7 @@ def lookup_result(session, word, want_dict=False, want_ai=False, want_save=False
     # Multitran is ru<->fr: a word in the Latin alphabet IS French → skip the
     # useless Google fr→fr "translation" (eventail → eventail).
     multi_fr = want_multi and detect_lang(word) == "en"
-    input_is_french = want_fr or direct_fr_verb or multi_fr
+    input_is_french = want_fr or direct_fr_verb or multi_fr or decide_direction(word) == "fr"
 
     translation, detected, alts, groups = None, None, [], []
     if input_is_french:
