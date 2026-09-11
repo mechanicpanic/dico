@@ -511,7 +511,15 @@ enum DicoClient {
 
     // MARK: The five modes + saving
 
-    static func lookup(_ word: String) throws -> Lookup { try call(Lookup.self, ["--json", word]) }
+    static func lookup(_ word: String) throws -> Lookup {
+        let l = try call(Lookup.self, ["--json", word])
+        // A lookup that failed comes back as {query, error}: that is an error,
+        // not an empty card.
+        if let e = l.error, !e.isEmpty, (l.senses ?? []).isEmpty, (l.translation ?? "").isEmpty {
+            throw DicoError.from(message: e)
+        }
+        return l
+    }
 
     static func conjugate(_ verb: String) throws -> Conjugation {
         let env = try call(ConjEnvelope.self, ["--json", "-c", verb])

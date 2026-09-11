@@ -37,7 +37,7 @@ Translation and Wiktionary need internet; Multitran and the conjugations work
 offline (databases in data/). The -a option uses the Anthropic API if
 ANTHROPIC_API_KEY is set (fast, ~1-2 s), otherwise the `claude` command.
 """
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 import argparse
 import html
@@ -259,8 +259,10 @@ def translate_rich(word, tl="fr", sl="auto"):
         terms = []
         for t in (entry[2] if len(entry) > 2 and entry[2] else []):
             if t and t[0]:
-                terms.append((t[0], [b for b in (t[1] if len(t) > 1 else []) if b][:4]))
-        if not terms and len(entry) > 1:
+                # Google leaves the back-translations null for some words (« государство »).
+                backs = t[1] if len(t) > 1 and isinstance(t[1], list) else []
+                terms.append((t[0], [b for b in backs if b][:4]))
+        if not terms and len(entry) > 1 and isinstance(entry[1], list):
             terms = [(x, []) for x in entry[1] if x]
         if terms:
             groups.append((pos, terms))

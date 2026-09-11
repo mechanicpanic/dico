@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 — 2026-09-11
+
+- A Russian word whose Google entry carries no back-translations
+  (« государство ») crashed the parser and the panel showed an empty card.
+  The parser copes, and a lookup that fails now shows its error in the panel
+  instead of a blank card.
+
 ## 1.0.3 — 2026-09-11
 
 - **Homebrew, fixed.** The `dico` command Homebrew links followed its own
