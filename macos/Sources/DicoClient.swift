@@ -346,13 +346,22 @@ enum DicoClient {
     }
 
     /// Resolves (executable, argument prefix).
+    /// Order: DICO_BIN · a checkout's dico.py · the bundled dico.py · a `dico`
+    /// on PATH. The bundle comes before PATH on purpose: a Homebrew install
+    /// links the app's own launcher into /opt/homebrew/bin, and the app must
+    /// never depend on that link (or on whatever else is called « dico »).
     private static func resolve() -> (String, [String])? {
         if let bin = ProcessInfo.processInfo.environment["DICO_BIN"],
            FileManager.default.isExecutableFile(atPath: bin) { return (bin, []) }
+        if let r = resolveScript() { return r }
         for dir in searchPath {
             let p = dir + "/dico"
             if FileManager.default.isExecutableFile(atPath: p) { return (p, []) }
         }
+        return nil
+    }
+
+    private static func resolveScript() -> (String, [String])? {
         var scripts = scriptCandidates
         if let s = ProcessInfo.processInfo.environment["DICO_SCRIPT"] { scripts.insert(s, at: 0) }
         for s in scripts where FileManager.default.fileExists(atPath: s) {

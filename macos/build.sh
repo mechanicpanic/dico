@@ -69,7 +69,12 @@ mkdir -p "$RES/bin"
 cat > "$RES/bin/dico" <<'SH'
 #!/bin/sh
 # dico — the CLI inside Dico.app. The data the app unpacks (~/.dico/data) is shared.
-here="$(cd "$(dirname "$0")/.." && pwd)"
+self="$0"
+while [ -L "$self" ]; do                      # Homebrew links it from /opt/homebrew/bin
+  target="$(readlink "$self")"
+  case "$target" in /*) self="$target" ;; *) self="$(dirname "$self")/$target" ;; esac
+done
+here="$(cd "$(dirname "$self")/.." && pwd)"
 export DICO_DATA="${DICO_DATA:-$HOME/.dico/data}"
 export DICO_HOME="${DICO_HOME:-$HOME/.dico}"
 if [ ! -f "$DICO_DATA/lexique.db" ] && [ -d "$here/data" ]; then

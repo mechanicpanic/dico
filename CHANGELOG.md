@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3 — 2026-09-11
+
+- **Homebrew, fixed.** The `dico` command Homebrew links followed its own
+  symlink to the wrong folder, and the app preferred that link over its own
+  bundled script — so a brew-installed Dico could not look anything up. The
+  launcher now resolves the link; the app uses its bundle before anything on
+  PATH. The cask clears the quarantine flag after installing (Homebrew 6
+  dropped `--no-quarantine`), so the first launch is not blocked.
+- The panel opens on the screen the mouse is on.
+
 ## 1.0.2 — 2026-09-10
 
 - **Homebrew.** `brew install --cask mechanicpanic/dico/dico` installs the app
