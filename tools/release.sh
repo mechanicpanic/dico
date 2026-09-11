@@ -95,7 +95,7 @@ cask "dico" do
 
   url "https://github.com/mechanicpanic/dico/releases/download/v#{version}/Dico-#{version}.zip"
   name "Dico"
-  desc "French dictionary popup for Russian and English speakers — offline, with flashcards"
+  desc "French dictionary popup for Russian and English speakers, with flashcards"
   homepage "https://github.com/mechanicpanic/dico"
 
   livecheck do
