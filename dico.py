@@ -227,13 +227,19 @@ def _google_query(word, tl="fr", sl="auto"):
 
 
 class Session:
-    """The REPL's state — one per terminal session, per --json call, and (later)
-    per --serve process. Holds what used to be module globals:
+    """The REPL's state and its driver — one per terminal session, per one-shot
+    call, and (later) per --serve process.
 
+    State (what used to be module globals):
     last          context for « ? » / « save N »: word, fr, sentence, senses,
                   hints (follow-up hint shown ≤ 3 times), conj_shown
     no_autosave   True while a follow-up or the --tour runs (never re-save)
     fallback_note set when a card came from the MyMemory fallback, shown once
+
+    Driver: handle(line) understands every REPL line; handle_args(args) the
+    argparse flags. Both turn their input into a *request* ({"op": …}) and
+    run() executes it — ONE dispatch, whatever the skin. Results are dicts:
+    the keys --json emits, plus "_"-prefixed ones for render() only.
     """
 
     def __init__(self):
@@ -241,65 +247,185 @@ class Session:
         self.no_autosave = False
         self.fallback_note = ""
 
-    def handle_args(self, args):
-        """The --json contract (the panels): argparse flags → ONE section, in
-        the priority --json has always had. The composite REPL lookup is
-        lookup_result()."""
-        self.fallback_note = ""
+    # ---- the two languages → a request ---------------------------------
+    _FOLLOW = re.compile(r"^(conj|conjugate|def|definition|define|ru|multitran|ex|examples|x|xray|x-ray"
+                         r"|grammar|check|xray|say|listen|audio|syn|synonyms)(?:\s+(.+))?$", re.I)
+    _SENTENCE_CMDS = ("grammar", "check", "x", "xray", "x-ray")
+
+    def parse(self, line):
+        """A REPL line → a request. « : » settings, « save N », the plain-word
+        follow-ups (conj · def · ru · ex · say · syn · grammar · x, on the last
+        card or on the word given), « ? question », a word / a sentence."""
+        line = line.strip()
+        if line.startswith(":"):               # a setting, not a lookup
+            return {"op": "setting", "line": line}
+        if line.lower() in ("help", "h", "?help"):
+            return {"op": "help"}
+        m = re.match(r"^(?:save|s)\s+(\d+)$", line, re.I)
+        if m:
+            return {"op": "save_sense", "n": int(m.group(1))}
+        m = self._FOLLOW.match(line)
+        if m:
+            cmd, arg = m.group(1).lower(), (m.group(2) or "").strip()
+            fr = arg or self.last.get("fr") or ""
+            sentence = arg or self.last.get("sentence") or fr
+            if not fr and not sentence:
+                return {"op": "message",
+                        "text": f"look something up first, or give a word: « {cmd} manger »"}
+            req = {"explicit": bool(arg)}
+            if cmd in ("conj", "conjugate"):
+                req.update(op="lookup", text=fr, conj=True, autosave=False)
+            elif cmd in ("def", "definition", "define"):
+                req.update(op="definition", text=fr)
+            elif cmd in ("ru", "multitran"):
+                req.update(op="multitran", text=fr)
+            elif cmd in ("say", "listen", "audio"):
+                req.update(op="audio", text=fr)
+            elif cmd in ("syn", "synonyms"):
+                req.update(op="synonyms", text=fr)
+            elif cmd in ("ex", "examples"):
+                req.update(op="examples", text=fr, en=3, ru=1, follow_up=True)
+            elif cmd in ("grammar", "check"):
+                req.update(op="grammar", text=sentence)
+            else:
+                req.update(op="xray", text=sentence)
+            return req
+        if line.startswith("?"):               # free question to the tutor (context = last word)
+            q = line.lstrip("?").strip()
+            if q:
+                return {"op": "ai", "text": q, "deep": line.startswith("??"), "question": True}
+            return {"op": "message", "text": "\u00ab ? your question \u00bb — e.g. ? cuisiner vs cuire · "
+                                              "? pourquoi \u00ab de \u00bb ici · ?? (detailed answer)"}
+        if line[:1] in "!-":                   # old prefix habit → point at the words
+            return {"op": "message", "text": "no prefixes anymore — say it in words: conj · def · ru · ex · "
+                                              f"grammar · x · save N · ? question   (e.g. « def {line.split()[-1]} »)"}
+        return {"op": "lookup", "text": line}  # a word, a French word, or a sentence
+
+    def handle(self, line, progress=None):
+        """The REPL: a line → a Result."""
+        return self.run(self.parse(line), progress)
+
+    @staticmethod
+    def request_from_args(args):
+        """argparse flags → a request. --json keeps its contract: ONE section,
+        in the priority it has always had; the terminal gets the composite
+        lookup (card + the sections asked for), like a REPL line would."""
         text = " ".join(args.words).strip()
-        out = {"query": text}
-        if not text:
-            return out
-        if args.ai or args.profond:
-            q = text if len(text.split()) > 1 else None
-            out.update(ai_result(self, text, bool(args.profond), question=q))
-        elif args.grammaire or args.xray:
-            # English or Russian in: translate first, analyse the French.
-            lang = _sentence_lang(text)
-            if lang != "fr":
-                try:
-                    tr = translate(text, "fr")[0].strip()
-                except Exception:
-                    tr = ""
-                if tr:
-                    out.update({"source": text, "source_lang": lang, "translated": tr})
-                    text = tr
-            out.update(grammar_result(text) if args.grammaire else xray_result(text))
-        elif args.examples:
-            out.update(examples_result(text))
-        elif args.francais or args.dico:
+        if args.json:
+            if args.ai or args.profond:
+                return {"op": "ai", "text": text, "deep": bool(args.profond),
+                        "question": len(text.split()) > 1}
+            if args.grammaire or args.xray:
+                return {"op": "grammar" if args.grammaire else "xray", "text": text, "translate_first": True}
+            if args.examples:
+                return {"op": "examples", "text": text}
+            if args.francais or args.dico:
+                return {"op": "definition", "text": text, "translate": bool(args.dico)}
+            if args.say or args.syn:
+                return {"op": "synonyms", "text": text, "audio": bool(args.say)}
+            if args.multitran:
+                return {"op": "multitran", "text": text}
+            if args.conj:
+                return {"op": "conj", "text": text}
+            return {"op": "lookup", "text": text, "autosave": False, "examples": True}
+        if args.examples:
+            return {"op": "examples", "text": text}
+        if args.say or args.syn:
+            return ({"op": "synonyms", "text": text, "audio": bool(args.say)} if args.syn
+                    else {"op": "audio", "text": text})
+        return {"op": "lookup", "text": text, "dict": args.dico, "ai": args.ai, "save": args.save,
+                "multi": args.multitran, "conj": args.conj, "deep": args.profond, "fr": args.francais,
+                "save_main": args.save_main, "gram": args.grammaire, "xray": args.xray}
+
+    def handle_args(self, args, progress=None):
+        """The one-shot CLI: flags → a Result (see request_from_args)."""
+        return self.run(self.request_from_args(args), progress)
+
+    # ---- the one dispatch -------------------------------------------------
+    def run(self, req, progress=None):
+        """Execute a request → a Result dict ("_kind" names it)."""
+        self.fallback_note = ""
+        op, text = req["op"], req.get("text", "")
+        r = {"query": text}
+        if op in ("setting", "help", "message", "save_sense"):
+            r = self._run_local(op, req)
+        elif not text:
+            r["_kind"] = "empty"
+        elif op == "lookup":
+            prev = self.no_autosave
+            if req.get("autosave") is False:   # a follow-up / the panel never (re-)saves
+                self.no_autosave = True
+            try:
+                r = lookup_result(self, text, req.get("dict"), req.get("ai"), req.get("save"),
+                                  req.get("multi"), req.get("conj"), req.get("deep"), req.get("fr"),
+                                  req.get("save_main"), req.get("gram"), req.get("xray"),
+                                  examples=req.get("examples"), progress=progress)
+            finally:
+                self.no_autosave = prev
+        elif op in ("grammar", "xray"):
+            if req.get("translate_first"):     # English or Russian in: translate first, analyse the French
+                lang = _sentence_lang(text)
+                if lang != "fr":
+                    try:
+                        tr = translate(text, "fr")[0].strip()
+                    except Exception:
+                        tr = ""
+                    if tr:
+                        r.update({"source": text, "source_lang": lang, "translated": tr})
+                        text = tr
+            r.update(grammar_result(text) if op == "grammar" else xray_result(text))
+            r["_kind"] = op
+        elif op == "definition":
             target = text
-            if args.dico and detect_lang(text) != "fr":
+            if req.get("translate") and detect_lang(text) != "fr":
                 try:
                     target = translate_rich(text, session=self)[0] or text
                 except Exception:
                     pass
-            out.update(definition_result(target))
-        elif args.say or args.syn:
-            out.update(synonyms_result(text))
-            if args.say:
-                out.update(audio_result(text))
-        elif args.multitran:
-            out.update(multitran_result(text))
-        elif args.conj:
-            out.update(conj_result(text))
+            r.update(definition_result(target), _kind="definition")
+        elif op == "multitran":
+            r.update(multitran_result(text), _kind="multitran")
+        elif op == "synonyms":
+            r.update(synonyms_result(text), _kind="synonyms")
+            if req.get("audio"):
+                r.update(audio_result(text))
+        elif op == "audio":
+            r.update(audio_result(text), _kind="audio")
+        elif op == "examples":
+            r.update(examples_result(text, req.get("en", 4), req.get("ru", 2)), _kind="examples")
+            if req.get("follow_up"):
+                r["_follow_up"] = True
+        elif op == "conj":
+            r.update(conj_result(text), _kind="conjugation")
+        elif op == "ai":
+            r.update(ai_result(self, text, bool(req.get("deep")),
+                               question=text if req.get("question") else None, progress=progress))
+            r["_kind"] = "answer"
         else:
-            lang = detect_lang(text)
-            if decide_direction(text) == "fr":
-                out.update(card_fr_result(self, text))
+            raise ValueError(f"unknown request: {op}")
+        if req.get("explicit"):                # « def maison » — the next follow-ups act on it
+            if op in ("grammar", "xray"):
+                self.last["sentence"] = text
             else:
-                try:
-                    tr, det, groups = translate_rich(text, session=self)
-                except Exception as e:
-                    out["error"] = str(e)
-                    return out
-                # The French RESULT deserves the same badges as a French query: what a
-                # learner wants to know about « cuisiner » does not depend on how they
-                # arrived at it.
-                out.update(card_to_fr_result(self, text, det or lang, tr, groups))
-        if self.fallback_note and "note" not in out:
-            out["note"] = self.fallback_note
-        return out
+                self.last["fr"] = text
+        if self.fallback_note and "note" not in r:
+            r["note"] = self.fallback_note
+        return r
+
+    def _run_local(self, op, req):
+        """Requests that touch no dictionary: settings, help, « save N », a hint."""
+        if op == "help":
+            return {"_kind": "help"}
+        if op == "message":
+            return {"_kind": "message", "message": req["text"]}
+        if op == "save_sense":
+            n, senses = req["n"], self.last.get("senses") or []
+            if not 1 <= n <= len(senses):
+                return {"_kind": "message", "message": f"no sense {n} — the last card has {len(senses)}"}
+            word = self.last.get("word", "")
+            front, status, cnt = _save_term(senses[n - 1], word, detect_lang(word), quiet=True)
+            return {"_kind": "saved", "saved": {"front": front, "status": status, "count": cnt, "auto": False}}
+        return setting_result(req["line"])
 
 
 def _public(obj):
@@ -900,14 +1026,12 @@ def render_audio(r):
     return [f"  🔈 {BOLD}{r['_word']}{RESET}  {DIM}(Wiktionnaire · Commons){RESET}"]
 
 
-def _show_audio(word):
-    """« say » — play the native recording (macOS: afplay handles the MP3)."""
-    r = audio_result(word)
-    for line in render_audio(r):
-        print(line)
-    path = r["audio"]["path"]
-    if r["audio"]["error"]:
-        return None
+def _play_audio(r):
+    """After render(): play the recording a « say » fetched (macOS: afplay
+    handles the MP3). The driver never plays — --serve's panel does."""
+    path = (r.get("audio") or {}).get("path")
+    if not path:
+        return
     if sys.platform == "win32":                       # no afplay: hand it to the default player
         try:
             os.startfile(path)                        # noqa: S606 — a local MP3 we just wrote
@@ -917,14 +1041,13 @@ def _show_audio(word):
     player = shutil.which("afplay") or shutil.which("ffplay")
     if not player:
         print(f"     {DIM}{path}{RESET}")
-        return path
+        return
     try:
         subprocess.run([player, path] + ([] if player.endswith("afplay")
                                          else ["-nodisp", "-autoexit"]),
                        check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
         print(f"     {DIM}({e}){RESET}")
-    return path
 
 
 def synonyms_result(word):
@@ -954,11 +1077,6 @@ def render_synonyms(r):
     if not lines:
         lines.append(f"  {DIM}≈ no synonyms listed for « {r['_word']} »{RESET}")
     return lines
-
-
-def _show_synonyms(word):
-    for line in render_synonyms(synonyms_result(word)):
-        print(line)
 
 
 def _wikt_words(items, limit=8):
@@ -1022,13 +1140,6 @@ def render_definition(r):
     if d["has_audio"]:
         lines.append(f"     {DIM}🔈 « say » to hear it{RESET}")
     return lines
-
-
-def _show_wikt(lookup_word):
-    r = definition_result(lookup_word)
-    for line in render_definition(r):
-        print(line)
-    return r["_entry"]
 
 
 # --------------------------------------------------------------------------- #
@@ -1292,11 +1403,6 @@ def render_ai(r):
 def _progress(line):
     """The terminal's « thinking… » line, overwritten by the answer."""
     print(line, end="\r", flush=True)
-
-
-def _show_ai(session, word, deep, question=None):
-    for line in render_ai(ai_result(session, word, deep, question, progress=_progress)):
-        print(line)
 
 
 # --------------------------------------------------------------------------- #
@@ -2700,11 +2806,6 @@ def render_multitran(r):
     return lines
 
 
-def _show_multitran(word):
-    for line in render_multitran(multitran_result(word)):
-        print(line)
-
-
 def xray_result(sentence):
     """Result section of the x-ray: {"sentence", "xray": [token dicts]} — the
     panels' contract — plus, for the terminal, "_rows" (the table, richer verb
@@ -2826,12 +2927,6 @@ def render_xray(r):
     return lines
 
 
-def _show_xray(sentence):
-    """Sentence x-ray: each word — lemma, nature, tense, gender, frequency, role, meaning."""
-    for line in render_xray(xray_result(sentence)):
-        print(line)
-
-
 # --------------------------------------------------------------------------- #
 #  Grammar: offline Grammalecte (data/grammalecte, via build_grammalecte.py)
 # --------------------------------------------------------------------------- #
@@ -2938,10 +3033,6 @@ def render_grammar(r):
     return lines
 
 
-def _show_grammar(sentence):
-    for line in render_grammar(grammar_result(sentence)):
-        print(line)
-
 # --------------------------------------------------------------------------- #
 #  Display                                                                    #
 # --------------------------------------------------------------------------- #
@@ -3020,7 +3111,8 @@ def decide_direction(word):
 
 def lookup_result(session, word, want_dict=False, want_ai=False, want_save=False,
                   want_multi=False, want_conj=False, want_deep=False, want_fr=False,
-                  want_save_main=False, want_gram=False, want_xray=False, progress=None):
+                  want_save_main=False, want_gram=False, want_xray=False, examples=None,
+                  progress=None):
     """The REPL's lookup, as data: what a line means — a card (with the extra
     sections asked for under their keys), a grammar check / x-ray, an answer
     from the tutor, or an error. "_kind" names it; "_"-prefixed keys serve
@@ -3109,7 +3201,7 @@ def lookup_result(session, word, want_dict=False, want_ai=False, want_save=False
         r.update({"_kind": "error", "_no_translation": True})
         return r
     if translation:
-        ex_on = config_load().get("examples", True)
+        ex_on = config_load().get("examples", True) if examples is None else examples
         is_fr = input_is_french or _deaccent(translation.lower()) == _deaccent(word.strip().lower())
         if is_fr:
             r.update(card_fr_result(session, translation, lex_fr, examples=ex_on and not want_conj))
@@ -3216,6 +3308,14 @@ def render(r):
     """THE terminal printer: a Result → its lines, sections in the order the
     REPL has always shown them. Colours live here and in the render_* it calls."""
     kind = r.get("_kind", "")
+    if kind == "help":
+        return cheatsheet_lines()
+    if kind == "setting":
+        return render_setting(r)
+    if kind == "message":
+        return [f"  {DIM}{r['message']}{RESET}"]
+    if kind == "empty":
+        return []
     lines = []
     if r.get("_sentence_note"):
         lines.append(f"  {DIM}French sentence → grammar  (\u00ab !x \u00bb for the x-ray, \u00ab ? \u00bb to ask){RESET}")
@@ -3254,27 +3354,17 @@ def render(r):
     if "audio" in r:
         lines += render_audio(r)
     if "examples" in r and isinstance(r["examples"], dict):
-        lines += render_examples(r)
+        lines += render_examples(r, follow_up=r.get("_follow_up", False))
     if "model" in r:
         lines += render_ai(r)
     if "saved" in r:
         s = r["saved"]
         tag = f"  {DIM}×{s['count']}{RESET}" if s["count"] > 1 else ""
         badge = f"  {DIM}auto{RESET}" if s["auto"] else ""
-        lines.append(f"  {GREEN}💾 \u00ab {s['front']} \u00bb → {s['status']}{RESET}{tag}{badge}")
+        lines.append(f"  {GREEN}💾 « {s['front']} » → {s['status']}{RESET}{tag}{badge}")
     if r.get("_save_error"):
         lines.append(f"  {YELLOW}💾 save failed:{RESET} {r['_save_error']}")
     return lines
-
-
-def show(session, word, want_dict=False, want_ai=False, want_save=False,
-         want_multi=False, want_conj=False, want_deep=False, want_fr=False,
-         want_save_main=False, want_gram=False, want_xray=False):
-    """The terminal's lookup: build the Result, print it."""
-    r = lookup_result(session, word, want_dict, want_ai, want_save, want_multi, want_conj,
-                      want_deep, want_fr, want_save_main, want_gram, want_xray, progress=_progress)
-    for line in render(r):
-        print(line)
 
 
 # --------------------------------------------------------------------------- #
@@ -3283,79 +3373,23 @@ def show(session, word, want_dict=False, want_ai=False, want_save=False,
 _FOLLOW_HINT = "↳  save N · conj · def · ru · ex · say · syn · ? question"
 
 
-def _follow_up(session, line):
-    """Plain-word commands. « conj », « def », « ru », « ex », « x », « grammar » act on
-    the last card, or on the word/sentence you give: « conj manger ». True if handled."""
-    low = line.strip()
-    m = re.match(r"^(?:save|s)\s+(\d+)$", low, re.I)
-    if m:
-        n = int(m.group(1)); senses = session.last.get("senses") or []
-        if 1 <= n <= len(senses):
-            _save_term(senses[n - 1], session.last.get("word", ""), detect_lang(session.last.get("word", "")))
-        else:
-            print(f"  {DIM}no sense {n} — the last card has {len(senses)}{RESET}")
-        return True
-    if low.lower() in ("help", "h", ":help", "?help"):
-        _print_cheatsheet()
-        return True
-    m = re.match(r"^(conj|conjugate|def|definition|define|ru|multitran|ex|examples|x|xray|x-ray"
-                 r"|grammar|check|xray|say|listen|audio|syn|synonyms)(?:\s+(.+))?$", low, re.I)
-    if not m:
-        return False
-    cmd, arg = m.group(1).lower(), (m.group(2) or "").strip()
-    fr = arg or session.last.get("fr") or ""
-    sentence = arg or session.last.get("sentence") or fr
-    if not fr and not sentence:
-        print(f"  {DIM}look something up first, or give a word: « {cmd} manger »{RESET}")
-        return True
-    prev, session.no_autosave = session.no_autosave, True     # a follow-up never re-saves
-    try:
-        if cmd in ("conj", "conjugate"):
-            show(session, fr, want_conj=True)
-        elif cmd in ("def", "definition", "define"):
-            _show_wikt(fr)
-        elif cmd in ("ru", "multitran"):
-            _show_multitran(fr)
-        elif cmd in ("say", "listen", "audio"):
-            _show_audio(fr)
-        elif cmd in ("syn", "synonyms"):
-            _show_synonyms(fr)
-        elif cmd in ("ex", "examples"):
-            for line in render_examples(examples_result(fr, en=3, ru=1), follow_up=True):
-                print(line)
-        elif cmd in ("grammar", "check"):
-            _show_grammar(sentence)
-        else:
-            _show_xray(sentence)
-    finally:
-        session.no_autosave = prev
-    if arg:
-        session.last["fr"] = arg if cmd not in ("grammar", "check", "x", "xray", "x-ray") else session.last.get("fr", "")
-        if cmd in ("grammar", "check", "x", "xray", "x-ray"):
-            session.last["sentence"] = arg
-    return True
-
-
-def _repl_command(session, line):
-    """":" commands of the interactive mode (settings, not lookups)."""
+def setting_result(line):
+    """« : » commands of the interactive mode (settings, not lookups) → a Result
+    {"_kind": "setting", "setting": name, …}."""
     parts = line[1:].split()
     cmd = parts[0].lower() if parts else ""
     arg = " ".join(parts[1:]).strip()
+    r = {"_kind": "setting", "setting": cmd}
     if cmd in ("save", "autosave"):
+        r["setting"] = "autosave"
         if arg.lower() in ("on", "off"):
             config_set("autosave", arg.lower() == "on")
-            state = "on" if arg.lower() == "on" else "off"
-            print(f"  {GREEN}✓ autosave {state}{RESET}")
-        else:
-            print(f"  autosave: {'ON' if autosave_on() else 'off'}"
-                  f"   {DIM}(:save on | :save off){RESET}")
+            r["changed"] = True
+        r["value"] = autosave_on()
     elif cmd == "forget" and arg:
-        n = store_forget(arg)
-        print(f"  {GREEN}✓ \u00ab {arg} \u00bb dropped{RESET}" if n
-              else f"  {DIM}\u00ab {arg} \u00bb not found{RESET}")
+        r.update(word=arg, count=store_forget(arg))
     elif cmd == "render":
         store_render()
-        print(f"  {GREEN}✓ markdown regenerated{RESET}")
     elif cmd == "llm":
         url, model, _ = _llm_cfg()
         if arg:
@@ -3364,21 +3398,42 @@ def _repl_command(session, line):
             if len(parts) > 1:
                 config_set("llm_model", parts[1])
             url, model, _ = _llm_cfg()
-        state = "OK" if _llm_reachable() else "unreachable"
-        print(f"  tutor: {url}  ·  model: {model or '(first one loaded)'}  ·  {state}"
-              f"   {DIM}(:llm <url> [model] · :llm <model>){RESET}")
+        r.update(url=url, model=model, reachable=_llm_reachable())
     elif cmd in ("examples", "exemples"):
+        r["setting"] = "examples"
         if arg.lower() in ("on", "off"):
             config_set("examples", arg.lower() == "on")
-        print(f"  Tatoeba examples: {'ON' if config_load().get('examples', True) else 'off'}")
+        r["value"] = config_load().get("examples", True)
     elif cmd == "spacy":
         if arg.lower() in ("on", "off"):
             config_set("xray_spacy", arg.lower() == "on")
-        state = "ON" if config_load().get("xray_spacy", True) else "off"
-        print(f"  spaCy for \u00ab !x \u00bb: {state}   {DIM}(:spacy on | :spacy off — off = "
-              f"instant, Lexique only){RESET}")
+        r["value"] = config_load().get("xray_spacy", True)
     else:
-        print(f"  {DIM}commands: :save on|off · :forget <word> · :render · :spacy on|off · :llm{RESET}")
+        r["setting"] = ""
+    return r
+
+
+def render_setting(r):
+    s = r["setting"]
+    if s == "autosave":
+        if r.get("changed"):
+            return [f"  {GREEN}✓ autosave {'on' if r['value'] else 'off'}{RESET}"]
+        return [f"  autosave: {'ON' if r['value'] else 'off'}   {DIM}(:save on | :save off){RESET}"]
+    if s == "forget":
+        return [f"  {GREEN}✓ \u00ab {r['word']} \u00bb dropped{RESET}" if r["count"]
+                else f"  {DIM}\u00ab {r['word']} \u00bb not found{RESET}"]
+    if s == "render":
+        return [f"  {GREEN}✓ markdown regenerated{RESET}"]
+    if s == "llm":
+        return [f"  tutor: {r['url']}  ·  model: {r['model'] or '(first one loaded)'}  ·  "
+                f"{'OK' if r['reachable'] else 'unreachable'}"
+                f"   {DIM}(:llm <url> [model] · :llm <model>){RESET}"]
+    if s == "examples":
+        return [f"  Tatoeba examples: {'ON' if r['value'] else 'off'}"]
+    if s == "spacy":
+        return [f"  spaCy for \u00ab !x \u00bb: {'ON' if r['value'] else 'off'}   {DIM}(:spacy on | :spacy off — off = "
+                f"instant, Lexique only){RESET}"]
+    return [f"  {DIM}commands: :save on|off · :forget <word> · :render · :spacy on|off · :llm{RESET}"]
 
 
 def _load_history():
@@ -3418,6 +3473,13 @@ def _save_history():
             readline.write_history_file(HISTFILE)
         except OSError:
             pass
+
+
+def _print_result(r):
+    """render → print, then the one side effect a Result asks for (audio)."""
+    for line in render(r):
+        print(line)
+    _play_audio(r)
 
 
 def interactive(session):
@@ -3466,25 +3528,7 @@ def interactive(session):
             if line.lower() in ("q", "quit", "exit", "quitter"):
                 print(f"{DIM}See you soon! 👋{RESET}")
                 break
-            if line.startswith(":"):           # a setting, not a lookup
-                _repl_command(session, line)
-                continue
-            if _follow_up(session, line):                  # "save 2", "conj", "def", "ru", "ex", "x", "help"
-                continue
-            if line.startswith("?"):           # free question to the tutor (context = last word)
-                deep = line.startswith("??")
-                q = line.lstrip("?").strip()
-                if q:
-                    _show_ai(session, None, deep, question=q)
-                else:
-                    print(f"  {DIM}\u00ab ? your question \u00bb — e.g. ? cuisiner vs cuire · "
-                          f"? pourquoi \u00ab de \u00bb ici · ?? (detailed answer){RESET}")
-                continue
-            if line[:1] in "!-":               # old prefix habit → point at the words
-                print(f"  {DIM}no prefixes anymore — say it in words: conj · def · ru · ex · "
-                      f"grammar · x · save N · ? question   (e.g. « def {line.split()[-1]} »){RESET}")
-                continue
-            show(session, line)                # a word, a French word, or a sentence
+            _print_result(session.handle(line, progress=_progress))
     finally:
         _save_history()
 
@@ -3571,7 +3615,7 @@ def setup_llm():
         print(f"   {GREEN}✓ {name} answers{RESET}  — key stored in {CONFIG_PATH} (chmod 600)")
 
 
-def _print_cheatsheet():
+def cheatsheet_lines():
     rows = [("a word (RU/EN)", "card: numbered senses · gender · example"),
             ("a French word", "its card (+ présent if it's a verb)"),
             ("a French sentence", "grammar check + the rule"),
@@ -3583,28 +3627,36 @@ def _print_cheatsheet():
             (":save on|off", "auto-save every lookup (also :forget word, :render, :llm, :spacy)"),
             ("q", "quit")]
     w = max(len(k) for k, _ in rows)
-    for k, d in rows:
-        print(f"   {BOLD}{CYAN}{k.ljust(w)}{RESET}  {d}")
+    return [f"   {BOLD}{CYAN}{k.ljust(w)}{RESET}  {d}" for k, d in rows]
+
+
+def _print_cheatsheet():
+    for line in cheatsheet_lines():
+        print(line)
 
 
 def run_tour(session):
     """A 2-minute guided tour. Needs internet; does not auto-save your store."""
     session.no_autosave = True
+
+    def go(*lines):
+        for line in lines:
+            _print_result(session.handle(line, progress=_progress))
     steps = [
         ("Type an English or Russian word. You get a card: senses numbered and grouped by "
          "part of speech, each noun with its article and gender, ★ = how common.", "cook",
-         lambda: show(session, "cook")),
+         lambda: go("cook")),
         ("The first sense is what auto-save keeps. Want another one? Just say « save 5 ».",
-         "save 5", lambda: _follow_up(session, "save 5")),
+         "save 5", lambda: go("save 5")),
         ("A French word gives its own card: nature, gender, frequency, English senses, an example.",
-         "maison", lambda: show(session, "maison")),
+         "maison", lambda: go("maison")),
         ("A French verb shows its présent right away. « conj » gives the whole grid.",
-         "aller  →  conj", lambda: (show(session, "aller"), _follow_up(session, "conj"))),
+         "aller  →  conj", lambda: go("aller", "conj")),
         ("Type a French sentence and dico corrects it — and names the rule.",
          "elle est parti hier et je mange un pomme",
-         lambda: show(session, "elle est parti hier et je mange un pomme")),
+         lambda: go("elle est parti hier et je mange un pomme")),
         ("Ask the tutor anything about what you're looking at: « ? … ».",
-         "? tu ou vous ?", lambda: _show_ai(session, None, False, question="tu ou vous ?")),
+         "? tu ou vous ?", lambda: go("? tu ou vous ?")),
     ]
     print(f"\n{BOLD}📖 dico — the tour{RESET}  {DIM}(Enter = next, q = stop){RESET}")
     for text, cmd, run in steps:
@@ -3797,12 +3849,10 @@ def main():
                           tier=args.tier or "google")
     if args.context:
         session.last["word"] = args.context
-    if args.examples and not args.json:
-        for line in render_examples(examples_result(" ".join(args.words))):
-            print(line)
-        return
     if args.json:
         return print(json.dumps(_public(session.handle_args(args)), ensure_ascii=False, indent=2))
+    if args.examples:
+        return _print_result(session.handle_args(args))
     if args.mots_outils is not None:
         show_mots_outils(args.mots_outils, save=(args.save or args.save_main))
         return
@@ -3825,17 +3875,8 @@ def main():
 
     if not _data_ready() and args.words:
         print(f"  {DIM}(offline data not built — run: dico --setup){RESET}")
-    if args.words and (args.say or args.syn) and not args.json:
-        text = " ".join(args.words)
-        if args.syn:
-            _show_synonyms(text)
-        if args.say:
-            _show_audio(text)
-        return
     if args.words:
-        show(session, " ".join(args.words), args.dico, args.ai, args.save,
-             args.multitran, args.conj, args.profond, args.francais, args.save_main,
-             args.grammaire, args.xray)
+        _print_result(session.handle_args(args, progress=_progress))
     else:
         interactive(session)
 
