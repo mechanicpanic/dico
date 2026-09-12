@@ -106,9 +106,9 @@ def _deaccent(s):
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn").lower().strip()
 
 
-def _get(url):
+def _get(url, timeout=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+    with urllib.request.urlopen(req, timeout=timeout or TIMEOUT) as r:
         return r.read().decode("utf-8")
 
 
@@ -575,20 +575,31 @@ def translate(word, tl="fr"):
         return translate_mymemory(word, src_guess)
 
 
-def _tatoeba(fr_word, to="eng", limit=1):
+# How long a card may wait for its one example sentence. Tatoeba takes 0.6 s
+# on a good day and several seconds on a bad one; past this the card ships
+# without the line (the Examples pane, with the full TIMEOUT, still finds it).
+EXAMPLE_BUDGET = 2.0
+_TATOEBA_MISSED = set()          # keys that failed in this process: asked once, not twice
+
+
+def _tatoeba(fr_word, to="eng", limit=1, budget=None):
     """Real example sentences (Tatoeba, CC-BY): [(FR sentence, translation)].
-    Cached: Tatoeba answers in 0.3 s on a good day and 2 s on a bad one, and
-    that latency was landing on every single card."""
+    Cached 30 days: the same word comes back in a lesson. `budget` caps the
+    wait in seconds; a miss is not cached on disk, so the next run tries
+    again, but within one process the same question is not asked twice."""
     ck = f"t:{to}:{limit}:{fr_word.strip().lower()}"
     hit = _cache_get(ck)
     if hit is not None:
         return [tuple(x) for x in hit]
+    if ck in _TATOEBA_MISSED:
+        return []
     try:
         url = ("https://tatoeba.org/en/api_v0/search?from=fra&to=" + to
                + "&query=" + urllib.parse.quote(f'"{fr_word}"')
                + "&sort=relevance&limit=8&word_count_min=4&word_count_max=12")
-        data = json.loads(_get(url))
+        data = json.loads(_get(url, timeout=budget))
     except Exception:
+        _TATOEBA_MISSED.add(ck)
         return []
     out = []
     for r in data.get("results", []):
@@ -652,7 +663,7 @@ def card_to_fr_result(session, word, src, translation, groups, examples=True):
                            "band": lx["band"] if lx else "",
                            "cefr": (lx or {}).get("cefr") or ""})
     out["senses"] = senses
-    out["examples"] = _tatoeba(translation, "eng") if translation else []
+    out["examples"] = _tatoeba(translation, "eng", budget=EXAMPLE_BUDGET) if translation else []
     # The terminal's rows. The main translation (the one autosave keeps) must be sense 1.
     tmain = (translation or "").strip().lower()
     groups = [(p, list(t)) for p, t in groups]
@@ -677,7 +688,8 @@ def card_to_fr_result(session, word, src, translation, groups, examples=True):
     session.last["senses"] = fronts
     shown = []
     if examples and translation:
-        shown = _tatoeba(translation.split()[-1] if " " in translation else translation, "eng")
+        shown = _tatoeba(translation.split()[-1] if " " in translation else translation, "eng",
+                         budget=EXAMPLE_BUDGET)
     session.last["hints"] = session.last.get("hints", 0) + 1
     out["_card"] = {"word": word, "src": src, "rows": rows, "examples": shown,
                     "hint": session.last["hints"] <= 3}
@@ -745,7 +757,7 @@ def card_fr_result(session, word, lex=None, examples=True):
         inf, data, _ = _conj_query(lex["lemma"])
         if data and data.get("présent"):
             present = data["présent"]
-    out["examples"] = _tatoeba(word, "eng") if examples else []
+    out["examples"] = _tatoeba(word, "eng", budget=EXAMPLE_BUDGET) if examples else []
     out["_card"] = {"word": word, "head": head, "bits": bits,
                     "ipa": (lex or {}).get("ipa") or "", "groups": groups[:3],
                     "hint": session.last["hints"] <= 3, "present": present,
@@ -2431,9 +2443,16 @@ def render_conjugation(r):
 
 
 def examples_result(text, en=4, ru=2):
-    """{"examples": {"en": [{"fr", "en"}], "ru": [{"fr", "ru"}]}} — Tatoeba."""
-    return {"examples": {"en": [{"fr": s, "en": t} for s, t in _tatoeba(text, "eng", limit=en)],
-                         "ru": [{"fr": s, "ru": t} for s, t in _tatoeba(text, "rus", limit=ru)]},
+    """{"examples": {"en": [{"fr", "en"}], "ru": [{"fr", "ru"}]}} — Tatoeba.
+    The two languages are two requests; they run side by side."""
+    from concurrent.futures import ThreadPoolExecutor
+    _cache_load()                                   # once, before the threads share it
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_en = pool.submit(_tatoeba, text, "eng", en)
+        f_ru = pool.submit(_tatoeba, text, "rus", ru)
+        en_rows, ru_rows = f_en.result(), f_ru.result()
+    return {"examples": {"en": [{"fr": s, "en": t} for s, t in en_rows],
+                         "ru": [{"fr": s, "ru": t} for s, t in ru_rows]},
             "_word": text}
 
 
