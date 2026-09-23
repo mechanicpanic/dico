@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+The session refactor (`docs/session-refactor.md`).
+- One driver for the REPL, the one-shot CLI and `--json`: a typed line or
+  the flags become a request that `Session.run()` executes. Every lookup
+  returns a structured result and one `render()` prints it. The `--json`
+  schema is byte-identical, guarded by golden outputs in JSON and terminal
+  form (`tests/check_goldens.py`).
+- One rule for a card's direction (`decide_direction`): a word Lexique knows
+  as a frequent content-word lemma (at least 50 per million in film
+  subtitles) is French; everything else is translated first, with the
+  cognate flag. `manger` and `dire` get their French cards in the terminal;
+  `car` becomes *voiture* in the panels.
+- `dico --serve`: one long-lived process answering JSON requests line by
+  line over one session, with today's flags or anything you would type,
+  plus `ping` and `history`. Proven equal to the one-shot by
+  `tests/check_serve.py`.
+- The tutor remembers the session: the last 12 turns (lookups with the sense
+  saved, grammar checks, earlier questions and answers) go into every `?`
+  question. `history` shows them, `:forget` clears them.
+- A new English word no longer waits on Tatoeba: the card's example line has
+  a 2 s budget, and the Examples pane fetches English and Russian side by side.
+
 ## 1.0.6 — 2026-09-11
 
 The Windows panel, after a day on a real screen.

@@ -21,7 +21,7 @@ Where dico stands, what blocks, what is next. Updated 2026-09-23.
 
 - Rebuild the macOS app from the branch and run its `--selftest`. Only with the owner's go-ahead: the app is in daily use.
 - Use the REPL by hand for a while; the goldens cover fixed queries, not habits.
-- Add the "Unreleased" paragraph to `CHANGELOG.md` (drafted at the end of `docs/session-refactor.md`'s history).
+- Give the "Unreleased" section of `CHANGELOG.md` a version number when it ships.
 
 ## Next
 
